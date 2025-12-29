@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Solar</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        // Kiểm tra xem trang này được mở do hành động gì
+        // Nếu type là 'reload' (F5) thì chuyển hướng sang trang logout
+        try {
+            const navigationEntries = performance.getEntriesByType("navigation");
+            if (navigationEntries.length > 0 && navigationEntries[0].type === "reload") {
+                window.location.href = "/logout";
+            }
+        } catch (e) {
+            // Fallback cho trình duyệt cũ
+            if (window.performance && window.performance.navigation.type === 1) {
+                window.location.href = "/logout";
+            }
+        }
+    </script>
     <style>
         :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; }
         body { font-family: 'Roboto', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
