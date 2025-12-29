@@ -11,10 +11,11 @@ app.secret_key = 'khoa_bi_mat_cua_du_an_solar'
 SETTINGS = {
     'evn_bac': [1806, 1866, 2167, 2729, 3050, 3151],
     'gia_kinh_doanh': 2666,
-    'gia_san_xuat': 1600
+    'gia_san_xuat': 1600,
+    'so_gio_nang': 4.0 # <-- THÊM MỚI: Mặc định là 4 giờ
 }
 
-# --- HÀM TÍNH NGƯỢC TIỀN ĐIỆN (BẬC THANG) ---
+# --- HÀM TÍNH NGƯỢC TIỀN ĐIỆN (Giữ nguyên) ---
 def tinh_nguoc_kwh_evn(tong_tien):
     VAT = 1.08
     gia_bac = SETTINGS['evn_bac']
@@ -35,15 +36,12 @@ def tinh_nguoc_kwh_evn(tong_tien):
             break
     return kwh_tich_luy
 
-# --- HÀM TÍNH TOÁN CHÍNH (ĐÃ NÂNG CẤP) ---
-def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap):
+# --- HÀM TÍNH TOÁN CHÍNH (ĐÃ CẬP NHẬT) ---
+def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_nhap, gio_nang_admin):
     kWh = 0
     
-    # TRƯỜNG HỢP 1: NGƯỜI DÙNG NHẬP THẲNG SỐ KWH
     if che_do_nhap == 'theo_kwh':
         kWh = gia_tri_nhap
-        
-    # TRƯỜNG HỢP 2: NGƯỜI DÙNG NHẬP TIỀN (VNĐ) -> PHẢI QUY ĐỔI
     else: 
         tien_dien = gia_tri_nhap
         if loai_hinh == 'can_ho':
@@ -53,9 +51,9 @@ def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap):
         elif loai_hinh == 'san_xuat':
             kWh = tien_dien / SETTINGS['gia_san_xuat']
     
-    # CÔNG THỨC TÍNH KWP
-    if kWh > 0:
-        return round(((kWh * 0.5) / 30) / 4, 2)
+    # CÔNG THỨC MỚI: Dùng he_so_nhap (thay 0.5) và gio_nang_admin (thay 4)
+    if kWh > 0 and gio_nang_admin > 0:
+        return round(((kWh * he_so_nhap) / 30) / gio_nang_admin, 2)
     return 0
 
 # --- ROUTE ---
@@ -67,7 +65,7 @@ def login():
         pwd = request.form.get('password')
         if (user == 'admin' and pwd == 'admin') or (user == 'user' and pwd == 'user'):
             session['user'] = user
-            return redirect(url_for('home')) # Chuyển thẳng vào trang chủ
+            return redirect(url_for('home'))
         else:
             error = "Sai tài khoản hoặc mật khẩu!"
     return render_template('login.html', error=error)
@@ -85,15 +83,16 @@ def home():
     msg_update = None
     active_tab = 'calc'
     
-    # Biến để lưu lại giá trị cũ khi reload trang
+    # Thêm he_so vào dữ liệu mặc định (0.5)
     du_lieu_nhap = {
         'loai_hinh': 'can_ho', 
         'gia_tri': '', 
-        'che_do': 'theo_tien' # Mặc định là nhập tiền
+        'che_do': 'theo_tien',
+        'he_so': 0.5 
     }
 
     if request.method == 'POST':
-        # LOGIC UPDATE GIÁ (ADMIN)
+        # --- ADMIN CẬP NHẬT ---
         if 'btn_update_price' in request.form and role == 'admin':
             try:
                 SETTINGS['evn_bac'] = [
@@ -103,23 +102,31 @@ def home():
                 ]
                 SETTINGS['gia_kinh_doanh'] = float(request.form.get('gia_kd'))
                 SETTINGS['gia_san_xuat'] = float(request.form.get('gia_sx'))
-                msg_update = "✅ Đã cập nhật giá điện thành công!"
+                
+                # Lấy số giờ nắng từ Admin nhập
+                SETTINGS['so_gio_nang'] = float(request.form.get('gio_nang'))
+                
+                msg_update = "✅ Đã cập nhật cấu hình thành công!"
                 active_tab = 'config'
             except ValueError:
                 msg_update = "❌ Lỗi nhập liệu!"
                 active_tab = 'config'
 
-        # LOGIC TÍNH TOÁN (USER + ADMIN)
+        # --- TÍNH TOÁN ---
         elif 'btn_calc' in request.form:
             try:
                 loai_hinh = request.form.get('loai_hinh')
-                che_do = request.form.get('che_do_nhap') # Lấy chế độ (theo_tien hay theo_kwh)
-                gia_tri = float(request.form.get('gia_tri_dau_vao')) # Lấy con số nhập vào
+                che_do = request.form.get('che_do_nhap')
+                gia_tri = float(request.form.get('gia_tri_dau_vao'))
                 
-                # Lưu lại để hiển thị lên form
-                du_lieu_nhap = {'loai_hinh': loai_hinh, 'gia_tri': gia_tri, 'che_do': che_do}
+                # Lấy hệ số người dùng nhập (mặc định 0.5 nếu rỗng)
+                he_so_input = request.form.get('he_so_nhap')
+                he_so = float(he_so_input) if he_so_input else 0.5
                 
-                ket_qua = tinh_toan_kwp(loai_hinh, gia_tri, che_do)
+                du_lieu_nhap = {'loai_hinh': loai_hinh, 'gia_tri': gia_tri, 'che_do': che_do, 'he_so': he_so}
+                
+                # Gọi hàm tính toán mới
+                ket_qua = tinh_toan_kwp(loai_hinh, gia_tri, che_do, he_so, SETTINGS['so_gio_nang'])
                 active_tab = 'calc'
             except ValueError:
                 pass
