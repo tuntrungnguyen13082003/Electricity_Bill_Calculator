@@ -14,11 +14,7 @@ SETTINGS = {
     'gia_san_xuat': 1600,
     # DANH SÁCH TỈNH THÀNH VÀ GIỜ NẮNG (Mặc định)
     'tinh_thanh': {
-        'Hà Nội': 3.2,
-        'Đà Nẵng': 4.5,
-        'TP. Hồ Chí Minh': 4.6,
-        'Cần Thơ': 4.8,
-        'Ninh Thuận': 5.2
+
     }
 }
 
