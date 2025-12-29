@@ -15,10 +15,10 @@
     </script>
 
     <style>
-        :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; --tab-bg: #dfe1e5; --tab-active: #ffffff; }
+        :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; --tab-bg: #dfe1e5; --tab-active: #ffffff; --danger: #e74c3c; }
         body { font-family: 'Roboto', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 20px; }
-        .logout-btn { background: #e74c3c; color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; }
+        .logout-btn { background: var(--danger); color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; }
         
         .main-container { max-width: 800px; margin: 0 auto; }
         .tab-bar { display: flex; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #ccc; margin-bottom: -1px; justify-content: center; }
@@ -29,7 +29,7 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         label { display: block; margin: 15px 0 5px; font-weight: 500; font-size: 14px; color: #333;}
-        input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        input[type="number"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .btn-calc { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold; font-size: 16px;}
         .btn-update { width: 100%; padding: 10px; background: var(--dark); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;}
         
@@ -41,60 +41,19 @@
         .result-box { margin-top: 30px; background: #e8f8f5; padding: 20px; text-align: center; border-radius: 8px; border: 1px solid #d1f2eb;}
         .alert { padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 15px; text-align: center;}
 
-        /* --- CSS CHO SLIDER MỚI --- */
-        .slider-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #f0fcf9;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #d1f2eb;
-        }
-        /* Tùy chỉnh thanh trượt */
-        input[type="range"] {
-            flex-grow: 1; /* Chiếm hết không gian còn lại */
-            margin-right: 15px;
-            height: 8px;
-            border-radius: 5px;
-            background: #d7e4e0;
-            outline: none;
-            opacity: 0.8;
-            transition: opacity .2s;
-            -webkit-appearance: none; /* Quan trọng để bỏ style mặc định */
-        }
+        /* CSS SLIDER */
+        .slider-container { display: flex; align-items: center; justify-content: space-between; background: #f0fcf9; padding: 15px; border-radius: 8px; border: 1px solid #d1f2eb; }
+        input[type="range"] { flex-grow: 1; margin-right: 15px; height: 8px; border-radius: 5px; background: #d7e4e0; outline: none; opacity: 0.8; transition: opacity .2s; -webkit-appearance: none; }
         input[type="range"]:hover { opacity: 1; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--primary); cursor: pointer; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .slider-value { font-weight: bold; color: var(--secondary); font-size: 18px; min-width: 50px; text-align: right; }
 
-        /* Tùy chỉnh nút kéo (Thumb) cho Chrome/Safari/Edge */
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: var(--primary); /* Màu xanh chủ đạo */
-            cursor: pointer;
-            border: 3px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        /* Tùy chỉnh nút kéo cho Firefox */
-        input[type="range"]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: var(--primary);
-            cursor: pointer;
-            border: 3px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .slider-value {
-            font-weight: bold;
-            color: var(--secondary);
-            font-size: 18px;
-            min-width: 50px;
-            text-align: right;
-        }
+        /* CSS BẢNG TỈNH THÀNH (MỚI) */
+        .province-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .province-table th, .province-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .province-table th { background-color: #f2f2f2; font-size: 14px; }
+        .btn-small-del { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+        .add-province-box { background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
@@ -117,6 +76,15 @@
             <h2 style="color: var(--secondary); margin-top: 0; text-align: center;">Dự Toán Công Suất</h2>
             
             <form method="POST">
+                <label>Khu vực lắp đặt (Tỉnh/Thành):</label>
+                <select name="tinh_thanh_chon">
+                    {% for ten_tinh, gio_nang in settings.tinh_thanh.items() %}
+                        <option value="{{ ten_tinh }}" {% if du_lieu_nhap.tinh_chon == ten_tinh %}selected{% endif %}>
+                            {{ ten_tinh }} ({{ gio_nang }}h nắng)
+                        </option>
+                    {% endfor %}
+                </select>
+
                 <label>Loại hình lắp đặt:</label>
                 <select name="loai_hinh">
                     <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏡 Căn hộ gia đình</option>
@@ -127,25 +95,23 @@
                 <label>Bạn muốn nhập dữ liệu theo:</label>
                 <div class="input-mode-group">
                     <label class="radio-label">
-                        <input type="radio" name="che_do_nhap" value="theo_tien" {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %} onchange="toggleUnit(this)"> 
-                        Số tiền (VNĐ)
+                        <input type="radio" name="che_do_nhap" value="theo_tien" {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %} onchange="toggleUnit(this)"> Số tiền (VNĐ)
                     </label>
                     <label class="radio-label">
-                        <input type="radio" name="che_do_nhap" value="theo_kwh" {% if du_lieu_nhap.che_do == 'theo_kwh' %}checked{% endif %} onchange="toggleUnit(this)"> 
-                        Số điện (kWh)
+                        <input type="radio" name="che_do_nhap" value="theo_kwh" {% if du_lieu_nhap.che_do == 'theo_kwh' %}checked{% endif %} onchange="toggleUnit(this)"> Số điện (kWh)
                     </label>
                 </div>
 
                 <label id="input-label">Tổng tiền điện tháng (VNĐ):</label>
                 <input type="number" name="gia_tri_dau_vao" id="gia_tri_input" placeholder="Nhập số..." value="{{ du_lieu_nhap.gia_tri }}" required>
-                <small id="input-hint" style="color: #666; display: block; margin-top: 5px;">Nhập tổng số tiền bạn phải trả hàng tháng.</small>
-
+                
                 <label style="margin-top: 25px;">Mức sử dụng điện ban ngày (Hệ số quy đổi):</label>
                 <div class="slider-container">
                     <input type="range" id="he_so_slider" name="he_so_nhap" min="0" max="1" step="0.01" value="{{ du_lieu_nhap.he_so }}">
                     <span id="slider-value-display" class="slider-value">50%</span>
                 </div>
-                <small style="color: #666; display: block; margin-top: 5px;">Kéo để chọn tỷ lệ điện dùng vào ban ngày (0% - 100%).</small>
+                <small style="color: #666; display: block; margin-top: 5px;">Kéo để chọn tỷ lệ điện dùng vào ban ngày.</small>
+
                 <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN NGAY</button>
             </form>
 
@@ -153,7 +119,10 @@
             <div class="result-box">
                 <div>Công suất hệ thống đề xuất:</div>
                 <h1 style="color: var(--secondary); margin: 10px 0; font-size: 40px;">{{ ket_qua }} <span style="font-size: 20px;">kWp</span></h1>
-                <p style="font-size: 14px; color: #666;">(Tính theo giờ nắng: {{ settings.so_gio_nang }}h)</p>
+                <p style="font-size: 14px; color: #666;">
+                    📍 Khu vực: <strong>{{ du_lieu_nhap.tinh_chon }}</strong> <br>
+                    ☀️ Giờ nắng áp dụng: <strong>{{ gio_nang_da_dung }}h/ngày</strong>
+                </p>
             </div>
             {% endif %}
         </div>
@@ -162,16 +131,54 @@
         <div id="config" class="tab-content {{ 'active' if active_tab == 'config' else '' }}">
             <h2 style="color: var(--dark); margin-top: 0; text-align: center;">Cài Đặt Hệ Thống</h2>
             {% if msg_update %}<div class="alert">{{ msg_update }}</div>{% endif %}
-            <form method="POST">
-                <label style="color: #d35400;">☀️ Số giờ nắng trung bình (h/ngày):</label>
-                <input type="number" step="0.1" name="gio_nang" value="{{ settings.so_gio_nang }}" style="border-color: #d35400; font-weight: bold;">
+            
+            <div class="add-province-box">
+                <form method="POST" style="display: flex; gap: 10px; align-items: flex-end;">
+                    <div style="flex: 2;">
+                        <label style="margin-top:0">Thêm Tỉnh/Thành mới:</label>
+                        <input type="text" name="new_province_name" placeholder="VD: Cà Mau">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="margin-top:0">Giờ nắng:</label>
+                        <input type="number" step="0.1" name="new_province_hours" placeholder="4.5">
+                    </div>
+                    <button type="submit" name="btn_add_province" style="background: #f39c12; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; height: 42px;">Thêm</button>
+                </form>
+            </div>
 
+            <label><strong>Danh sách Giờ nắng theo Tỉnh:</strong></label>
+            <table class="province-table">
+                <thead>
+                    <tr>
+                        <th>Tên Tỉnh/Thành</th>
+                        <th>Giờ nắng (h)</th>
+                        <th style="width: 50px;">Xóa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ten, gio in settings.tinh_thanh.items() %}
+                    <tr>
+                        <td>{{ ten }}</td>
+                        <td>{{ gio }}</td>
+                        <td>
+                            <form method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa tỉnh này?');">
+                                <input type="hidden" name="delete_name" value="{{ ten }}">
+                                <button type="submit" name="btn_delete_province" class="btn-small-del">X</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+
+            <form method="POST">
                 <div class="grid-6">
-                    <div><label>Giá Sản Xuất (VNĐ/kWh):</label><input type="number" name="gia_sx" value="{{ settings.gia_san_xuat }}"></div>
-                    <div><label>Giá Kinh Doanh (VNĐ/kWh):</label><input type="number" name="gia_kd" value="{{ settings.gia_kinh_doanh }}"></div>
+                    <div><label>Giá Sản Xuất (VNĐ):</label><input type="number" name="gia_sx" value="{{ settings.gia_san_xuat }}"></div>
+                    <div><label>Giá Kinh Doanh (VNĐ):</label><input type="number" name="gia_kd" value="{{ settings.gia_kinh_doanh }}"></div>
                 </div>
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-                <label><strong>Bậc thang sinh hoạt (VNĐ/kWh):</strong></label>
+                <label style="margin-top: 15px"><strong>Bậc thang sinh hoạt (VNĐ):</strong></label>
                 <div class="grid-6">
                     <div><small>Bậc 1</small><input type="number" name="b1" value="{{ settings.evn_bac[0] }}"></div>
                     <div><small>Bậc 2</small><input type="number" name="b2" value="{{ settings.evn_bac[1] }}"></div>
@@ -180,7 +187,7 @@
                     <div><small>Bậc 5</small><input type="number" name="b5" value="{{ settings.evn_bac[4] }}"></div>
                     <div><small>Bậc 6</small><input type="number" name="b6" value="{{ settings.evn_bac[5] }}"></div>
                 </div>
-                <button type="submit" name="btn_update_price" class="btn-update">LƯU CẤU HÌNH</button>
+                <button type="submit" name="btn_update_price" class="btn-update">LƯU CẤU HÌNH GIÁ</button>
             </form>
         </div>
         {% endif %}
@@ -196,44 +203,29 @@
             document.getElementById(tabId).classList.add("active");
             event.currentTarget.classList.add("active");
         }
-
         function toggleUnit(radio) {
             var label = document.getElementById("input-label");
-            var hint = document.getElementById("input-hint");
             var input = document.getElementById("gia_tri_input");
-
             if (radio.value === "theo_tien") {
                 label.innerText = "Tổng tiền điện tháng (VNĐ):";
                 input.placeholder = "Ví dụ: 2000000";
-                hint.innerText = "Nhập tổng số tiền bạn phải trả hàng tháng.";
             } else {
                 label.innerText = "Sản lượng tiêu thụ (kWh):";
                 input.placeholder = "Ví dụ: 500";
-                hint.innerText = "Nhập tổng số kWh (số điện) tiêu thụ hàng tháng.";
             }
         }
-
-        // --- SCRIPT MỚI CHO SLIDER ---
         var slider = document.getElementById("he_so_slider");
         var output = document.getElementById("slider-value-display");
-
-        // Hàm cập nhật số % khi kéo
         function updateSliderValue() {
-            // Lấy giá trị (VD: 0.5) nhân 100 và làm tròn để ra số %
             var percent = Math.round(slider.value * 100);
             output.innerHTML = percent + "%";
         }
-
-        // Gán sự kiện: khi kéo thì gọi hàm cập nhật
         slider.oninput = updateSliderValue;
-
-        // Gọi 1 lần khi tải trang để hiển thị đúng giá trị ban đầu
         window.onload = function() {
             var checkedRadio = document.querySelector('input[name="che_do_nhap"]:checked');
             if(checkedRadio) toggleUnit(checkedRadio);
-            updateSliderValue(); // Cập nhật số % ban đầu
+            updateSliderValue();
         }
-        // -----------------------------
     </script>
 </body>
 </html>

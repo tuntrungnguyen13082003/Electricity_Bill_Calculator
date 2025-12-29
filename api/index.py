@@ -12,10 +12,17 @@ SETTINGS = {
     'evn_bac': [1806, 1866, 2167, 2729, 3050, 3151],
     'gia_kinh_doanh': 2666,
     'gia_san_xuat': 1600,
-    'so_gio_nang': 4.0 # <-- THÊM MỚI: Mặc định là 4 giờ
+    # DANH SÁCH TỈNH THÀNH VÀ GIỜ NẮNG (Mặc định)
+    'tinh_thanh': {
+        'Hà Nội': 3.2,
+        'Đà Nẵng': 4.5,
+        'TP. Hồ Chí Minh': 4.6,
+        'Cần Thơ': 4.8,
+        'Ninh Thuận': 5.2
+    }
 }
 
-# --- HÀM TÍNH NGƯỢC TIỀN ĐIỆN (Giữ nguyên) ---
+# --- HÀM TÍNH TOÁN ---
 def tinh_nguoc_kwh_evn(tong_tien):
     VAT = 1.08
     gia_bac = SETTINGS['evn_bac']
@@ -36,10 +43,8 @@ def tinh_nguoc_kwh_evn(tong_tien):
             break
     return kwh_tich_luy
 
-# --- HÀM TÍNH TOÁN CHÍNH (ĐÃ CẬP NHẬT) ---
-def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_nhap, gio_nang_admin):
+def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_nhap, gio_nang_tinh):
     kWh = 0
-    
     if che_do_nhap == 'theo_kwh':
         kWh = gia_tri_nhap
     else: 
@@ -51,9 +56,9 @@ def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_nhap, gio_nang_adm
         elif loai_hinh == 'san_xuat':
             kWh = tien_dien / SETTINGS['gia_san_xuat']
     
-    # CÔNG THỨC MỚI: Dùng he_so_nhap (thay 0.5) và gio_nang_admin (thay 4)
-    if kWh > 0 and gio_nang_admin > 0:
-        return round(((kWh * he_so_nhap) / 30) / gio_nang_admin, 2)
+    # CÔNG THỨC: Dùng gio_nang_tinh được truyền vào
+    if kWh > 0 and gio_nang_tinh > 0:
+        return round(((kWh * he_so_nhap) / 30) / gio_nang_tinh, 2)
     return 0
 
 # --- ROUTE ---
@@ -83,16 +88,15 @@ def home():
     msg_update = None
     active_tab = 'calc'
     
-    # Thêm he_so vào dữ liệu mặc định (0.5)
+    # Dữ liệu mặc định form nhập
     du_lieu_nhap = {
-        'loai_hinh': 'can_ho', 
-        'gia_tri': '', 
-        'che_do': 'theo_tien',
-        'he_so': 0.5 
+        'loai_hinh': 'can_ho', 'gia_tri': '', 'che_do': 'theo_tien', 'he_so': 0.5, 'tinh_chon': ''
     }
+    # Lấy thông tin giờ nắng của tỉnh đang chọn để hiển thị ra kết quả
+    gio_nang_da_dung = 0 
 
     if request.method == 'POST':
-        # --- ADMIN CẬP NHẬT ---
+        # --- ADMIN: CẬP NHẬT GIÁ CƠ BẢN ---
         if 'btn_update_price' in request.form and role == 'admin':
             try:
                 SETTINGS['evn_bac'] = [
@@ -102,36 +106,53 @@ def home():
                 ]
                 SETTINGS['gia_kinh_doanh'] = float(request.form.get('gia_kd'))
                 SETTINGS['gia_san_xuat'] = float(request.form.get('gia_sx'))
-                
-                # Lấy số giờ nắng từ Admin nhập
-                SETTINGS['so_gio_nang'] = float(request.form.get('gio_nang'))
-                
-                msg_update = "✅ Đã cập nhật cấu hình thành công!"
+                msg_update = "✅ Đã cập nhật giá điện cơ bản!"
                 active_tab = 'config'
             except ValueError:
-                msg_update = "❌ Lỗi nhập liệu!"
+                msg_update = "❌ Lỗi nhập liệu giá!"
                 active_tab = 'config'
+        
+        # --- ADMIN: THÊM TỈNH MỚI ---
+        elif 'btn_add_province' in request.form and role == 'admin':
+            ten_moi = request.form.get('new_province_name')
+            gio_moi = float(request.form.get('new_province_hours'))
+            if ten_moi and gio_moi > 0:
+                SETTINGS['tinh_thanh'][ten_moi] = gio_moi
+                msg_update = f"✅ Đã thêm tỉnh {ten_moi}!"
+            active_tab = 'config'
 
-        # --- TÍNH TOÁN ---
+        # --- ADMIN: XÓA TỈNH ---
+        elif 'btn_delete_province' in request.form and role == 'admin':
+            ten_xoa = request.form.get('delete_name')
+            if ten_xoa in SETTINGS['tinh_thanh']:
+                del SETTINGS['tinh_thanh'][ten_xoa]
+                msg_update = f"🗑️ Đã xóa tỉnh {ten_xoa}!"
+            active_tab = 'config'
+
+        # --- USER: TÍNH TOÁN ---
         elif 'btn_calc' in request.form:
             try:
                 loai_hinh = request.form.get('loai_hinh')
                 che_do = request.form.get('che_do_nhap')
                 gia_tri = float(request.form.get('gia_tri_dau_vao'))
+                he_so = float(request.form.get('he_so_nhap') or 0.5)
                 
-                # Lấy hệ số người dùng nhập (mặc định 0.5 nếu rỗng)
-                he_so_input = request.form.get('he_so_nhap')
-                he_so = float(he_so_input) if he_so_input else 0.5
+                # Lấy tên tỉnh và tra cứu giờ nắng
+                tinh_chon = request.form.get('tinh_thanh_chon')
+                gio_nang = SETTINGS['tinh_thanh'].get(tinh_chon, 4.0) # Mặc định 4 nếu lỗi
+                gio_nang_da_dung = gio_nang
+
+                du_lieu_nhap = {
+                    'loai_hinh': loai_hinh, 'gia_tri': gia_tri, 
+                    'che_do': che_do, 'he_so': he_so, 'tinh_chon': tinh_chon
+                }
                 
-                du_lieu_nhap = {'loai_hinh': loai_hinh, 'gia_tri': gia_tri, 'che_do': che_do, 'he_so': he_so}
-                
-                # Gọi hàm tính toán mới
-                ket_qua = tinh_toan_kwp(loai_hinh, gia_tri, che_do, he_so, SETTINGS['so_gio_nang'])
+                ket_qua = tinh_toan_kwp(loai_hinh, gia_tri, che_do, he_so, gio_nang)
                 active_tab = 'calc'
             except ValueError:
                 pass
 
-    return render_template('index.html', role=role, settings=SETTINGS, ket_qua=ket_qua, du_lieu_nhap=du_lieu_nhap, msg_update=msg_update, active_tab=active_tab)
+    return render_template('index.html', role=role, settings=SETTINGS, ket_qua=ket_qua, du_lieu_nhap=du_lieu_nhap, msg_update=msg_update, active_tab=active_tab, gio_nang_da_dung=gio_nang_da_dung)
 
 if __name__ == '__main__':
     app.run(debug=True)
