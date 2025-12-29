@@ -90,20 +90,21 @@ def logout():
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    # Chưa đăng nhập thì đá về trang login
     if 'user' not in session:
         return redirect(url_for('login'))
     
-    role = session['user'] # Lấy quyền (admin hay user)
+    role = session['user']
     ket_qua = None
     du_lieu_nhap = {}
     msg_update = None
+    
+    # Mặc định vào là hiện tab tính toán
+    active_tab = 'calc' 
 
     if request.method == 'POST':
-        # XỬ LÝ 1: ADMIN CẬP NHẬT GIÁ
+        # TRƯỜNG HỢP 1: ADMIN CẬP NHẬT GIÁ
         if 'btn_update_price' in request.form and role == 'admin':
             try:
-                # Cập nhật vào biến toàn cục SETTINGS
                 SETTINGS['evn_bac'] = [
                     float(request.form.get('b1')), float(request.form.get('b2')),
                     float(request.form.get('b3')), float(request.form.get('b4')),
@@ -112,16 +113,23 @@ def home():
                 SETTINGS['gia_kinh_doanh'] = float(request.form.get('gia_kd'))
                 SETTINGS['gia_san_xuat'] = float(request.form.get('gia_sx'))
                 msg_update = "✅ Đã cập nhật giá điện thành công!"
+                
+                # Quan trọng: Nếu vừa lưu cấu hình xong thì giữ nguyên tab Config
+                active_tab = 'config' 
             except ValueError:
                 msg_update = "❌ Lỗi nhập liệu cấu hình!"
+                active_tab = 'config'
 
-        # XỬ LÝ 2: TÍNH TOÁN (Dành cho cả Admin và User)
+        # TRƯỜNG HỢP 2: TÍNH TOÁN
         elif 'btn_calc' in request.form:
             try:
                 loai_hinh = request.form.get('loai_hinh')
                 tien_dien = float(request.form.get('tien_dien'))
                 du_lieu_nhap = {'loai_hinh': loai_hinh, 'tien_dien': tien_dien}
                 ket_qua = tinh_toan_kwp(loai_hinh, tien_dien)
+                
+                # Tính xong thì vẫn ở tab tính toán
+                active_tab = 'calc'
             except ValueError:
                 pass
 
@@ -130,7 +138,8 @@ def home():
                            settings=SETTINGS, 
                            ket_qua=ket_qua, 
                            du_lieu_nhap=du_lieu_nhap,
-                           msg_update=msg_update)
+                           msg_update=msg_update,
+                           active_tab=active_tab) # Truyền biến này sang HTML
 
 if __name__ == '__main__':
     app.run(debug=True)
