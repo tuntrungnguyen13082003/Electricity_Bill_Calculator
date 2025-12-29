@@ -17,64 +17,29 @@
     <style>
         :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; --tab-bg: #dfe1e5; --tab-active: #ffffff; }
         body { font-family: 'Roboto', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-        
         .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 20px; }
         .logout-btn { background: #e74c3c; color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; }
         
-        /* --- CSS CHO TAB (KIỂU CHROME) --- */
-        .main-container { max-width: 800px; margin: 0 auto; background: transparent; }
-        
-        /* Thanh chứa các Tab */
-        .tab-bar {display: flex; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #ccc; margin-bottom: -1px; justify-content: center; /* <--- THÊM DÒNG NÀY ĐỂ RA GIỮA */}
-        
-        /* Nút Tab */
-        .tab-btn {
-            padding: 10px 20px;
-            background: var(--tab-bg);
-            color: #5f6368;
-            border: 1px solid #ccc;
-            border-bottom: none;
-            border-radius: 8px 8px 0 0; /* Bo tròn góc trên */
-            margin-right: -1px; /* Dính liền nhau */
-            cursor: pointer;
-            font-weight: 500;
-            position: relative;
-            transition: background 0.2s;
-            font-size: 14px;
-        }
-        
-        .tab-btn:hover { background: #ebeced; }
-        
-        /* Tab đang được chọn (Active) */
-        .tab-btn.active {
-            background: var(--tab-active);
-            color: var(--secondary);
-            font-weight: bold;
-            border-bottom: 1px solid var(--tab-active); /* Che đường kẻ ngang */
-            z-index: 2; /* Nổi lên trên */
-            padding-top: 12px; /* Cao hơn 1 chút */
-        }
-
-        /* Nội dung Tab */
-        .tab-content {
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 0 8px 8px 8px; /* Bo tròn các góc dưới */
-            padding: 30px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            display: none; /* Mặc định ẩn hết */
-        }
-        
-        /* Chỉ hiện nội dung có class active */
+        /* TAB STYLES */
+        .main-container { max-width: 800px; margin: 0 auto; }
+        .tab-bar { display: flex; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #ccc; margin-bottom: -1px; justify-content: center; }
+        .tab-btn { padding: 10px 20px; background: var(--tab-bg); color: #5f6368; border: 1px solid #ccc; border-bottom: none; border-radius: 8px 8px 0 0; margin-right: -1px; cursor: pointer; font-weight: 500; font-size: 14px; }
+        .tab-btn.active { background: var(--tab-active); color: var(--secondary); font-weight: bold; border-bottom: 1px solid var(--tab-active); padding-top: 12px; }
+        .tab-content { background: white; border: 1px solid #ccc; border-radius: 0 8px 8px 8px; padding: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s; }
-        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Form styling cũ */
+        /* FORM STYLES */
         label { display: block; margin: 15px 0 5px; font-weight: 500; font-size: 14px; color: #333;}
         input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .btn-calc { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold; font-size: 16px;}
         .btn-update { width: 100%; padding: 10px; background: var(--dark); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;}
+        
+        /* CSS CHO RADIO BUTTON CHỌN CHẾ ĐỘ */
+        .input-mode-group { display: flex; gap: 20px; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
+        .radio-label { display: flex; align-items: center; cursor: pointer; font-weight: normal; margin: 0; }
+        .radio-label input { width: auto; margin-right: 8px; }
+
         .grid-6 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .result-box { margin-top: 30px; background: #e8f8f5; padding: 20px; text-align: center; border-radius: 8px; border: 1px solid #d1f2eb;}
         .alert { padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 15px; text-align: center;}
@@ -90,29 +55,42 @@
     <div class="main-container">
         
         <div class="tab-bar">
-            <button class="tab-btn {{ 'active' if active_tab == 'calc' else '' }}" onclick="openTab('calc')">
-                ⚡ Tính Toán Solar
-            </button>
-
+            <button class="tab-btn {{ 'active' if active_tab == 'calc' else '' }}" onclick="openTab('calc')">⚡ Tính Toán Solar</button>
             {% if role == 'admin' %}
-            <button class="tab-btn {{ 'active' if active_tab == 'config' else '' }}" onclick="openTab('config')">
-                ⚙️ Cấu Hình Giá
-            </button>
+            <button class="tab-btn {{ 'active' if active_tab == 'config' else '' }}" onclick="openTab('config')">⚙️ Cấu Hình Giá</button>
             {% endif %}
         </div>
 
         <div id="calc" class="tab-content {{ 'active' if active_tab == 'calc' else '' }}">
             <h2 style="color: var(--secondary); margin-top: 0; text-align: center;">Dự Toán Công Suất</h2>
+            
             <form method="POST">
                 <label>Loại hình lắp đặt:</label>
                 <select name="loai_hinh">
-                    <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏡 Căn hộ (Bậc thang EVN)</option>
+                    <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏡 Căn hộ gia đình</option>
                     <option value="kinh_doanh" {% if du_lieu_nhap.loai_hinh == 'kinh_doanh' %}selected{% endif %}>🏢 Kinh doanh</option>
                     <option value="san_xuat" {% if du_lieu_nhap.loai_hinh == 'san_xuat' %}selected{% endif %}>🏭 Sản xuất</option>
                 </select>
 
-                <label>Tổng tiền điện trung bình tháng (VNĐ):</label>
-                <input type="number" name="tien_dien" placeholder="Ví dụ: 2000000" value="{{ du_lieu_nhap.tien_dien }}" required>
+                <label>Bạn muốn nhập dữ liệu theo:</label>
+                <div class="input-mode-group">
+                    <label class="radio-label">
+                        <input type="radio" name="che_do_nhap" value="theo_tien" 
+                               {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %} 
+                               onchange="toggleUnit(this)"> 
+                        Số tiền (VNĐ)
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="che_do_nhap" value="theo_kwh" 
+                               {% if du_lieu_nhap.che_do == 'theo_kwh' %}checked{% endif %}
+                               onchange="toggleUnit(this)"> 
+                        Số điện (kWh)
+                    </label>
+                </div>
+
+                <label id="input-label">Tổng tiền điện tháng (VNĐ):</label>
+                <input type="number" name="gia_tri_dau_vao" id="gia_tri_input" placeholder="Nhập số..." value="{{ du_lieu_nhap.gia_tri }}" required>
+                <small id="input-hint" style="color: #666; display: block; margin-top: 5px;">Nhập tổng số tiền bạn phải trả hàng tháng.</small>
 
                 <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN NGAY</button>
             </form>
@@ -128,32 +106,22 @@
         {% if role == 'admin' %}
         <div id="config" class="tab-content {{ 'active' if active_tab == 'config' else '' }}">
             <h2 style="color: var(--dark); margin-top: 0; text-align: center;">Cài Đặt Hệ Thống</h2>
-            {% if msg_update %}
-                <div class="alert">{{ msg_update }}</div>
-            {% endif %}
+            {% if msg_update %}<div class="alert">{{ msg_update }}</div>{% endif %}
             <form method="POST">
                 <div class="grid-6">
-                    <div>
-                        <label>Giá Sản Xuất:</label>
-                        <input type="number" name="gia_sx" value="{{ settings.gia_san_xuat }}">
-                    </div>
-                    <div>
-                        <label>Giá Kinh Doanh:</label>
-                        <input type="number" name="gia_kd" value="{{ settings.gia_kinh_doanh }}">
-                    </div>
+                    <div><label>Giá Sản Xuất (VNĐ/kWh):</label><input type="number" name="gia_sx" value="{{ settings.gia_san_xuat }}"></div>
+                    <div><label>Giá Kinh Doanh (VNĐ/kWh):</label><input type="number" name="gia_kd" value="{{ settings.gia_kinh_doanh }}"></div>
                 </div>
-
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-                <label><strong>Bậc thang sinh hoạt (6 bậc EVN):</strong></label>
+                <label><strong>Bậc thang sinh hoạt (VNĐ/kWh):</strong></label>
                 <div class="grid-6">
-                    <div><small>Bậc 1 (0-50)</small><input type="number" name="b1" value="{{ settings.evn_bac[0] }}"></div>
-                    <div><small>Bậc 2 (51-100)</small><input type="number" name="b2" value="{{ settings.evn_bac[1] }}"></div>
-                    <div><small>Bậc 3 (101-200)</small><input type="number" name="b3" value="{{ settings.evn_bac[2] }}"></div>
-                    <div><small>Bậc 4 (201-300)</small><input type="number" name="b4" value="{{ settings.evn_bac[3] }}"></div>
-                    <div><small>Bậc 5 (301-400)</small><input type="number" name="b5" value="{{ settings.evn_bac[4] }}"></div>
-                    <div><small>Bậc 6 (>401)</small><input type="number" name="b6" value="{{ settings.evn_bac[5] }}"></div>
+                    <div><small>Bậc 1</small><input type="number" name="b1" value="{{ settings.evn_bac[0] }}"></div>
+                    <div><small>Bậc 2</small><input type="number" name="b2" value="{{ settings.evn_bac[1] }}"></div>
+                    <div><small>Bậc 3</small><input type="number" name="b3" value="{{ settings.evn_bac[2] }}"></div>
+                    <div><small>Bậc 4</small><input type="number" name="b4" value="{{ settings.evn_bac[3] }}"></div>
+                    <div><small>Bậc 5</small><input type="number" name="b5" value="{{ settings.evn_bac[4] }}"></div>
+                    <div><small>Bậc 6</small><input type="number" name="b6" value="{{ settings.evn_bac[5] }}"></div>
                 </div>
-
                 <button type="submit" name="btn_update_price" class="btn-update">LƯU CẤU HÌNH</button>
             </form>
         </div>
@@ -163,25 +131,35 @@
 
     <script>
         function openTab(tabId) {
-            // 1. Ẩn tất cả nội dung tab
             var contents = document.getElementsByClassName("tab-content");
-            for (var i = 0; i < contents.length; i++) {
-                contents[i].classList.remove("active");
-            }
-            
-            // 2. Bỏ trạng thái active của tất cả nút tab
+            for (var i = 0; i < contents.length; i++) contents[i].classList.remove("active");
             var btns = document.getElementsByClassName("tab-btn");
-            for (var i = 0; i < btns.length; i++) {
-                btns[i].classList.remove("active");
-            }
-            
-            // 3. Hiện tab được chọn
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove("active");
             document.getElementById(tabId).classList.add("active");
-            
-            // 4. Active nút được chọn (Tìm nút nào có onclick chứa tabId này)
-            // Cách đơn giản nhất: click vào đâu thì cái đó active (this)
-            // Tuy nhiên do ta gọi hàm từ onclick, ta cần set class cho chính element đó.
             event.currentTarget.classList.add("active");
+        }
+
+        // HÀM ĐỔI NHÃN ĐƠN VỊ KHI CLICK RADIO BUTTON
+        function toggleUnit(radio) {
+            var label = document.getElementById("input-label");
+            var hint = document.getElementById("input-hint");
+            var input = document.getElementById("gia_tri_input");
+
+            if (radio.value === "theo_tien") {
+                label.innerText = "Tổng tiền điện tháng (VNĐ):";
+                input.placeholder = "Ví dụ: 2000000";
+                hint.innerText = "Nhập tổng số tiền bạn phải trả hàng tháng.";
+            } else {
+                label.innerText = "Sản lượng tiêu thụ (kWh):";
+                input.placeholder = "Ví dụ: 500";
+                hint.innerText = "Nhập tổng số kWh (số điện) tiêu thụ hàng tháng.";
+            }
+        }
+
+        // Kích hoạt lại trạng thái đúng khi reload trang (nếu user đang chọn kWh)
+        window.onload = function() {
+            var checkedRadio = document.querySelector('input[name="che_do_nhap"]:checked');
+            if(checkedRadio) toggleUnit(checkedRadio);
         }
     </script>
 </body>
