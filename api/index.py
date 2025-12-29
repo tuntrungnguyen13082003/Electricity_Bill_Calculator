@@ -67,7 +67,7 @@ def login():
         pwd = request.form.get('password')
         if (user == 'admin' and pwd == 'admin') or (user == 'user' and pwd == 'user'):
             session['user'] = user
-            return render_template('auth_redirect.html') # Dùng trang trung chuyển như cũ
+            return redirect(url_for('home')) # Chuyển thẳng vào trang chủ
         else:
             error = "Sai tài khoản hoặc mật khẩu!"
     return render_template('login.html', error=error)
