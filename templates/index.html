@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tính toán Solar</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; background: #f4f4f9; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; box-sizing: border-box; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; font-size: 16px; font-weight: bold;}
+        .result { background: #e9ecef; padding: 10px; text-align: center; border-radius: 5px; }
+        h3 { color: #0056b3; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 style="text-align: center;">Dự toán Điện Mặt Trời</h2>
+        <form method="POST">
+            <label>Loại mô hình:</label>
+            <select name="loai_hinh">
+                <option value="can_ho">Căn hộ gia đình</option>
+                <option value="kinh_doanh">Kinh doanh</option>
+                <option value="san_xuat">Sản xuất</option>
+            </select>
+            
+            <label>Tiền điện trung bình (VNĐ):</label>
+            <input type="number" name="tien_dien" placeholder="Ví dụ: 2000000" required>
+
+            <button type="submit">Tính toán</button>
+        </form>
+
+        {% if ket_qua is not none %}
+        <div class="result">
+            Công suất cần lắp:
+            <h3>{{ ket_qua }} kWp</h3>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
