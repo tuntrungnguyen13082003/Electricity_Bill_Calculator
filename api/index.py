@@ -13,19 +13,17 @@ SETTINGS = {
     'gia_kinh_doanh': 2666,
     'gia_san_xuat': 1600,
     'tinh_thanh': {
-        # Bắc
-        'TP. Hà Nội': 4.0, 'Quảng Ninh': 4.0, 'Cao Bằng': 4.0, 'Lạng Sơn': 4.0, 'Lai Châu': 4.0,
-        'Điện Biên': 4.0, 'Sơn La': 4.0, 'Tuyên Quang': 4.0, 'Lào Cai': 4.0, 'Thái Nguyên': 4.0, 
-        'Phú Thọ': 4.0, 'Bắc Ninh': 4.0, 'Hưng Yên': 4.0, 'TP. Hải Phòng': 4.0, 'Ninh Bình': 4.0,
-        'Thanh Hóa': 4.0, 'Nghệ An': 4.0, 'Hà Tĩnh': 4.0,
+        # Cities (TP.) - alphabetical
+        'TP. Cần Thơ': 4.0,   'TP. Đà Nẵng': 4.0, 'TP. Hà Nội': 4.0, 
+        'TP. Hải Phòng': 4.0, 'TP. Huế': 4.0,     'TP. Hồ Chí Minh': 4.0,
 
-        # Trung
-        'TP. Huế': 4.0, 'Quảng Trị': 4.0, 'TP. Đà Nẵng': 4.0, 'Quảng Ngãi': 4.0, 'Gia Lai': 4.0,
-        'Khánh Hòa': 4.0, 'Lâm Đồng': 4.0, 'Đắk Lắk': 4.0,
-
-        # Nam
-        'TP. Hồ Chí Minh': 4.0, 'Đồng Nai': 4.0, 'Tây Ninh': 4.0, 'TP. Cần Thơ': 4.0, 'Vĩnh Long': 4.0,
-        'Đồng Tháp': 4.0, 'Cà Mau': 4.0, 'An Giang': 4.0
+        # Provinces - alphabetical
+        'An Giang': 4.0, 'Bắc Ninh': 4.0, 'Cà Mau': 4.0, 'Cao Bằng': 4.0, 'Đắk Lắk': 4.0,
+        'Điện Biên': 4.0, 'Đồng Nai': 4.0, 'Đồng Tháp': 4.0, 'Gia Lai': 4.0, 'Hà Tĩnh': 4.0,
+        'Hưng Yên': 4.0, 'Khánh Hòa': 4.0, 'Lai Châu': 4.0, 'Lâm Đồng': 4.0, 'Lào Cai': 4.0,
+        'Lạng Sơn': 4.0, 'Nghệ An': 4.0, 'Ninh Bình': 4.0, 'Phú Thọ': 4.0, 'Quảng Ngãi': 4.0,
+        'Quảng Ninh': 4.0, 'Quảng Trị': 4.0, 'Sơn La': 4.0, 'Tây Ninh': 4.0, 'Thái Nguyên': 4.0,
+        'Thanh Hóa': 4.0, 'Tuyên Quang': 4.0, 'Vĩnh Long': 4.0
     }
 }
 
