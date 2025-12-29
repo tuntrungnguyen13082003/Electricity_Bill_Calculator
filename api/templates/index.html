@@ -80,37 +80,37 @@
                 <select name="tinh_thanh_chon">
                     {% for ten_tinh, gio_nang in settings.tinh_thanh.items() %}
                         <option value="{{ ten_tinh }}" {% if du_lieu_nhap.tinh_chon == ten_tinh %}selected{% endif %}>
-                            {{ ten_tinh }} ({{ gio_nang }}h nắng)
+                            {{ ten_tinh }}
                         </option>
                     {% endfor %}
                 </select>
 
-                <label>Loại hình lắp đặt:</label>
+                <label>Mô hình lắp đặt:</label>
                 <select name="loai_hinh">
-                    <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏡 Căn hộ gia đình</option>
+                    <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏡 Hộ gia đình</option>
                     <option value="kinh_doanh" {% if du_lieu_nhap.loai_hinh == 'kinh_doanh' %}selected{% endif %}>🏢 Kinh doanh</option>
                     <option value="san_xuat" {% if du_lieu_nhap.loai_hinh == 'san_xuat' %}selected{% endif %}>🏭 Sản xuất</option>
                 </select>
 
-                <label>Bạn muốn nhập dữ liệu theo:</label>
+                <label>Nhập dữ liệu theo:</label>
                 <div class="input-mode-group">
                     <label class="radio-label">
-                        <input type="radio" name="che_do_nhap" value="theo_tien" {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %} onchange="toggleUnit(this)"> Số tiền (VNĐ)
+                        <input type="radio" name="che_do_nhap" value="theo_tien" {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %} onchange="toggleUnit(this)"> Số tiền điện (VNĐ)
                     </label>
                     <label class="radio-label">
                         <input type="radio" name="che_do_nhap" value="theo_kwh" {% if du_lieu_nhap.che_do == 'theo_kwh' %}checked{% endif %} onchange="toggleUnit(this)"> Số điện (kWh)
                     </label>
                 </div>
 
-                <label id="input-label">Tổng tiền điện tháng (VNĐ):</label>
+                <label id="input-label">Tiền điện trung bình tháng (VNĐ/Month):</label>
                 <input type="number" name="gia_tri_dau_vao" id="gia_tri_input" placeholder="Nhập số..." value="{{ du_lieu_nhap.gia_tri }}" required>
                 
-                <label style="margin-top: 25px;">Mức sử dụng điện ban ngày (Hệ số quy đổi):</label>
+                <label style="margin-top: 25px;">Mức sử dụng điện:</label>
                 <div class="slider-container">
                     <input type="range" id="he_so_slider" name="he_so_nhap" min="0" max="1" step="0.01" value="{{ du_lieu_nhap.he_so }}">
                     <span id="slider-value-display" class="slider-value">50%</span>
                 </div>
-                <small style="color: #666; display: block; margin-top: 5px;">Kéo để chọn tỷ lệ điện dùng vào ban ngày.</small>
+                <small style="color: #666; display: block; margin-top: 5px;">Kéo để chọn tỷ lệ dùng điện.</small>
 
                 <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN NGAY</button>
             </form>
@@ -207,10 +207,10 @@
             var label = document.getElementById("input-label");
             var input = document.getElementById("gia_tri_input");
             if (radio.value === "theo_tien") {
-                label.innerText = "Tổng tiền điện tháng (VNĐ):";
+                label.innerText = "Tiền điện trung bình tháng (VNĐ/Month):";
                 input.placeholder = "Ví dụ: 2000000";
             } else {
-                label.innerText = "Sản lượng tiêu thụ (kWh):";
+                label.innerText = "Sản lượng tiêu thụ (kWh/):";
                 input.placeholder = "Ví dụ: 500";
             }
         }
