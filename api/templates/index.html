@@ -5,61 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Solar</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    
     <script>
         function forceLogout() { window.location.href = "/logout"; }
-        try {
-            const navEntries = performance.getEntriesByType("navigation");
-            if (navEntries.length > 0 && navEntries[0].type === "reload") { forceLogout(); }
-        } catch (e) {}
+        try { if(performance.getEntriesByType("navigation")[0].type==="reload") forceLogout(); } catch(e){}
     </script>
-
     <style>
         :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; --tab-bg: #dfe1e5; --tab-active: #ffffff; --danger: #e74c3c; }
         body { font-family: 'Roboto', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 20px; }
         .logout-btn { background: var(--danger); color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; }
-        
         .main-container { max-width: 800px; margin: 0 auto; }
-        .tab-bar { display: flex; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #ccc; margin-bottom: -1px; justify-content: center; }
-        .tab-btn { padding: 10px 20px; background: var(--tab-bg); color: #5f6368; border: 1px solid #ccc; border-bottom: none; border-radius: 8px 8px 0 0; margin-right: -1px; cursor: pointer; font-weight: 500; font-size: 14px; }
+        
+        /* TAB BAR */
+        .tab-bar { display: flex; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #ccc; justify-content: center; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 15px; background: var(--tab-bg); color: #5f6368; border: 1px solid #ccc; border-bottom: none; border-radius: 8px 8px 0 0; margin-right: -1px; cursor: pointer; font-weight: 500; font-size: 14px; }
         .tab-btn.active { background: var(--tab-active); color: var(--secondary); font-weight: bold; border-bottom: 1px solid var(--tab-active); padding-top: 12px; }
-        .tab-content { background: white; border: 1px solid #ccc; border-radius: 0 8px 8px 8px; padding: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: none; }
+        .tab-content { background: white; border: 1px solid #ccc; border-radius: 0 8px 8px 8px; padding: 30px; display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
+        
+        /* FORM ELEMENTS */
         label { display: block; margin: 15px 0 5px; font-weight: 500; font-size: 14px; color: #333;}
-        input[type="number"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .btn-calc { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold; font-size: 16px;}
         .btn-update { width: 100%; padding: 10px; background: var(--dark); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;}
+        .alert { padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 15px; text-align: center;}
         
-        .input-mode-group { display: flex; gap: 20px; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
+        /* SLIDER */
+        .slider-container { display: flex; align-items: center; justify-content: space-between; background: #f0fcf9; padding: 15px; border-radius: 8px; border: 1px solid #d1f2eb; }
+        input[type="range"] { flex-grow: 1; margin-right: 15px; height: 8px; }
+        
+        /* TABLE & GRID */
+        table { width: 100% !important; border-collapse: collapse; }
+        .table th, .table td { border: 1px solid #ddd; padding: 10px; vertical-align: middle !important; }
+        .text-center-input input { text-align: center; font-weight: bold; margin: 0 auto; max-width: 120px; display: block; }
+        .col-center { text-align: center !important; }
+        .btn-danger-circle { border-radius: 50% !important; width: 32px; height: 32px; padding: 0 !important; line-height: 32px; text-align: center; border:none; background: #e74c3c; color: white; cursor: pointer; }
+        .grid-6 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        /* INPUT RADIO */
+        .input-mode-group { display: flex; gap: 20px; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 5px; }
         .radio-label { display: flex; align-items: center; cursor: pointer; font-weight: normal; margin: 0; }
         .radio-label input { width: auto; margin-right: 8px; }
-
-        .grid-6 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        /* BOXES */
         .result-box { margin-top: 30px; background: #e8f8f5; padding: 20px; text-align: center; border-radius: 8px; border: 1px solid #d1f2eb;}
-        .alert { padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 15px; text-align: center;}
-
-        /* CSS SLIDER */
-        .slider-container { display: flex; align-items: center; justify-content: space-between; background: #f0fcf9; padding: 15px; border-radius: 8px; border: 1px solid #d1f2eb; }
-        input[type="range"] { flex-grow: 1; margin-right: 15px; height: 8px; border-radius: 5px; background: #d7e4e0; outline: none; opacity: 0.8; transition: opacity .2s; -webkit-appearance: none; }
-        input[type="range"]:hover { opacity: 1; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--primary); cursor: pointer; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .slider-value { font-weight: bold; color: var(--secondary); font-size: 18px; min-width: 50px; text-align: right; }
-
-        /* CSS BẢNG TỈNH THÀNH (MỚI) */
-        .province-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .province-table th, .province-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .province-table th { background-color: #f2f2f2; font-size: 14px; }
-        .btn-small-del { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
-        .add-province-box { background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ffeeba; }
+        .management-box { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
-
     <div class="header">
-        <div>Xin chào, <strong>{{ role.upper() }}</strong></div>
+        <div>Xin chào, <strong>{{ session['user'] }}</strong> ({{ role.upper() }})</div>
         <a href="/logout" class="logout-btn">Đăng xuất</a>
     </div>
 
@@ -67,113 +63,98 @@
         
         <div class="tab-bar">
             <button class="tab-btn {{ 'active' if active_tab == 'calc' else '' }}" onclick="openTab('calc')">⚡ Tính Toán Solar</button>
+            
             {% if role == 'admin' %}
-            <button class="tab-btn {{ 'active' if active_tab == 'config' else '' }}" onclick="openTab('config')">⚙️ Cấu Hình Giá</button>
+            <button class="tab-btn {{ 'active' if active_tab == 'config' else '' }}" onclick="openTab('config')">⚙️ Cấu Hình Hệ Số</button>
+            {% endif %}
+
+            <button class="tab-btn {{ 'active' if active_tab == 'account' else '' }}" onclick="openTab('account')">🔑 Đổi Mật Khẩu</button>
+            
+            {% if role == 'admin' %}
+            <button class="tab-btn {{ 'active' if active_tab == 'users' else '' }}" onclick="openTab('users')">👥 Tạo User</button>
             {% endif %}
         </div>
 
         <div id="calc" class="tab-content {{ 'active' if active_tab == 'calc' else '' }}">
             <h2 style="color: var(--secondary); margin-top: 0; text-align: center;">Dự Toán Công Suất</h2>
-            
             <form method="POST">
-                <label>Khu vực lắp đặt (Tỉnh/Thành):</label>
+                <label>Khu vực:</label>
                 <select name="tinh_thanh_chon">
-                    {% for ten_tinh, gio_nang in settings.tinh_thanh.items() %}
-                        <option value="{{ ten_tinh }}" {% if du_lieu_nhap.tinh_chon == ten_tinh %}selected{% endif %}>
-                            {{ ten_tinh }}
-                        </option>
+                    {% for ten_tinh in settings.tinh_thanh.keys()|sort %}
+                        <option value="{{ ten_tinh }}" {% if du_lieu_nhap.tinh_chon == ten_tinh %}selected{% endif %}>{{ ten_tinh }}</option>
                     {% endfor %}
                 </select>
 
-                <label>Mô hình lắp đặt:</label>
+                <label>Mô hình:</label>
                 <select name="loai_hinh">
-                    <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏡 Hộ gia đình</option>
-                    <option value="kinh_doanh" {% if du_lieu_nhap.loai_hinh == 'kinh_doanh' %}selected{% endif %}>🏢 Kinh doanh</option>
-                    <option value="san_xuat" {% if du_lieu_nhap.loai_hinh == 'san_xuat' %}selected{% endif %}>🏭 Sản xuất</option>
+                    <option value="can_ho">🏡 Hộ gia đình</option>
+                    <option value="kinh_doanh">🏢 Kinh doanh</option>
+                    <option value="san_xuat">🏭 Sản xuất</option>
                 </select>
 
-                <label>Nhập dữ liệu theo:</label>
+                <label>Nhập liệu theo:</label>
                 <div class="input-mode-group">
-                    <label class="radio-label">
-                        <input type="radio" name="che_do_nhap" value="theo_tien" {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %} onchange="toggleUnit(this)"> Số tiền điện (VNĐ)
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="che_do_nhap" value="theo_kwh" {% if du_lieu_nhap.che_do == 'theo_kwh' %}checked{% endif %} onchange="toggleUnit(this)"> Số điện (kWh)
-                    </label>
+                    <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_tien" checked onchange="toggleUnit(this)"> Số tiền (VNĐ)</label>
+                    <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_kwh" onchange="toggleUnit(this)"> Số điện (kWh)</label>
                 </div>
 
-                <label id="input-label">Tiền điện trung bình tháng (VNĐ/Month):</label>
+                <label id="input-label">Tiền điện trung bình tháng:</label>
                 <input type="number" name="gia_tri_dau_vao" id="gia_tri_input" placeholder="Nhập số..." value="{{ du_lieu_nhap.gia_tri }}" required>
                 
-                <label style="margin-top: 25px;">Mức sử dụng điện:</label>
+                <label style="margin-top: 25px;">Mức sử dụng điện (Hệ số mái):</label>
                 <div class="slider-container">
                     <input type="range" id="he_so_slider" name="he_so_nhap" min="0" max="1" step="0.01" value="{{ du_lieu_nhap.he_so }}">
-                    <span id="slider-value-display" class="slider-value">50%</span>
+                    <span id="slider-value-display" style="font-weight:bold; color:var(--secondary)">50%</span>
                 </div>
-                <small style="color: #666; display: block; margin-top: 5px;">Kéo để chọn tỷ lệ dùng điện.</small>
+                <small style="color: #666; display: block; margin-top: 5px;">Kéo để chọn tỷ lệ.</small>
 
                 <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN NGAY</button>
             </form>
 
             {% if ket_qua is not none %}
             <div class="result-box">
-                <div>Công suất hệ thống đề xuất:</div>
-                <h1 style="color: var(--secondary); margin: 10px 0; font-size: 40px;">{{ ket_qua }} <span style="font-size: 20px;">kWp</span></h1>
-                <p style="font-size: 14px; color: #666;">
-                    📍 Khu vực: <strong>{{ du_lieu_nhap.tinh_chon }}</strong> <br>
-                    ☀️ Giờ nắng áp dụng: <strong>{{ gio_nang_da_dung }}h/ngày</strong>
-                </p>
+                <div>Công suất đề xuất:</div>
+                <h1 style="color: var(--secondary); margin: 10px 0; font-size: 40px;">{{ ket_qua }} kWp</h1>
+                <p>📍 {{ du_lieu_nhap.tinh_chon }} | ☀️ {{ gio_nang_da_dung }}h/ngày</p>
             </div>
             {% endif %}
         </div>
 
         {% if role == 'admin' %}
         <div id="config" class="tab-content {{ 'active' if active_tab == 'config' else '' }}">
-            <h2 style="color: var(--dark); margin-top: 0; text-align: center;">Cài Đặt Hệ Thống</h2>
-            {% if msg_update %}<div class="alert">{{ msg_update }}</div>{% endif %}
-            
-            <div class="add-province-box">
-                <form method="POST" style="display: flex; gap: 10px; align-items: flex-end;">
-                    <div style="flex: 2;">
-                        <label style="margin-top:0">Thêm Tỉnh/Thành mới:</label>
-                        <input type="text" name="new_province_name" placeholder="VD: Cà Mau">
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="margin-top:0">Giờ nắng:</label>
-                        <input type="number" step="0.1" name="new_province_hours" placeholder="4">
-                    </div>
-                    <button type="submit" name="btn_add_province" style="background: #f39c12; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; height: 42px;">Thêm</button>
+            <h2 style="color: var(--dark); margin-top: 0; text-align: center;">Cấu Hình Hệ Thống</h2>
+            {% if msg_update and active_tab == 'config' %}<div class="alert">{{ msg_update }}</div>{% endif %}
+
+            <h3 style="color:#16a085; border-bottom: 2px solid #eee; padding-bottom: 10px;">📍 Tỉnh Thành & Giờ Nắng</h3>
+            <div style="background:#e8f6f3; padding:15px; border-radius:5px; margin-bottom:15px;">
+                <form method="POST" style="display:flex; gap:10px;">
+                    <input type="text" name="new_province_name" placeholder="Tên tỉnh..." style="flex:2">
+                    <input type="number" step="0.1" name="new_province_hours" placeholder="Giờ nắng" style="flex:1">
+                    <button type="submit" name="btn_add_province" style="background:#16a085; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer">Thêm</button>
                 </form>
             </div>
-
-            <label><strong>Danh sách Giờ nắng theo Tỉnh:</strong></label>
-            <table class="province-table">
-                <thead>
-                    <tr>
-                        <th>Tên Tỉnh/Thành</th>
-                        <th>Giờ nắng (h)</th>
-                        <th style="width: 50px;">Xóa</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ten, gio in settings.tinh_thanh.items() %}
-                    <tr>
-                        <td>{{ ten }}</td>
-                        <td>{{ gio }}</td>
-                        <td>
-                            <form method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa tỉnh này?');">
-                                <input type="hidden" name="delete_name" value="{{ ten }}">
-                                <button type="submit" name="btn_delete_province" class="btn-small-del">X</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
-
+            
             <form method="POST">
+                <div class="table-responsive" style="max-height:300px; overflow-y:auto; border:1px solid #ddd;">
+                    <table class="table table-bordered table-striped mb-0">
+                        <thead class="thead-dark"><tr><th>Tên Tỉnh</th><th class="col-center" style="width:30%">Giờ nắng</th><th class="col-center" style="width:15%">Xóa</th></tr></thead>
+                        <tbody>
+                            {% for ten, gio in settings['tinh_thanh']|dictsort %}
+                            <tr>
+                                <td>{{ ten }}</td>
+                                <td class="text-center-input"><input type="number" step="0.1" name="hours_{{ ten }}" value="{{ gio }}"></td>
+                                <td class="col-center"><button type="submit" name="btn_delete_province" value="{{ ten }}" class="btn-danger-circle" onclick="return confirm('Xóa {{ ten }}?');">✕</button></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div style="text-align:right; margin-top:10px"><button type="submit" name="btn_save_list" class="btn-update" style="width:auto; background:#27ae60">💾 Lưu Giờ Nắng</button></div>
+            </form>
+
+            <hr style="border:0; border-top:2px solid #eee; margin:30px 0;">
+            <form method="POST">
+                <h3 style="color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">💲 Đơn Giá Điện</h3>
                 <div class="grid-6">
                     <div><label>Giá Sản Xuất (VNĐ):</label><input type="number" name="gia_sx" value="{{ settings.gia_san_xuat }}"></div>
                     <div><label>Giá Kinh Doanh (VNĐ):</label><input type="number" name="gia_kd" value="{{ settings.gia_kinh_doanh }}"></div>
@@ -192,39 +173,103 @@
         </div>
         {% endif %}
 
+        <div id="account" class="tab-content {{ 'active' if active_tab == 'account' else '' }}">
+            <h2 style="color: #2980b9; margin-top: 0; text-align: center;">Đổi Mật Khẩu Cá Nhân</h2>
+            {% if msg_update and active_tab == 'account' %}<div class="alert">{{ msg_update }}</div>{% endif %}
+            
+            <form method="POST" style="max-width: 400px; margin: 0 auto;">
+                <label>Mật khẩu cũ:</label>
+                <input type="password" name="old_pass" required>
+                <label>Mật khẩu mới:</label>
+                <input type="password" name="new_pass" required>
+                <button type="submit" name="btn_change_pass" class="btn-update" style="background: #2980b9;">Lưu Mật Khẩu Mới</button>
+            </form>
+        </div>
+
+        {% if role == 'admin' %}
+        <div id="users" class="tab-content {{ 'active' if active_tab == 'users' else '' }}">
+            <h2 style="color: #856404; margin-top: 0; text-align: center;">Quản Lý Người Dùng</h2>
+            {% if msg_update and active_tab == 'users' %}<div class="alert">{{ msg_update }}</div>{% endif %}
+
+            <div class="management-box">
+                <form method="POST" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px;">
+                    <div style="flex: 2;">
+                        <label style="margin:0; font-size:12px">Username:</label>
+                        <input type="text" name="new_username" placeholder="user1" autocomplete="off">
+                    </div>
+                    <div style="flex: 2;">
+                        <label style="margin:0; font-size:12px">Password:</label>
+                        <input type="text" name="new_password" placeholder="123" autocomplete="off">
+                    </div>
+                    <div style="flex: 1.5;">
+                        <label style="margin:0; font-size:12px">Vai trò:</label>
+                        <select name="new_role">
+                            <option value="user">User (Thường)</option>
+                            <option value="admin">Admin (QTV)</option>
+                        </select>
+                    </div>
+                    <button type="submit" name="btn_add_user" style="background:#27ae60; color:white; border:none; padding:10px; border-radius:5px; height:42px; cursor:pointer">Thêm</button>
+                </form>
+
+                <div class="table-responsive" style="background:white; border:1px solid #eee;">
+                    <table class="table table-bordered mb-0">
+                        <thead class="thead-dark"><tr><th>User</th><th>Vai trò</th><th class="col-center">Xóa</th></tr></thead>
+                        <tbody>
+                            {% for u, info in users.items() %}
+                            <tr>
+                                <td>{{ u }}</td>
+                                <td>
+                                    {% if info.role == 'admin' %}
+                                    <span style="background:#2c3e50; color:white; padding:2px 6px; border-radius:4px; font-size:12px">Admin</span>
+                                    {% else %}
+                                    <span style="background:#95a5a6; color:white; padding:2px 6px; border-radius:4px; font-size:12px">User</span>
+                                    {% endif %}
+                                </td>
+                                <td class="col-center">
+                                    {% if u != 'admin' and u != session['user'] %}
+                                    <button onclick="if(confirm('Xóa {{ u }}?')) { var f=document.createElement('form'); f.method='POST'; var i=document.createElement('input'); i.name='btn_delete_user'; i.value='{{ u }}'; f.appendChild(i); document.body.appendChild(f); f.submit(); }" class="btn-danger-circle">✕</button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
     </div>
 
     <script>
-        function openTab(tabId) {
-            var contents = document.getElementsByClassName("tab-content");
-            for (var i = 0; i < contents.length; i++) contents[i].classList.remove("active");
-            var btns = document.getElementsByClassName("tab-btn");
-            for (var i = 0; i < btns.length; i++) btns[i].classList.remove("active");
-            document.getElementById(tabId).classList.add("active");
-            event.currentTarget.classList.add("active");
-        }
-        function toggleUnit(radio) {
-            var label = document.getElementById("input-label");
-            var input = document.getElementById("gia_tri_input");
-            if (radio.value === "theo_tien") {
-                label.innerText = "Tiền điện trung bình tháng (VNĐ/Month):";
-                input.placeholder = "Ví dụ: 2000000";
-            } else {
-                label.innerText = "Sản lượng tiêu thụ (kWh/):";
-                input.placeholder = "Ví dụ: 500";
+        function openTab(id) {
+            // Tắt hết các tab cũ
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            // Bật tab mới được chọn
+            document.getElementById(id).classList.add('active');
+            
+            // Tìm nút bấm tương ứng để highlight (đảm bảo đúng nút kể cả khi có nhiều nút)
+            var buttons = document.querySelectorAll('.tab-btn');
+            for (var i = 0; i < buttons.length; i++) {
+                if (buttons[i].onclick.toString().includes(id)) {
+                    buttons[i].classList.add('active');
+                }
             }
         }
-        var slider = document.getElementById("he_so_slider");
-        var output = document.getElementById("slider-value-display");
-        function updateSliderValue() {
-            var percent = Math.round(slider.value * 100);
-            output.innerHTML = percent + "%";
+
+        function toggleUnit(radio) {
+            document.getElementById("input-label").innerText = radio.value === "theo_tien" ? "Tiền điện trung bình tháng (VNĐ):" : "Sản lượng tiêu thụ (kWh):";
+            document.getElementById("gia_tri_input").placeholder = radio.value === "theo_tien" ? "VD: 2000000" : "VD: 500";
         }
-        slider.oninput = updateSliderValue;
-        window.onload = function() {
-            var checkedRadio = document.querySelector('input[name="che_do_nhap"]:checked');
-            if(checkedRadio) toggleUnit(checkedRadio);
-            updateSliderValue();
+        
+        // Cập nhật giá trị Slider
+        var slider = document.getElementById("he_so_slider");
+        if(slider){
+             slider.oninput = function() { 
+                document.getElementById("slider-value-display").innerHTML = Math.round(this.value * 100) + "%"; 
+            }
         }
     </script>
 </body>
