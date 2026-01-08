@@ -262,7 +262,7 @@ def home():
                         "Thời Gian": thoi_gian, 
                         "Khu Vực": f"{tc} - {ten_sheet}", 
                         "Đầu Vào": f"{raw_gt} {'VNĐ' if cd=='theo_tien' else 'kWh'}/Month", 
-                        "Kết Quả (kWp)": excel_res
+                        "Kết Quả": excel_res
                     }])
                     
                     all_sheets = pd.read_excel(history_path, sheet_name=None) if os.path.exists(history_path) else {}
