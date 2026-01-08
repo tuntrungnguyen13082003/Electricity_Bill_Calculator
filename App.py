@@ -323,4 +323,4 @@ def download_excel():
     else: return "Chưa có file!", 404
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=18003)
+    app.run(host='0.0.0.0', port=17005)
