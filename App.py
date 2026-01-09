@@ -271,7 +271,7 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (ĐÃ CHUYỂN LÊN ĐÂY CHO ĐÚNG CẤU TRÚC IF/ELIF)
+        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (LOGIC NÂNG CAO: TẢI NỀN & GIỜ LÀM VIỆC)
         elif 'btn_calc_load' in request.form:
             try:
                 def get_float_safe(key):
@@ -286,6 +286,14 @@ def home():
                 d_start = request.form.get('ngay_dau')
                 d_end = request.form.get('ngay_cuoi')
                 
+                # Lấy giờ làm việc (Chỉ lấy phần giờ, bỏ phút)
+                # Ví dụ: 08:00 -> 8, 17:00 -> 17
+                try:
+                    h_start = int(request.form.get('gio_lam_tu', '8').split(':')[0])
+                    h_end = int(request.form.get('gio_lam_den', '17').split(':')[0])
+                except: h_start, h_end = 8, 17 # Mặc định nếu lỗi
+
+                # Cập nhật lại input
                 du_lieu_nhap.update({
                     'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                     'ngay_dau': d_start, 'ngay_cuoi': d_end,
@@ -299,59 +307,90 @@ def home():
                     so_ngay = delta.days + 1
                     
                     if so_ngay > 0:
+                        # 1. Tính trung bình ngày
                         avg_day_cd = kwh_cd / so_ngay
                         avg_day_td = kwh_td / so_ngay
                         avg_day_bt = kwh_bt / so_ngay
                         
-                        p_td = avg_day_td / 6 if avg_day_td > 0 else 0
-                        p_cd = avg_day_cd / 5 if avg_day_cd > 0 else 0
-                        p_bt = avg_day_bt / 13 if avg_day_bt > 0 else 0
+                        # 2. TÍNH TẢI NỀN (P_base) = Công suất trung bình giờ thấp điểm
+                        # Giờ thấp điểm: 6 tiếng (22h-4h)
+                        p_base = avg_day_td / 6 if avg_day_td > 0 else 0
                         
-                        # 3. Tạo dữ liệu biểu đồ dạng STACKED (Chồng cột)
-                        # ... (Đoạn tính p_td, p_cd, p_bt giữ nguyên) ...
+                        # 3. PHÂN BỔ NĂNG LƯỢNG CHO BÌNH THƯỜNG & CAO ĐIỂM
+                        # Logic: 
+                        # - Tổng năng lượng có sẵn = avg_day_bt (hoặc cd)
+                        # - Năng lượng "nuôi" tải nền = p_base * Tổng số giờ (13h hoặc 5h)
+                        # - Năng lượng "sản xuất" còn lại = Tổng - Năng lượng nền
+                        # - Công suất cộng thêm vào giờ làm = Năng lượng sản xuất / Số giờ làm thực tế
+                        
+                        # --- XỬ LÝ BÌNH THƯỜNG (BT) ---
+                        total_hours_bt = 13 # Tổng giờ BT trong ngày
+                        energy_base_bt = p_base * total_hours_bt # Điện tốn cho tải nền
+                        energy_remain_bt = max(0, avg_day_bt - energy_base_bt) # Điện dành cho sx
+                        
+                        # Đếm số giờ làm việc nằm trong khung BT
+                        count_work_bt = 0
+                        for h in range(24):
+                            is_working = h_start <= h < h_end # Kiểm tra giờ h có phải giờ làm ko
+                            if not is_working: continue # Không làm thì bỏ qua
+                            
+                            if h in [4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 20, 21]: count_work_bt += 1
+                            elif h == 9 or h == 11: count_work_bt += 0.5 # Giờ ghép tính 0.5
+                            
+                        # Công suất cộng thêm vào giờ làm (P_add)
+                        p_add_bt = energy_remain_bt / count_work_bt if count_work_bt > 0 else 0
 
-                        # 3. Tạo dữ liệu biểu đồ dạng 5 LỚP (Để xếp hình tùy ý)
-                        data_td = []       # Thấp điểm (Xanh lá)
-                        data_bt_lower = [] # BT nằm dưới (Xanh biển)
-                        data_cd_lower = [] # CD nằm dưới (Đỏ)
-                        data_bt_upper = [] # BT nằm trên (Xanh biển) - Dành cho giờ 11h
-                        data_cd_upper = [] # CD nằm trên (Đỏ) - Dành cho giờ 9h
+                        # --- XỬ LÝ CAO ĐIỂM (CD) ---
+                        total_hours_cd = 5 # Tổng giờ CD trong ngày
+                        energy_base_cd = p_base * total_hours_cd
+                        energy_remain_cd = max(0, avg_day_cd - energy_base_cd)
                         
+                        count_work_cd = 0
+                        for h in range(24):
+                            is_working = h_start <= h < h_end
+                            if not is_working: continue
+                            
+                            if h in [10, 17, 18, 19]: count_work_cd += 1
+                            elif h == 9 or h == 11: count_work_cd += 0.5
+                            
+                        p_add_cd = energy_remain_cd / count_work_cd if count_work_cd > 0 else 0
+
+                        # 4. TẠO DỮ LIỆU BIỂU ĐỒ (ÁP DỤNG P_BASE VÀ P_ADD)
+                        data_td = []
+                        data_bt_lower = []
+                        data_cd_lower = []
+                        data_bt_upper = []
+                        data_cd_upper = []
                         labels = []
 
                         for h in range(24):
                             labels.append(f"{h}h")
+                            is_working = h_start <= h < h_end # Kiểm tra giờ này có làm việc ko
                             
-                            # Reset giá trị
-                            v_td = 0
-                            v_bt_lower = 0
-                            v_cd_lower = 0
-                            v_bt_upper = 0
-                            v_cd_upper = 0
+                            # Hàm tính công suất tại giờ h: Nền + (Cộng thêm nếu đang làm)
+                            def get_p(p_added):
+                                return p_base + (p_added if is_working else 0)
 
-                            # --- LOGIC XẾP HÌNH ---
-                            
-                            # 1. Thấp điểm (22h - 4h)
-                            if h in [22, 23, 0, 1, 2, 3]:
-                                v_td = p_td
+                            # Reset biến
+                            v_td, v_bt_lower, v_cd_lower, v_bt_upper, v_cd_upper = 0, 0, 0, 0, 0
 
-                            # 2. Giờ 9h: BT dưới, CD trên
-                            elif h == 9:
-                                v_bt_lower = p_bt * 0.5
-                                v_cd_upper = p_cd * 0.5
+                            # -- PHÂN LOẠI GIỜ --
+                            if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
+                                v_td = p_td # Thấp điểm giữ nguyên như cũ
                             
-                            # 3. Giờ 11h: CD dưới, BT trên (Yêu cầu của bạn)
-                            elif h == 11:
-                                v_cd_lower = p_cd * 0.5
-                                v_bt_upper = p_bt * 0.5
-                            
-                            # 4. Full Cao điểm (10h, 17h-20h) -> Nằm ở layer dưới
-                            elif h == 10 or h in [17, 18, 19]:
-                                v_cd_lower = p_cd
-
-                            # 5. Full Bình thường -> Nằm ở layer dưới
-                            else:
-                                v_bt_lower = p_bt
+                            elif h == 9: # 9h: BT dưới, CD trên
+                                v_bt_lower = get_p(p_add_bt) * 0.5
+                                v_cd_upper = get_p(p_add_cd) * 0.5
+                                
+                            elif h == 11: # 11h: CD dưới, BT trên
+                                v_cd_lower = get_p(p_add_cd) * 0.5
+                                v_bt_upper = get_p(p_add_bt) * 0.5
+                                
+                            elif h == 10 or h in [17, 18, 19]: # Full Cao điểm
+                                v_cd_lower = get_p(p_add_cd)
+                                
+                            else: # Full Bình thường
+                                v_bt_lower = get_p(p_add_bt)
 
                             # Thêm vào mảng
                             data_td.append(round(v_td, 2))
@@ -360,7 +399,6 @@ def home():
                             data_bt_upper.append(round(v_bt_upper, 2))
                             data_cd_upper.append(round(v_cd_upper, 2))
                                 
-                        # Đóng gói 5 datasets gửi sang Frontend
                         du_lieu_nhap['chart_data'] = {
                             'labels': labels,
                             'datasets': {
