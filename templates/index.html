@@ -300,6 +300,8 @@
                             function renderComboChart(canvasId, dataSrc, maxYValue) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
 
+                                const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; // Màu cam vàng đậm
+                                
                                 // 1. Tính đường tổng (Line)
                                 const totalLoad = dataSrc.td.map((val, i) => {
                                     return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
@@ -315,7 +317,7 @@
                                                 type: 'line',
                                                 label: 'Tổng công suất',
                                                 data: totalLoad,
-                                                borderColor: '#2980b9', // Xanh biển đậm
+                                                borderColor: DARK_YELLOW, // Xanh biển đậm
                                                 borderWidth: 3,
                                                 tension: 0.4,       // Cong mềm mại
                                                 fill: false,        // KHÔNG TÔ NỀN DƯỚI
