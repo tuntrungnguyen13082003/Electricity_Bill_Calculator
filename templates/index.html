@@ -263,50 +263,67 @@
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
                                 
-                                // Vẽ các biểu đồ tồn tại
-                                renderLineChart('chart_weekday', chartDataRaw.weekday_work);
-                                
-                                if(document.getElementById('chart_sunday')) 
-                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work);
-                                
-                                if(document.getElementById('chart_off_wd')) 
-                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday);
-                                
-                                if(document.getElementById('chart_off_sun')) 
-                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday);
-                            });
+                                // --- BƯỚC 1: TÌM GIÁ TRỊ LỚN NHẤT TRONG TẤT CẢ CÁC BIỂU ĐỒ ---
+                                let maxVal = 0;
+                                const allDatasets = [
+                                    chartDataRaw.weekday_work, 
+                                    chartDataRaw.sunday_work, 
+                                    chartDataRaw.off_weekday, 
+                                    chartDataRaw.off_sunday
+                                ];
 
-                            function renderLineChart(canvasId, dataSrc) {
-                                const ctx = document.getElementById(canvasId).getContext('2d');
-
-                                // 1. TÍNH TỔNG CÔNG SUẤT (Gộp tất cả các thành phần lại)
-                                // Backend gửi xuống dạng mảnh nhỏ (td, bt_l, cd_l...), ta cộng lại để ra đường tổng
-                                const totalLoad = dataSrc.td.map((val, i) => {
-                                    return val + 
-                                           (dataSrc.bt_l[i] || 0) + 
-                                           (dataSrc.cd_l[i] || 0) + 
-                                           (dataSrc.bt_u[i] || 0) + 
-                                           (dataSrc.cd_u[i] || 0);
+                                allDatasets.forEach(data => {
+                                    if (data) {
+                                        // Gộp tất cả các mảng dữ liệu lại để tìm số to nhất
+                                        const allNumbers = [
+                                            ...data.td, ...data.bt_l, ...data.cd_l, 
+                                            ...data.bt_u, ...data.cd_u
+                                        ];
+                                        const currentMax = Math.max(...allNumbers);
+                                        if (currentMax > maxVal) maxVal = currentMax;
+                                    }
                                 });
 
-                                // 2. VẼ BIỂU ĐỒ 1 ĐƯỜNG DUY NHẤT
+                                // Cộng thêm 10% dư ra cho đẹp thoáng (ví dụ max là 200 thì set trục là 220)
+                                const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.1) : 50;
+
+                                // --- BƯỚC 2: VẼ BIỂU ĐỒ VỚI TRỤC Y CHUNG (COMMON_MAX_Y) ---
+                                renderLineChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
+                                
+                                if(document.getElementById('chart_sunday')) 
+                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y);
+                                
+                                if(document.getElementById('chart_off_wd')) 
+                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y);
+                                
+                                if(document.getElementById('chart_off_sun')) 
+                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y);
+                            });
+
+                            function renderLineChart(canvasId, dataSrc, maxYValue) {
+                                const ctx = document.getElementById(canvasId).getContext('2d');
                                 new Chart(ctx, {
-                                    type: 'line',
+                                    type: 'line', 
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
                                             { 
-                                                label: 'Công suất tiêu thụ', 
-                                                data: totalLoad, 
-                                                // Màu xanh biển (Sea Blue)
-                                                borderColor: '#2980b9', 
-                                                backgroundColor: 'rgba(52, 152, 219, 0.3)', 
-                                                borderWidth: 2, 
-                                                fill: true,         // Tô màu nền dưới
-                                                tension: 0.4,       // Đường cong mềm mại
-                                                pointRadius: 0,     // Ẩn chấm tròn cho mượt
-                                                pointHoverRadius: 6 // Hiện chấm khi di chuột vào
-                                            }
+                                                label: 'Thấp điểm', data: dataSrc.td, 
+                                                backgroundColor: 'rgba(46, 204, 113, 0.4)', borderColor: '#2ecc71',
+                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
+                                            },
+                                            { 
+                                                label: 'Bình thường', data: dataSrc.bt_l, 
+                                                backgroundColor: 'rgba(52, 152, 219, 0.4)', borderColor: '#3498db',
+                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
+                                            },
+                                            { 
+                                                label: 'Cao điểm', data: dataSrc.cd_l, 
+                                                backgroundColor: 'rgba(231, 76, 60, 0.4)', borderColor: '#e74c3c',
+                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
+                                            },
+                                            { label: '', data: dataSrc.bt_u, backgroundColor: 'rgba(52, 152, 219, 0.4)', borderColor: '#3498db', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' },
+                                            { label: '', data: dataSrc.cd_u, backgroundColor: 'rgba(231, 76, 60, 0.4)', borderColor: '#e74c3c', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' }
                                         ]
                                     },
                                     options: {
@@ -315,6 +332,8 @@
                                         scales: {
                                             y: { 
                                                 beginAtZero: true, 
+                                                stacked: true, 
+                                                max: maxYValue, // <--- ĐÂY LÀ CHỖ QUAN TRỌNG: ÉP TRỤC Y GIỐNG NHAU
                                                 title: {display: true, text: 'Công suất (kW)'},
                                                 grid: { color: '#f0f0f0' }
                                             },
@@ -324,22 +343,13 @@
                                             }
                                         },
                                         plugins: {
-                                            legend: { display: false }, // Ẩn chú thích (vì chỉ có 1 đường)
+                                            legend: { position: 'bottom', labels: { filter: i => i.text !== '' } },
                                             tooltip: {
-                                                mode: 'index',
-                                                intersect: false,
-                                                callbacks: { 
-                                                    label: function(context) { 
-                                                        return 'Công suất: ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
-                                                    } 
-                                                }
+                                                mode: 'index', intersect: false,
+                                                callbacks: { label: function(context) { if (!context.dataset.label) return null; return context.dataset.label + ': ' + Number(context.parsed.y).toFixed(1) + ' kW'; } }
                                             }
                                         },
-                                        interaction: {
-                                            mode: 'nearest',
-                                            axis: 'x',
-                                            intersect: false
-                                        }
+                                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
                                     }
                                 });
                             }
