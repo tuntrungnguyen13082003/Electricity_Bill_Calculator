@@ -263,7 +263,7 @@
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
                                 
-                                // --- BƯỚC 1: TÍNH MAX Y ĐỂ ĐỒNG BỘ TỈ LỆ ---
+                                // --- BƯỚC 1: TÌM GIÁ TRỊ LỚN NHẤT TRONG TẤT CẢ CÁC BIỂU ĐỒ (ĐỂ ĐỒNG BỘ TRỤC Y) ---
                                 let maxVal = 0;
                                 const allDatasets = [
                                     chartDataRaw.weekday_work, 
@@ -274,7 +274,7 @@
 
                                 allDatasets.forEach(data => {
                                     if (data) {
-                                        // Cộng tổng các thành phần lại để tìm đỉnh cao nhất
+                                        // Tính tổng công suất tại mỗi giờ để tìm đỉnh cao nhất
                                         const hourlyTotals = data.td.map((val, i) => {
                                             return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
                                         });
@@ -283,10 +283,10 @@
                                     }
                                 });
 
-                                // Cộng thêm 10% dư địa
+                                // Cộng thêm 10% cho thoáng
                                 const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.1) : 50;
 
-                                // --- BƯỚC 2: VẼ BIỂU ĐỒ ---
+                                // --- BƯỚC 2: VẼ CÁC BIỂU ĐỒ ---
                                 renderLineChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_sunday')) 
@@ -302,54 +302,32 @@
                             function renderLineChart(canvasId, dataSrc, maxYValue) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
 
-                                // Chúng ta sẽ vẽ 5 lớp chồng lên nhau để tái tạo màu sắc
-                                // Lớp 1: Thấp điểm (Dưới cùng)
-                                // Lớp 2: Bình thường (Dưới)
-                                // Lớp 3: Cao điểm (Dưới)
-                                // Lớp 4+5: Phần dư (nếu có)
-                                
+                                // 1. TÍNH TỔNG CÔNG SUẤT (Gộp tất cả các thành phần lại)
+                                const totalLoad = dataSrc.td.map((val, i) => {
+                                    return val + 
+                                           (dataSrc.bt_l[i] || 0) + 
+                                           (dataSrc.cd_l[i] || 0) + 
+                                           (dataSrc.bt_u[i] || 0) + 
+                                           (dataSrc.cd_u[i] || 0);
+                                });
+
+                                // 2. VẼ BIỂU ĐỒ
                                 new Chart(ctx, {
                                     type: 'line',
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
                                             { 
-                                                label: 'Thấp điểm', 
-                                                data: dataSrc.td, 
-                                                backgroundColor: 'rgba(46, 204, 113, 0.5)', // Xanh lá
-                                                borderColor: 'rgba(46, 204, 113, 1)', 
-                                                borderWidth: 1, 
-                                                fill: true, tension: 0.4, pointRadius: 0, stack: 'root' 
-                                            },
-                                            { 
-                                                label: 'Bình thường', 
-                                                data: dataSrc.bt_l, 
-                                                backgroundColor: 'rgba(52, 152, 219, 0.5)', // Xanh dương
-                                                borderColor: 'rgba(52, 152, 219, 1)', 
-                                                borderWidth: 1, 
-                                                fill: true, tension: 0.4, pointRadius: 0, stack: 'root' 
-                                            },
-                                            { 
-                                                label: 'Cao điểm', 
-                                                data: dataSrc.cd_l, 
-                                                backgroundColor: 'rgba(231, 76, 60, 0.5)', // Đỏ
-                                                borderColor: 'rgba(231, 76, 60, 1)', 
-                                                borderWidth: 1, 
-                                                fill: true, tension: 0.4, pointRadius: 0, stack: 'root' 
-                                            },
-                                            { 
-                                                label: '', // Lớp phụ BT (nếu có)
-                                                data: dataSrc.bt_u, 
-                                                backgroundColor: 'rgba(52, 152, 219, 0.5)', 
-                                                borderColor: 'rgba(52, 152, 219, 1)', borderWidth: 0,
-                                                fill: true, tension: 0.4, pointRadius: 0, stack: 'root' 
-                                            },
-                                            { 
-                                                label: '', // Lớp phụ CD (nếu có)
-                                                data: dataSrc.cd_u, 
-                                                backgroundColor: 'rgba(231, 76, 60, 0.5)', 
-                                                borderColor: 'rgba(231, 76, 60, 1)', borderWidth: 0,
-                                                fill: true, tension: 0.4, pointRadius: 0, stack: 'root' 
+                                                label: 'Công suất tiêu thụ', 
+                                                data: totalLoad, 
+                                                // Màu xanh biển (Sea Blue)
+                                                borderColor: '#2980b9', 
+                                                backgroundColor: 'rgba(52, 152, 219, 0.3)', 
+                                                borderWidth: 2, 
+                                                fill: true,         // Tô màu nền dưới
+                                                tension: 0.4,       // Đường cong mềm mại
+                                                pointRadius: 0,     // Ẩn chấm tròn cho mượt
+                                                pointHoverRadius: 6 // Hiện chấm khi di chuột vào
                                             }
                                         ]
                                     },
@@ -359,8 +337,7 @@
                                         scales: {
                                             y: { 
                                                 beginAtZero: true, 
-                                                stacked: true, // <--- QUAN TRỌNG: Xếp chồng lên nhau
-                                                max: maxYValue, 
+                                                max: maxYValue, // <--- ĐỒNG BỘ TRỤC Y
                                                 title: {display: true, text: 'Công suất (kW)'},
                                                 grid: { color: '#f0f0f0' }
                                             },
@@ -370,17 +347,13 @@
                                             }
                                         },
                                         plugins: {
-                                            legend: { 
-                                                position: 'bottom', 
-                                                labels: { filter: i => i.text !== '' } // Chỉ hiện chú thích chính
-                                            }, 
+                                            legend: { display: false }, 
                                             tooltip: {
                                                 mode: 'index',
                                                 intersect: false,
                                                 callbacks: { 
                                                     label: function(context) { 
-                                                        if (!context.dataset.label) return null; // Ẩn label rỗng
-                                                        return context.dataset.label + ': ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
+                                                        return 'Công suất: ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
                                                     } 
                                                 }
                                             }
