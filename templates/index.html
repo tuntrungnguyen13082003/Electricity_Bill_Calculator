@@ -186,7 +186,6 @@
                         </div>
                         <script>
                             document.addEventListener("DOMContentLoaded", function() {
-                                // Tự động chuyển sang tab biểu đồ nếu vừa ấn nút vẽ
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
 
                                 const ctx = document.getElementById('loadChart').getContext('2d');
@@ -196,31 +195,49 @@
                                     type: 'bar',
                                     data: {
                                         labels: chartData.labels,
-                                        datasets: [{
-                                            label: 'Công suất tiêu thụ (kW)',
-                                            data: chartData.values,
-                                            backgroundColor: chartData.colors,
-                                            borderWidth: 1
-                                        }]
+                                        datasets: [
+                                            {
+                                                label: 'Thấp điểm (Xanh lá)',
+                                                data: chartData.datasets.td,
+                                                backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                                                stack: 'Stack 0', // Cùng stack để chồng lên nhau
+                                            },
+                                            {
+                                                label: 'Bình thường (Xanh biển)',
+                                                data: chartData.datasets.bt,
+                                                backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                                                stack: 'Stack 0',
+                                            },
+                                            {
+                                                label: 'Cao điểm (Đỏ)',
+                                                data: chartData.datasets.cd,
+                                                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                                                stack: 'Stack 0',
+                                            }
+                                        ]
                                     },
                                     options: {
                                         responsive: true,
                                         maintainAspectRatio: false,
                                         scales: {
-                                            y: { beginAtZero: true, title: {display: true, text: 'Công suất (kW)'} },
-                                            x: { title: {display: true, text: 'Giờ trong ngày (0h-23h)'} }
+                                            y: { 
+                                                beginAtZero: true, 
+                                                stacked: true, // QUAN TRỌNG: Bật chế độ chồng Y
+                                                title: {display: true, text: 'Công suất trung bình (kW)'} 
+                                            },
+                                            x: { 
+                                                stacked: true, // QUAN TRỌNG: Bật chế độ chồng X
+                                                title: {display: true, text: 'Giờ trong ngày (0h-23h)'} 
+                                            }
                                         },
                                         plugins: {
-                                            legend: { display: false },
                                             tooltip: {
-                                                callbacks: {
-                                                    label: function(context) {
-                                                        let label = context.dataset.label || '';
-                                                        if (label) label += ': ';
-                                                        label += context.parsed.y + ' kW';
-                                                        return label;
-                                                    }
-                                                }
+                                                mode: 'index',
+                                                intersect: false
+                                            },
+                                            legend: {
+                                                display: true, // Hiện chú thích màu cho chuyên nghiệp
+                                                position: 'bottom'
                                             }
                                         }
                                     }

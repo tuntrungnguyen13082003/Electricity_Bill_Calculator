@@ -307,20 +307,60 @@ def home():
                         p_cd = avg_day_cd / 5 if avg_day_cd > 0 else 0
                         p_bt = avg_day_bt / 13 if avg_day_bt > 0 else 0
                         
-                        chart_data = {'labels': [], 'values': [], 'colors': []}
+                        # 3. Tạo dữ liệu biểu đồ dạng STACKED (Chồng cột)
+                        # Thay vì 1 mảng value, ta tạo 3 mảng cho 3 loại giờ
+                        data_td = [] # Thấp điểm
+                        data_bt = [] # Bình thường
+                        data_cd = [] # Cao điểm
+                        labels = []
+
                         for h in range(24):
-                            chart_data['labels'].append(f"{h}h")
-                            if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
-                                chart_data['values'].append(round(p_td, 2))
-                                chart_data['colors'].append('rgba(46, 204, 113, 0.8)')
-                            elif h in [10, 11, 17, 18, 19]: # Cao điểm
-                                chart_data['values'].append(round(p_cd, 2))
-                                chart_data['colors'].append('rgba(231, 76, 60, 0.8)')
-                            else: # Bình thường
-                                chart_data['values'].append(round(p_bt, 2))
-                                chart_data['colors'].append('rgba(52, 152, 219, 0.8)')
+                            labels.append(f"{h}h")
+                            # Khởi tạo giá trị 0 cho giờ này
+                            val_td = 0
+                            val_bt = 0
+                            val_cd = 0
+                            # --- LOGIC KHUNG GIỜ EVN CHÍNH XÁC ---
+                            # 1. THẤP ĐIỂM (22h - 04h)
+                            if h in [22, 23, 0, 1, 2, 3]:
+                                val_td = p_td
+                            # 2. CAO ĐIỂM & BÌNH THƯỜNG (Có chia tách phút)
+                            # Giờ 9 (09:00 - 10:00): Nửa đầu BT, Nửa sau CĐ
+                            elif h == 9:
+                                val_bt = p_bt * 0.5
+                                val_cd = p_cd * 0.5
+                            
+                            # Giờ 10 (10:00 - 11:00): Full Cao điểm
+                            elif h == 10:
+                                val_cd = p_cd
+
+                            # Giờ 11 (11:00 - 12:00): Nửa đầu CĐ, Nửa sau BT
+                            elif h == 11:
+                                val_cd = p_cd * 0.5
+                                val_bt = p_bt * 0.5
+                            
+                            # Khung chiều (17h - 20h): Full Cao điểm
+                            elif h in [17, 18, 19]:
+                                val_cd = p_cd
                                 
-                        du_lieu_nhap['chart_data'] = chart_data
+                            # Các giờ còn lại: Full Bình thường
+                            else:
+                                val_bt = p_bt
+
+                            # Thêm vào mảng (Làm tròn 2 số lẻ)
+                            data_td.append(round(val_td, 2))
+                            data_bt.append(round(val_bt, 2))
+                            data_cd.append(round(val_cd, 2))
+                                
+                        # Đóng gói dữ liệu gửi sang Frontend
+                        du_lieu_nhap['chart_data'] = {
+                            'labels': labels,
+                            'datasets': {
+                                'td': data_td,
+                                'bt': data_bt,
+                                'cd': data_cd
+                            }
+                        }
             except Exception as e: 
                 print(f"Lỗi tính tải: {e}")
                 msg_update = f"❌ Lỗi tính toán: {e}"
