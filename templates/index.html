@@ -14,12 +14,16 @@
             
             // Trường hợp 1: Vừa đăng nhập xong (có init=1 trên URL)
             if (urlParams.get('init') === '1') {
+                // Đánh dấu vào bộ nhớ tạm của Tab này là "Đã xác thực"
                 sessionStorage.setItem('phien_dang_nhap', 'hop_le');
+                // Xóa chữ ?init=1 trên thanh địa chỉ cho đẹp
                 window.history.replaceState(null, null, window.location.pathname);
             } 
             // Trường hợp 2: Vào trang mà KHÔNG có init=1 (F5 hoặc Mở lại tab)
             else {
+                // Kiểm tra xem Tab này có cái dấu "Đã xác thực" không
                 if (!sessionStorage.getItem('phien_dang_nhap')) {
+                    // Nếu không có (do tắt tab mất rồi) -> BẮT BUỘC LOGOUT
                     window.location.href = "/logout";
                 }
             }
@@ -44,12 +48,12 @@
         
         /* CSS TAB DỌC */
         .history-container { display: flex; background: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; height: 600px; }
-        .history-sidebar { width: 220px; background: #f8f9fa; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        .history-sidebar { width: 200px; background: #f8f9fa; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         .v-tab-btn { padding: 15px; border: none; background: transparent; text-align: left; cursor: pointer; border-bottom: 1px solid #eee; transition: 0.2s; font-weight: 500; color: #555; display: flex; align-items: center; gap: 10px; }
         .v-tab-btn:hover { background: #e9ecef; }
         .v-tab-btn.active { background: white; color: #2c3e50; font-weight: bold; border-right: 4px solid var(--secondary); margin-right: -1px; }
         .history-main-area { flex: 1; padding: 0; overflow: hidden; position: relative; }
-        .v-tab-content { display: none; height: 100%; overflow-y: auto; padding: 20px; } /* Thêm padding ở đây */
+        .v-tab-content { display: none; height: 100%; overflow-y: auto; }
         .v-tab-content.active { display: block; animation: fadeIn 0.3s; }
 
         /* CÁC CSS KHÁC */
@@ -72,21 +76,6 @@
         .config-col-left { padding-right: 30px; margin-right: 30px; border-right: 2px dashed #16a085; }
         .table-scroll-container { height: 615px; overflow-y: auto; border: 1px solid #ddd; background: white; }
         .mt-auto { margin-top: auto; }
-
-        /* CSS DROPDOWN CHECKBOX */
-        .dropdown-check-list { display: inline-block; width: 100%; position: relative; }
-        .dropdown-check-list .anchor { position: relative; cursor: pointer; display: block; padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
-        .dropdown-check-list .anchor:after { position: absolute; content: ""; border-left: 2px solid black; border-top: 2px solid black; padding: 3px; right: 10px; top: 30%; transform: rotate(-135deg); }
-        .dropdown-check-list .items { padding: 10px; display: none; margin: 0; border: 1px solid #ccc; border-top: none; position: absolute; width: 100%; background: #fff; z-index: 100; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
-        .dropdown-check-list .items li { list-style: none; margin-bottom: 5px; }
-        .dropdown-check-list.visible .items { display: block; }
-        
-        /* CSS Chart Button */
-        .chart-btn { padding: 8px 15px; border: none; border-radius: 4px; background: transparent; color: #555; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .chart-btn.active { background: #3498db; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .chart-btn:hover:not(.active) { background: #ddd; }
-        .small-label { font-size: 12px; color: #7f8c8d; }
-        .big-num { font-size: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -112,12 +101,12 @@
             <h2 style="color: var(--secondary); margin-top: 0; text-align: center; margin-bottom: 20px;">Tính Toán & Phân Tích</h2>
             
             <div class="history-container" style="height: auto; min-height: 600px;">
-                <div class="history-sidebar">
+                <div class="history-sidebar" style="width: 220px;">
                     <button class="v-tab-btn active" onclick="openSubTab('sub_du_toan', this)">⚡ Dự Toán Công Suất</button>
                     <button id="btn_tab_bieu_do" class="v-tab-btn" onclick="openSubTab('sub_bieu_do', this)">📊 Biểu Đồ Phụ Tải</button>
                 </div>
 
-                <div class="history-main-area">
+                <div class="history-main-area" style="padding: 20px; overflow-y: auto;">
                     
                     <div id="sub_du_toan" class="v-tab-content active">
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Dự toán theo hóa đơn</h3>
@@ -183,23 +172,6 @@
                                 <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
                             </div>
 
-                            <div style="margin-top: 10px;">
-                                <label>Chọn ngày nghỉ trong tuần:</label>
-                                <div id="list1" class="dropdown-check-list" tabindex="100">
-                                    <span class="anchor" onclick="toggleDropdown()">🔻 Bấm để chọn ngày nghỉ...</span>
-                                    <ul class="items">
-                                        {% set selected_days = du_lieu_nhap.get('list_ngay_nghi', [6]) %}
-                                        <li><input type="checkbox" name="ngay_nghi" value="0" {{ 'checked' if 0 in selected_days else '' }}/> Thứ 2 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="1" {{ 'checked' if 1 in selected_days else '' }}/> Thứ 3 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="2" {{ 'checked' if 2 in selected_days else '' }}/> Thứ 4 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="3" {{ 'checked' if 3 in selected_days else '' }}/> Thứ 5 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="4" {{ 'checked' if 4 in selected_days else '' }}/> Thứ 6 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="5" {{ 'checked' if 5 in selected_days else '' }}/> Thứ 7 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="6" {{ 'checked' if 6 in selected_days else '' }}/> Chủ Nhật </li>
-                                    </ul>
-                                </div>
-                            </div>
-
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                 <div><label>Giờ làm việc (Từ):</label><input type="time" name="gio_lam_tu" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_tu', '08:00') }}"></div>
                                 <div><label>Giờ làm việc (Đến):</label><input type="time" name="gio_lam_den" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_den', '17:00') }}"></div>
@@ -212,19 +184,25 @@
                         
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #e9ecef;">
                             <div style="display: flex; justify-content: space-around; text-align: center;">
-                                <div><div class="small-label">Tổng ngày</div><div class="big-num">{{ du_lieu_nhap.chart_data.stats.total }}</div></div>
-                                <div><div class="small-label" style="color:#27ae60">Ngày làm việc</div><div class="big-num" style="color:#27ae60">{{ du_lieu_nhap.chart_data.stats.work }}</div></div>
-                                <div><div class="small-label" style="color:#e74c3c">Ngày nghỉ</div><div class="big-num" style="color:#e74c3c">{{ du_lieu_nhap.chart_data.stats.off }}</div></div>
+                                <div>
+                                    <div style="font-size: 12px; color: #7f8c8d;">Tổng số ngày</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">{{ du_lieu_nhap.chart_data.stats.total }}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 12px; color: #27ae60;">Ngày làm việc</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #27ae60;">{{ du_lieu_nhap.chart_data.stats.work }}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 12px; color: #e74c3c;">Ngày nghỉ (CN)</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #e74c3c;">{{ du_lieu_nhap.chart_data.stats.sun }}</div>
+                                </div>
                             </div>
                         </div>
 
                         <div style="margin-top: 15px; text-align: center;">
                             <div class="btn-group" role="group" style="display: inline-flex; background: #eee; padding: 3px; border-radius: 5px;">
-                                <button type="button" onclick="switchChart('weekday_work')" id="btn_week" class="chart-btn active">🏭 Thứ 2 - Thứ 7</button>
-                                {% if du_lieu_nhap.chart_data.stats.sun_work > 0 %}
-                                <button type="button" onclick="switchChart('sunday_work')" id="btn_sun" class="chart-btn">☀️ Làm việc (CN)</button>
-                                {% endif %}
-                                <button type="button" onclick="switchChart('off_day')" id="btn_off" class="chart-btn">☕ Ngày Nghỉ</button>
+                                <button type="button" onclick="switchChart('working')" id="btn_work" style="padding: 8px 15px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-weight: bold;">🏭 Ngày Làm Việc</button>
+                                <button type="button" onclick="switchChart('sunday')" id="btn_sun" style="padding: 8px 15px; border: none; border-radius: 4px; background: transparent; color: #555; cursor: pointer; font-weight: bold;">☕ Ngày Chủ Nhật</button>
                             </div>
                         </div>
 
@@ -233,52 +211,69 @@
                         </div>
 
                         <script>
-                            // HÀM DROPDOWN
-                            function toggleDropdown() {
-                                var checkList = document.getElementById('list1');
-                                if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
-                                else checkList.classList.add('visible');
-                            }
-
-                            // HÀM VẼ CHART
                             let myChart = null;
                             const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
 
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
-                                renderChart('weekday_work');
+                                renderChart('working'); // Mặc định vẽ ngày làm việc trước
                             });
 
                             function switchChart(mode) {
-                                document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
-                                if(mode === 'weekday_work') document.getElementById('btn_week').classList.add('active');
-                                else if(mode === 'sunday_work') document.getElementById('btn_sun').classList.add('active');
-                                else document.getElementById('btn_off').classList.add('active');
+                                // Đổi màu nút
+                                const btnWork = document.getElementById('btn_work');
+                                const btnSun = document.getElementById('btn_sun');
+                                
+                                if(mode === 'working') {
+                                    btnWork.style.background = '#3498db'; btnWork.style.color = 'white';
+                                    btnSun.style.background = 'transparent'; btnSun.style.color = '#555';
+                                } else {
+                                    btnSun.style.background = '#3498db'; btnSun.style.color = 'white';
+                                    btnWork.style.background = 'transparent'; btnWork.style.color = '#555';
+                                }
                                 renderChart(mode);
                             }
 
                             function renderChart(mode) {
                                 const ctx = document.getElementById('loadChart').getContext('2d');
-                                const d = chartDataRaw[mode]; 
+                                const dataSrc = chartDataRaw[mode]; // Lấy data theo mode (working hoặc sunday)
 
-                                if (myChart) myChart.destroy();
+                                if (myChart) myChart.destroy(); // Xóa biểu đồ cũ
 
                                 myChart = new Chart(ctx, {
                                     type: 'bar',
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
-                                            { label: 'Thấp điểm', data: d.td, backgroundColor: '#2ecc71', stack: '0' },
-                                            { label: 'Bình thường', data: d.bt_l, backgroundColor: '#3498db', stack: '0' },
-                                            { label: 'Cao điểm', data: d.cd_l, backgroundColor: '#e74c3c', stack: '0' },
-                                            { label: '', data: d.bt_u, backgroundColor: '#3498db', stack: '0' },
-                                            { label: '', data: d.cd_u, backgroundColor: '#e74c3c', stack: '0' }
+                                            { label: 'Thấp điểm', data: dataSrc.td, backgroundColor: 'rgba(46, 204, 113, 0.8)', stack: 'Stack 0' },
+                                            { label: 'Bình thường', data: dataSrc.bt_lower, backgroundColor: 'rgba(52, 152, 219, 0.8)', stack: 'Stack 0' },
+                                            { label: 'Cao điểm', data: dataSrc.cd_lower, backgroundColor: 'rgba(231, 76, 60, 0.8)', stack: 'Stack 0' },
+                                            { label: '', data: dataSrc.bt_upper, backgroundColor: 'rgba(52, 152, 219, 0.8)', stack: 'Stack 0' },
+                                            { label: '', data: dataSrc.cd_upper, backgroundColor: 'rgba(231, 76, 60, 0.8)', stack: 'Stack 0' }
                                         ]
                                     },
                                     options: {
-                                        responsive: true, maintainAspectRatio: false,
-                                        scales: { y: {beginAtZero:true, stacked:true}, x:{stacked:true} },
-                                        plugins: { legend: {position:'bottom', labels:{filter: i=>i.text!==''}} }
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        animation: { duration: 500 },
+                                        scales: {
+                                            y: { beginAtZero: true, stacked: true, title: {display: true, text: 'kW'} },
+                                            x: { stacked: true, title: {display: true, text: 'Giờ (0h-23h)'} }
+                                        },
+                                        plugins: {
+                                            legend: {
+                                                position: 'bottom',
+                                                labels: { filter: function(item) { return item.text !== ''; } } // Ẩn label rỗng
+                                            },
+                                            tooltip: {
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        if (!context.dataset.label) return null;
+                                                        return context.dataset.label + ': ' + context.parsed.y + ' kW';
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 });
                             }
@@ -415,6 +410,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <div id="account" class="tab-content {{ 'active' if active_tab == 'account' else '' }}">
             <h2 style="color: #2980b9; text-align: center;">Đổi Mật Khẩu Cá Nhân</h2>
@@ -509,3 +505,8 @@
     </script>
 </body>
 </html>
+
+
+
+
+
