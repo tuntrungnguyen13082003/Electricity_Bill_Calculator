@@ -354,27 +354,51 @@ def home():
 
                         # --- F. TÍNH CÔNG SUẤT MÁY (P_ADD) ---
                         
-                        # 1. Cao điểm (Chỉ ngày thường đi làm mới gánh)
+                        # --- BƯỚC 4: TÍNH CÔNG SUẤT MÁY (P_ADD) ---
+
+                        # Xác định 3 trường hợp
+                        is_sun_work = count_days['sun_work'] > 0
+                        is_sun_off = 6 in list_ngay_nghi
+                        is_weekday_off = count_days['off'] > 0 and not is_sun_off
+
+                        # ===============================
+                        # A. CAO ĐIỂM – LUÔN ƯU TIÊN NGÀY THƯỜNG
+                        # ===============================
                         total_hours_cd_run = hours_cd_in_shift * count_days['week_work']
                         base_kwh_cd = p_base * 5 * count_days['week_work']
                         prod_kwh_cd = max(0, kwh_cd - base_kwh_cd)
+
                         p_add_cd = prod_kwh_cd / total_hours_cd_run if total_hours_cd_run > 0 else 0
 
-                        # 2. Bình thường (Trừ nền tất cả các ngày)
-                        # - Nghỉ thường: 13h BT
-                        # - Nghỉ CN: 18h BT
-                        # - Làm thường: 13h BT
-                        # - Làm CN: 18h BT
-                        total_base_kwh_bt = (count_days['off_weekday'] * 13 * p_base) + \
-                                            (count_days['off_sunday'] * 18 * p_base) + \
-                                            (count_days['week_work'] * 13 * p_base) + \
-                                            (count_days['sun_work'] * 18 * p_base)
-                        
+                        # ===============================
+                        # B. XỬ LÝ THẤP ĐIỂM CHO NGÀY NGHỈ (TH3)
+                        # ===============================
+                        energy_td_used_for_off = 0
+                        if is_sun_work and is_weekday_off:
+                            # dùng thấp điểm để nuôi nền ngày nghỉ
+                            energy_td_used_for_off = count_days['off'] * 6 * p_base
+                            kwh_td = max(0, kwh_td - energy_td_used_for_off)
+
+                        # ===============================
+                        # C. BÌNH THƯỜNG
+                        # ===============================
+                        total_base_kwh_bt = (
+                            count_days['off'] * 18 * p_base +
+                            count_days['week_work'] * 13 * p_base +
+                            count_days['sun_work'] * 18 * p_base
+                        )
+
+                        # Nếu CN đi làm → áp CD từ ngày thường sang CN
                         energy_fake_peak_sun = count_days['sun_work'] * hours_cd_in_shift * p_add_cd
+
                         prod_kwh_bt = max(0, kwh_bt - total_base_kwh_bt - energy_fake_peak_sun)
-                        
-                        total_hours_bt_run = (count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift
+
+                        total_hours_bt_run = (
+                            (count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift
+                        )
+
                         p_add_bt = prod_kwh_bt / total_hours_bt_run if total_hours_bt_run > 0 else 0
+
 
                         # --- G. TẠO DATASET ---
                         def create_profile(mode):
