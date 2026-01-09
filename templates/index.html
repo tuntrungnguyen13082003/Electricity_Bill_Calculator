@@ -229,7 +229,9 @@
                                 <button type="button" onclick="switchChart('sunday_work')" id="btn_sun" class="chart-btn">☀️ Làm việc (CN)</button>
                                 {% endif %}
                                 
+                                {% if du_lieu_nhap.chart_data.stats.off > 0 %}
                                 <button type="button" onclick="switchChart('off_day')" id="btn_off" class="chart-btn">☕ Ngày Nghỉ</button>
+                                {% endif %}
                             </div>
                         </div>
 
