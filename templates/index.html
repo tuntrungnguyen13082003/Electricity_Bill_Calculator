@@ -278,51 +278,68 @@
 
                             function renderLineChart(canvasId, dataSrc) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
+
+                                // 1. TÍNH TỔNG CÔNG SUẤT (Gộp tất cả các thành phần lại)
+                                // Backend gửi xuống dạng mảnh nhỏ (td, bt_l, cd_l...), ta cộng lại để ra đường tổng
+                                const totalLoad = dataSrc.td.map((val, i) => {
+                                    return val + 
+                                           (dataSrc.bt_l[i] || 0) + 
+                                           (dataSrc.cd_l[i] || 0) + 
+                                           (dataSrc.bt_u[i] || 0) + 
+                                           (dataSrc.cd_u[i] || 0);
+                                });
+
+                                // 2. VẼ BIỂU ĐỒ 1 ĐƯỜNG DUY NHẤT
                                 new Chart(ctx, {
-                                    type: 'line', 
+                                    type: 'line',
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
                                             { 
-                                                label: 'Thấp điểm', 
-                                                data: dataSrc.td, 
-                                                backgroundColor: 'rgba(46, 204, 113, 0.4)', 
-                                                borderColor: '#2ecc71',
-                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
-                                            },
-                                            { 
-                                                label: 'Bình thường', 
-                                                data: dataSrc.bt_l,  // <--- ĐÃ SỬA: bt_l
-                                                backgroundColor: 'rgba(52, 152, 219, 0.4)', 
-                                                borderColor: '#3498db',
-                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
-                                            },
-                                            { 
-                                                label: 'Cao điểm', 
-                                                data: dataSrc.cd_l,  // <--- ĐÃ SỬA: cd_l
-                                                backgroundColor: 'rgba(231, 76, 60, 0.4)', 
-                                                borderColor: '#e74c3c',
-                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
-                                            },
-                                            // Các lớp phụ
-                                            { label: '', data: dataSrc.bt_u, backgroundColor: 'rgba(52, 152, 219, 0.4)', borderColor: '#3498db', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' }, // <--- ĐÃ SỬA: bt_u
-                                            { label: '', data: dataSrc.cd_u, backgroundColor: 'rgba(231, 76, 60, 0.4)', borderColor: '#e74c3c', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' }  // <--- ĐÃ SỬA: cd_u
+                                                label: 'Công suất tiêu thụ', 
+                                                data: totalLoad, 
+                                                // Màu xanh biển (Sea Blue)
+                                                borderColor: '#2980b9', 
+                                                backgroundColor: 'rgba(52, 152, 219, 0.3)', 
+                                                borderWidth: 2, 
+                                                fill: true,         // Tô màu nền dưới
+                                                tension: 0.4,       // Đường cong mềm mại
+                                                pointRadius: 0,     // Ẩn chấm tròn cho mượt
+                                                pointHoverRadius: 6 // Hiện chấm khi di chuột vào
+                                            }
                                         ]
                                     },
                                     options: {
-                                        responsive: true, maintainAspectRatio: false,
+                                        responsive: true,
+                                        maintainAspectRatio: false,
                                         scales: {
-                                            y: { beginAtZero: true, stacked: true, title: {display: true, text: 'Công suất (kW)'}, grid: { color: '#f0f0f0' } },
-                                            x: { title: {display: true, text: 'Giờ trong ngày'}, grid: { display: false } }
-                                        },
-                                        plugins: {
-                                            legend: { position: 'bottom', labels: { filter: i => i.text !== '' } },
-                                            tooltip: {
-                                                mode: 'index', intersect: false,
-                                                callbacks: { label: function(context) { if (!context.dataset.label) return null; return context.dataset.label + ': ' + Number(context.parsed.y).toFixed(1) + ' kW'; } }
+                                            y: { 
+                                                beginAtZero: true, 
+                                                title: {display: true, text: 'Công suất (kW)'},
+                                                grid: { color: '#f0f0f0' }
+                                            },
+                                            x: { 
+                                                title: {display: true, text: 'Giờ trong ngày'},
+                                                grid: { display: false }
                                             }
                                         },
-                                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                                        plugins: {
+                                            legend: { display: false }, // Ẩn chú thích (vì chỉ có 1 đường)
+                                            tooltip: {
+                                                mode: 'index',
+                                                intersect: false,
+                                                callbacks: { 
+                                                    label: function(context) { 
+                                                        return 'Công suất: ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
+                                                    } 
+                                                }
+                                            }
+                                        },
+                                        interaction: {
+                                            mode: 'nearest',
+                                            axis: 'x',
+                                            intersect: false
+                                        }
                                     }
                                 });
                             }
