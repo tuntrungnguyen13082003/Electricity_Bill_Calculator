@@ -252,148 +252,172 @@
                         </div>
 
                         <script>
-                            function toggleDropdown() {
-                                var checkList = document.getElementById('list1');
-                                if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
-                                else checkList.classList.add('visible');
-                            }
+                                // --- KHO CHỨA TOÀN CỤC ---
+                                window.myChartInstances = {}; 
 
-                            const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
-
-                            document.addEventListener("DOMContentLoaded", function() {
-                                openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
-                                
-                                // 1. TÍNH MAX Y ĐỂ ĐỒNG BỘ TỈ LỆ
-                                let maxVal = 0;
-                                const allDatasets = [
-                                    chartDataRaw.weekday_work, chartDataRaw.sunday_work, 
-                                    chartDataRaw.off_weekday, chartDataRaw.off_sunday
-                                ];
-
-                                allDatasets.forEach(data => {
-                                    if (data) {
-                                        const hourlyTotals = data.td.map((val, i) => {
-                                            return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
-                                        });
-                                        const currentMax = Math.max(...hourlyTotals);
-                                        if (currentMax > maxVal) maxVal = currentMax;
-                                    }
-                                });
-                                const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
-
-                                // 2. VẼ BIỂU ĐỒ (Dùng biến myChart để lưu instance)
-                                renderInteractiveChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y, false); // false = không phải CN
-                                
-                                if(document.getElementById('chart_sunday')) 
-                                    renderInteractiveChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y, true); // true = là CN
-                                
-                                if(document.getElementById('chart_off_wd')) 
-                                    renderInteractiveChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y, false);
-                                
-                                if(document.getElementById('chart_off_sun')) 
-                                    renderInteractiveChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y, true);
-                            });
-
-                            function renderInteractiveChart(canvasId, dataSrc, maxYValue, isSundayMode) {
-                                const ctx = document.getElementById(canvasId).getContext('2d');
-                                const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-
-                                // Tính dữ liệu tổng ban đầu cho đường Line
-                                const totalLoad = dataSrc.td.map((val, i) => {
-                                    return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
-                                });
-
-                                // Khai báo biến chart để dùng trong onDrag
-                                let myChart;
-
-                                const config = {
-                                    type: 'bar',
-                                    data: {
-                                        labels: chartDataRaw.labels,
-                                        datasets: [
-                                            // --- LỚP 1: ĐƯỜNG TỔNG (KÉO ĐƯỢC) ---
-                                            {
-                                                type: 'line',
-                                                label: 'Tổng công suất (Kéo tôi đi!)',
-                                                data: totalLoad,
-                                                borderColor: DARK_YELLOW, borderWidth: 3,
-                                                pointRadius: 6, pointHoverRadius: 10,
-                                                pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
-                                                tension: 0.4, fill: false, order: 0,
-                                                dragData: true // Cho phép kéo
-                                            },
-                                            // --- LỚP 2: CÁC CỘT (INDEX 1, 2, 3) ---
-                                            { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false },
-                                            // Các lớp phụ (nếu có)
-                                            { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false }
-                                        ]
-                                    },
-                                    options: {
-                                        responsive: true, maintainAspectRatio: false,
-                                        scales: {
-                                            y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'Công suất (kW)'} },
-                                            x: { stacked: true, grid: { display: false } }
-                                        },
-                                        plugins: {
-                                            dragData: {
-                                                round: 1, showTooltip: true,
-                                                // --- XỬ LÝ KHI ĐANG KÉO (REAL-TIME) ---
-                                                onDrag: function(e, datasetIndex, index, value) {
-                                                    if (datasetIndex !== 0) return; // Chỉ cho kéo đường Line
-                                                    e.target.style.cursor = 'grabbing';
-                                                    
-                                                    // Gọi hàm cập nhật cột ngay lập tức
-                                                    updateBarFromLine(myChart, index, value, isSundayMode);
-                                                },
-                                                onDragEnd: function(e, datasetIndex, index, value) {
-                                                    if (datasetIndex !== 0) return;
-                                                    e.target.style.cursor = 'default';
-                                                }
-                                            },
-                                            legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
-                                            tooltip: { mode: 'index', intersect: false }
-                                        }
-                                    }
-                                };
-
-                                myChart = new Chart(ctx, config);
-                            }
-
-                            // --- HÀM LOGIC CẬP NHẬT CỘT ---
-                            function updateBarFromLine(chart, index, value, isSundayMode) {
-                                if (!chart) return;
-
-                                // 1. Xác định giờ hiện tại (index) thuộc loại gì
-                                const h = index;
-                                let targetDatasetIndex = 2; // Mặc định là Bình thường (Xanh dương) - Index 2
-
-                                // Logic giờ EVN
-                                if ([22, 23, 0, 1, 2, 3].includes(h)) {
-                                    targetDatasetIndex = 1; // Thấp điểm (Xanh lá) - Index 1
-                                } 
-                                else if (!isSundayMode && [10, 11, 17, 18, 19].includes(h)) {
-                                    // Chỉ ngày thường mới có Cao điểm
-                                    targetDatasetIndex = 3; // Cao điểm (Đỏ) - Index 3
+                                function toggleDropdown() {
+                                    var checkList = document.getElementById('list1');
+                                    if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
+                                    else checkList.classList.add('visible');
                                 }
 
-                                // 2. Cập nhật dữ liệu
-                                // Tắt hết các cột khác tại giờ đó
-                                chart.data.datasets[1].data[index] = 0;
-                                chart.data.datasets[2].data[index] = 0;
-                                chart.data.datasets[3].data[index] = 0;
-                                chart.data.datasets[4].data[index] = 0; // Phụ
-                                chart.data.datasets[5].data[index] = 0; // Phụ
+                                const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
 
-                                // Bật cột đúng màu lên bằng giá trị đường Line
-                                chart.data.datasets[targetDatasetIndex].data[index] = value;
+                                document.addEventListener("DOMContentLoaded", function() {
+                                    openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
+                                    
+                                    // 1. TÍNH MAX Y CHUNG
+                                    let maxVal = 0;
+                                    const allDatasets = [
+                                        chartDataRaw.weekday_work, chartDataRaw.sunday_work, 
+                                        chartDataRaw.off_weekday, chartDataRaw.off_sunday
+                                    ];
 
-                                // 3. QUAN TRỌNG: Vẽ lại ngay lập tức (không animation)
-                                chart.update('none');
-                            }
-                        </script>
+                                    allDatasets.forEach(data => {
+                                        if (data) {
+                                            const hourlyTotals = data.td.map((val, i) => {
+                                                return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
+                                            });
+                                            const currentMax = Math.max(...hourlyTotals);
+                                            if (currentMax > maxVal) maxVal = currentMax;
+                                        }
+                                    });
+                                    const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
+
+                                    // 2. KHỞI TẠO VÀ LƯU VÀO KHO
+                                    // Lưu ý: Tham số cuối cùng (true/false) là isSundayMode (để quyết định có màu đỏ hay không)
+                                    
+                                    window.myChartInstances['chart_weekday'] = renderInteractiveChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y, false);
+                                    
+                                    if(document.getElementById('chart_sunday')) 
+                                        window.myChartInstances['chart_sunday'] = renderInteractiveChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y, true);
+                                    
+                                    if(document.getElementById('chart_off_wd')) 
+                                        window.myChartInstances['chart_off_wd'] = renderInteractiveChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y, false);
+                                    
+                                    if(document.getElementById('chart_off_sun')) 
+                                        window.myChartInstances['chart_off_sun'] = renderInteractiveChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y, true);
+                                });
+
+                                function renderInteractiveChart(canvasId, dataSrc, maxYValue, isSundayMode) {
+                                    const ctx = document.getElementById(canvasId).getContext('2d');
+                                    const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+
+                                    const totalLoad = dataSrc.td.map((val, i) => {
+                                        return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
+                                    });
+
+                                    const config = {
+                                        type: 'bar',
+                                        data: {
+                                            labels: chartDataRaw.labels,
+                                            datasets: [
+                                                // LỚP 1: LINE (KÉO ĐƯỢC)
+                                                {
+                                                    type: 'line', label: 'Tổng công suất (Kéo tôi đi!)',
+                                                    data: totalLoad,
+                                                    borderColor: DARK_YELLOW, borderWidth: 3,
+                                                    pointRadius: 6, pointHoverRadius: 10,
+                                                    pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
+                                                    tension: 0.4, fill: false, order: 0,
+                                                    dragData: true
+                                                },
+                                                // LỚP 2: CỘT MÀU
+                                                { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'Stack 0', dragData: false },
+                                                { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
+                                                { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false },
+                                                // Phần phụ
+                                                { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
+                                                { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false }
+                                            ]
+                                        },
+                                        options: {
+                                            responsive: true, maintainAspectRatio: false,
+                                            scales: {
+                                                y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'Công suất (kW)'} },
+                                                x: { stacked: true, grid: { display: false } }
+                                            },
+                                            plugins: {
+                                                dragData: {
+                                                    round: 1, showTooltip: true,
+                                                    // --- SỰ KIỆN KÉO THẢ (REAL-TIME) ---
+                                                    onDrag: function(e, datasetIndex, index, value) {
+                                                        if (datasetIndex !== 0) return; 
+                                                        e.target.style.cursor = 'grabbing';
+                                                        
+                                                        // 1. Cập nhật chính nó
+                                                        const currentChart = window.myChartInstances[canvasId];
+                                                        if (currentChart) {
+                                                            updateBarFromLine(currentChart, index, value, isSundayMode);
+                                                            
+                                                            // 2. ĐỒNG BỘ TẤT CẢ BIỂU ĐỒ KHÁC
+                                                            syncAllCharts(canvasId, index, value);
+                                                        }
+                                                    },
+                                                    onDragEnd: function(e, datasetIndex, index, value) {
+                                                        if (datasetIndex !== 0) return;
+                                                        e.target.style.cursor = 'default';
+                                                    }
+                                                },
+                                                legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
+                                                tooltip: { mode: 'index', intersect: false }
+                                            }
+                                        }
+                                    };
+
+                                    return new Chart(ctx, config);
+                                }
+
+                                // --- HÀM CẬP NHẬT CỘT MÀU ---
+                                function updateBarFromLine(chart, index, value, isSundayMode) {
+                                    const h = index;
+                                    let targetIdx = 2; // Bình thường (Blue)
+
+                                    // Logic EVN
+                                    if ([22, 23, 0, 1, 2, 3].includes(h)) {
+                                        targetIdx = 1; // Thấp điểm (Green)
+                                    } 
+                                    else if (!isSundayMode && [10, 11, 17, 18, 19].includes(h)) {
+                                        // Chỉ ngày thường mới có Cao điểm (Red)
+                                        targetIdx = 3; 
+                                    }
+
+                                    // Reset
+                                    chart.data.datasets[1].data[index] = 0;
+                                    chart.data.datasets[2].data[index] = 0;
+                                    chart.data.datasets[3].data[index] = 0;
+                                    chart.data.datasets[4].data[index] = 0;
+                                    chart.data.datasets[5].data[index] = 0;
+
+                                    // Gán giá trị
+                                    chart.data.datasets[targetIdx].data[index] = value;
+                                    chart.update('none');
+                                }
+
+                                // --- HÀM ĐỒNG BỘ TOÀN DIỆN (MAGIC) ---
+                                function syncAllCharts(sourceId, index, value) {
+                                    // Danh sách tất cả các ID có thể có
+                                    const allIds = ['chart_weekday', 'chart_sunday', 'chart_off_wd', 'chart_off_sun'];
+
+                                    allIds.forEach(targetId => {
+                                        // Bỏ qua chính biểu đồ đang kéo (vì nó đã tự update rồi)
+                                        if (targetId === sourceId) return;
+
+                                        const targetChart = window.myChartInstances[targetId];
+                                        if (targetChart) {
+                                            // 1. Cập nhật đường Line (Dataset 0)
+                                            targetChart.data.datasets[0].data[index] = value;
+
+                                            // 2. Xác định xem Target Chart này là loại CN hay Ngày thường
+                                            // Để tô màu cho đúng luật EVN
+                                            const isTargetSunday = (targetId === 'chart_sunday' || targetId === 'chart_off_sun');
+
+                                            // 3. Cập nhật cột màu
+                                            updateBarFromLine(targetChart, index, value, isTargetSunday);
+                                        }
+                                    });
+                                }
+                            </script>
                         {% endif %}
                     </div>
 
