@@ -174,23 +174,19 @@
 
                     <div id="sub_bieu_do" class="v-tab-content">
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Phân tích Phụ tải 3 Giá</h3>
+                        
                         <form method="POST">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                                <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
-                                <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
-                            </div>
-
                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                                 <div><label style="color:#c0392b">Cao điểm (kWh):</label><input type="number" name="kwh_cd" class="form-control" value="{{ du_lieu_nhap.get('kwh_cd', '') }}" required></div>
                                 <div><label style="color:#2980b9">Bình thường (kWh):</label><input type="number" name="kwh_bt" class="form-control" value="{{ du_lieu_nhap.get('kwh_bt', '') }}" required></div>
                                 <div><label style="color:#27ae60">Thấp điểm (kWh):</label><input type="number" name="kwh_td" class="form-control" value="{{ du_lieu_nhap.get('kwh_td', '') }}" required></div>
                             </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                                <div><label>Giờ làm việc (Từ):</label><input type="time" name="gio_lam_tu" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_tu', '08:00') }}"></div>
-                                <div><label>Giờ làm việc (Đến):</label><input type="time" name="gio_lam_den" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_den', '17:00') }}"></div>
-                            </div>
                             
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
+                                <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
+                            </div>
+
                             <div style="margin-top: 10px;">
                                 <label>Chọn ngày nghỉ trong tuần:</label>
                                 <div id="list1" class="dropdown-check-list" tabindex="100">
@@ -208,6 +204,11 @@
                                 </div>
                             </div>
 
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                <div><label>Giờ làm việc (Từ):</label><input type="time" name="gio_lam_tu" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_tu', '08:00') }}"></div>
+                                <div><label>Giờ làm việc (Đến):</label><input type="time" name="gio_lam_den" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_den', '17:00') }}"></div>
+                            </div>
+
                             <button type="submit" name="btn_calc_load" class="btn-calc" style="background: #8e44ad; margin-top: 20px;">VẼ BIỂU ĐỒ</button>
                         </form>
 
@@ -221,87 +222,109 @@
                             </div>
                         </div>
 
-                        <div style="margin-top: 15px; text-align: center;">
-                            <div class="btn-group" role="group" style="display: inline-flex; background: #eee; padding: 3px; border-radius: 5px;">
-                                <button type="button" onclick="switchChart('weekday_work')" id="btn_week" class="chart-btn active">🏭 Ngày Thường</button>
-                                
-                                {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
-                                <button type="button" onclick="switchChart('sunday_work')" id="btn_sun" class="chart-btn">☀️ Làm việc (CN)</button>
-                                {% endif %}
-                                
-                                {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
-                                <button type="button" onclick="switchChart('off_weekday')" id="btn_off_wd" class="chart-btn">☕ Nghỉ (Ngày thường)</button>
-                                {% endif %}
-
-                                {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
-                                <button type="button" onclick="switchChart('off_sunday')" id="btn_off_sun" class="chart-btn">☕ Nghỉ (CN)</button>
-                                {% endif %}
+                        <div style="display: flex; flex-wrap: nowrap; gap: 15px; overflow-x: auto; margin-top: 20px; padding-bottom: 10px;">
+                            
+                            <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+                                <h4 style="text-align:center; margin: 0 0 10px 0; color: #2c3e50;">🏭 Ngày Thường</h4>
+                                <canvas id="chart_weekday"></canvas>
                             </div>
+
+                            {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
+                            <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+                                <h4 style="text-align:center; margin: 0 0 10px 0; color: #f39c12;">☀️ Làm việc (CN)</h4>
+                                <canvas id="chart_sunday"></canvas>
+                            </div>
+                            {% endif %}
+
+                            {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
+                            <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+                                <h4 style="text-align:center; margin: 0 0 10px 0; color: #7f8c8d;">☕ Nghỉ (Ngày thường)</h4>
+                                <canvas id="chart_off_wd"></canvas>
+                            </div>
+                            {% endif %}
+
+                            {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
+                            <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
+                                <h4 style="text-align:center; margin: 0 0 10px 0; color: #95a5a6;">☕ Nghỉ (Chủ Nhật)</h4>
+                                <canvas id="chart_off_sun"></canvas>
+                            </div>
+                            {% endif %}
                         </div>
 
-                        <div style="margin-top: 15px; height: 400px;">
-                            <canvas id="loadChart"></canvas>
-                        </div>
-                        
                         <script>
-                            let myChart = null;
-                            const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
-
-                            document.addEventListener("DOMContentLoaded", function() {
-                                openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
-                                renderChart('weekday_work');
-                            });
-
                             function toggleDropdown() {
                                 var checkList = document.getElementById('list1');
                                 if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
                                 else checkList.classList.add('visible');
                             }
 
-                            function switchChart(mode) {
-                                // Reset tất cả nút về mặc định
-                                document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+                            const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+
+                            document.addEventListener("DOMContentLoaded", function() {
+                                openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
                                 
-                                // Bật active cho nút tương ứng
-                                if(mode === 'weekday_work') document.getElementById('btn_week').classList.add('active');
-                                else if(mode === 'sunday_work') {
-                                    const btn = document.getElementById('btn_sun');
-                                    if(btn) btn.classList.add('active');
-                                }
-                                else if(mode === 'off_weekday') {
-                                    const btn = document.getElementById('btn_off_wd');
-                                    if(btn) btn.classList.add('active');
-                                }
-                                else if(mode === 'off_sunday') {
-                                    const btn = document.getElementById('btn_off_sun');
-                                    if(btn) btn.classList.add('active');
-                                }
+                                // Vẽ các biểu đồ tồn tại
+                                renderLineChart('chart_weekday', chartDataRaw.weekday_work);
                                 
-                                renderChart(mode);
-                            }
+                                if(document.getElementById('chart_sunday')) 
+                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work);
+                                
+                                if(document.getElementById('chart_off_wd')) 
+                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday);
+                                
+                                if(document.getElementById('chart_off_sun')) 
+                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday);
+                            });
 
-                            function renderChart(mode) {
-                                const ctx = document.getElementById('loadChart').getContext('2d');
-                                const d = chartDataRaw[mode]; 
-
-                                if (myChart) myChart.destroy();
-
-                                myChart = new Chart(ctx, {
-                                    type: 'bar',
+                            function renderLineChart(canvasId, dataSrc) {
+                                const ctx = document.getElementById(canvasId).getContext('2d');
+                                new Chart(ctx, {
+                                    type: 'line', // CHUYỂN SANG BIỂU ĐỒ ĐƯỜNG
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
-                                            { label: 'Thấp điểm', data: d.td, backgroundColor: '#2ecc71', stack: '0' },
-                                            { label: 'Bình thường', data: d.bt_l, backgroundColor: '#3498db', stack: '0' },
-                                            { label: 'Cao điểm', data: d.cd_l, backgroundColor: '#e74c3c', stack: '0' },
-                                            { label: '', data: d.bt_u, backgroundColor: '#3498db', stack: '0' },
-                                            { label: '', data: d.cd_u, backgroundColor: '#e74c3c', stack: '0' }
+                                            { 
+                                                label: 'Thấp điểm', data: dataSrc.td, 
+                                                backgroundColor: 'rgba(46, 204, 113, 0.6)', borderColor: 'rgba(46, 204, 113, 1)',
+                                                fill: true, pointRadius: 0, tension: 0.4, stack: '0' 
+                                            },
+                                            { 
+                                                label: 'Bình thường', data: dataSrc.bt_lower, 
+                                                backgroundColor: 'rgba(52, 152, 219, 0.6)', borderColor: 'rgba(52, 152, 219, 1)',
+                                                fill: true, pointRadius: 0, tension: 0.4, stack: '0' 
+                                            },
+                                            { 
+                                                label: 'Cao điểm', data: dataSrc.cd_lower, 
+                                                backgroundColor: 'rgba(231, 76, 60, 0.6)', borderColor: 'rgba(231, 76, 60, 1)',
+                                                fill: true, pointRadius: 0, tension: 0.4, stack: '0' 
+                                            },
+                                            { 
+                                                label: '', data: dataSrc.bt_upper, 
+                                                backgroundColor: 'rgba(52, 152, 219, 0.6)', borderColor: 'rgba(52, 152, 219, 1)',
+                                                fill: true, pointRadius: 0, tension: 0.4, stack: '0' 
+                                            },
+                                            { 
+                                                label: '', data: dataSrc.cd_upper, 
+                                                backgroundColor: 'rgba(231, 76, 60, 0.6)', borderColor: 'rgba(231, 76, 60, 1)',
+                                                fill: true, pointRadius: 0, tension: 0.4, stack: '0' 
+                                            }
                                         ]
                                     },
                                     options: {
-                                        responsive: true, maintainAspectRatio: false,
-                                        scales: { y: {beginAtZero:true, stacked:true}, x:{stacked:true} },
-                                        plugins: { legend: {position:'bottom', labels:{filter: i=>i.text!==''}} }
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        scales: {
+                                            y: { beginAtZero: true, stacked: true, title: {display: true, text: 'kW'} },
+                                            x: { title: {display: true, text: 'Giờ'} }
+                                        },
+                                        plugins: {
+                                            legend: { position: 'bottom', labels: { filter: i => i.text !== '' } },
+                                            tooltip: {
+                                                mode: 'index', intersect: false,
+                                                callbacks: { label: function(context) { if (!context.dataset.label) return null; return context.dataset.label + ': ' + context.parsed.y + ' kW'; } }
+                                            }
+                                        },
+                                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
                                     }
                                 });
                             }
