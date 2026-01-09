@@ -271,7 +271,7 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (LOGIC NÂNG CAO & ĐÃ FIX LỖI TIME)
+        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (ĐÃ FIX LỖI BIẾN p_td)
         elif 'btn_calc_load' in request.form:
             try:
                 # 1. Hàm lấy số an toàn
@@ -280,14 +280,13 @@ def home():
                     if not val or val.strip() == '': return 0.0
                     return float(val)
 
-                # 2. Hàm lấy giờ an toàn (Chống sập khi ô giờ bị trống)
+                # 2. Hàm lấy giờ an toàn
                 def get_hour_safe(key, default_h):
                     val = request.form.get(key)
                     if not val or ':' not in val: return default_h
                     try: return int(val.split(':')[0])
                     except: return default_h
 
-                # Lấy dữ liệu
                 kwh_cd = get_float_safe('kwh_cd')
                 kwh_td = get_float_safe('kwh_td')
                 kwh_bt = get_float_safe('kwh_bt')
@@ -295,11 +294,9 @@ def home():
                 d_start = request.form.get('ngay_dau')
                 d_end = request.form.get('ngay_cuoi')
                 
-                # Lấy giờ làm việc (Mặc định 8h -> 17h nếu lỗi)
                 h_start = get_hour_safe('gio_lam_tu', 8)
                 h_end = get_hour_safe('gio_lam_den', 17)
 
-                # Cập nhật lại input để form không bị trắng
                 du_lieu_nhap.update({
                     'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                     'ngay_dau': d_start, 'ngay_cuoi': d_end,
@@ -309,22 +306,20 @@ def home():
 
                 if d_start and d_end:
                     date_format = "%Y-%m-%d"
-                    # Thêm try-catch cho ngày tháng đề phòng nhập sai format
                     try:
                         delta = datetime.strptime(d_end, date_format) - datetime.strptime(d_start, date_format)
                         so_ngay = delta.days + 1
                     except: so_ngay = 0
                     
                     if so_ngay > 0:
-                        # --- BẮT ĐẦU TÍNH TOÁN ---
                         avg_day_cd = kwh_cd / so_ngay
                         avg_day_td = kwh_td / so_ngay
                         avg_day_bt = kwh_bt / so_ngay
                         
-                        # Tải nền (P_base) = TB giờ thấp điểm (chia 6h)
+                        # Tải nền (P_base) = TB giờ thấp điểm
                         p_base = avg_day_td / 6 if avg_day_td > 0 else 0
                         
-                        # --- XỬ LÝ BÌNH THƯỜNG (BT) ---
+                        # --- XỬ LÝ BÌNH THƯỜNG ---
                         total_hours_bt = 13 
                         energy_base_bt = p_base * total_hours_bt
                         energy_remain_bt = max(0, avg_day_bt - energy_base_bt)
@@ -338,7 +333,7 @@ def home():
                             
                         p_add_bt = energy_remain_bt / count_work_bt if count_work_bt > 0 else 0
 
-                        # --- XỬ LÝ CAO ĐIỂM (CD) ---
+                        # --- XỬ LÝ CAO ĐIỂM ---
                         total_hours_cd = 5
                         energy_base_cd = p_base * total_hours_cd
                         energy_remain_cd = max(0, avg_day_cd - energy_base_cd)
@@ -352,13 +347,8 @@ def home():
                             
                         p_add_cd = energy_remain_cd / count_work_cd if count_work_cd > 0 else 0
 
-                        # --- TẠO DỮ LIỆU BIỂU ĐỒ ---
-                        data_td = []
-                        data_bt_lower = []
-                        data_cd_lower = []
-                        data_bt_upper = []
-                        data_cd_upper = []
-                        labels = []
+                        # --- TẠO DỮ LIỆU ---
+                        data_td, data_bt_lower, data_cd_lower, data_bt_upper, data_cd_upper, labels = [], [], [], [], [], []
 
                         for h in range(24):
                             labels.append(f"{h}h")
@@ -370,20 +360,20 @@ def home():
                             v_td, v_bt_lower, v_cd_lower, v_bt_upper, v_cd_upper = 0, 0, 0, 0, 0
 
                             if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
-                                v_td = p_td # Thấp điểm giữ nguyên
+                                v_td = p_base  # <--- ĐÃ SỬA: Dùng p_base thay vì p_td (biến cũ)
                             
-                            elif h == 9: # 9h: BT dưới, CD trên
+                            elif h == 9: 
                                 v_bt_lower = get_p(p_add_bt) * 0.5
                                 v_cd_upper = get_p(p_add_cd) * 0.5
                                 
-                            elif h == 11: # 11h: CD dưới, BT trên
+                            elif h == 11: 
                                 v_cd_lower = get_p(p_add_cd) * 0.5
                                 v_bt_upper = get_p(p_add_bt) * 0.5
                                 
-                            elif h == 10 or h in [17, 18, 19]: # Full Cao điểm
+                            elif h == 10 or h in [17, 18, 19]: 
                                 v_cd_lower = get_p(p_add_cd)
                                 
-                            else: # Full Bình thường
+                            else: 
                                 v_bt_lower = get_p(p_add_bt)
 
                             data_td.append(round(v_td, 2))
@@ -403,10 +393,9 @@ def home():
                             }
                         }
             except Exception as e: 
-                print(f"Lỗi tính tải: {e}") # Xem lỗi ở log server nếu cần
-                msg_update = f"❌ Lỗi tính toán: {str(e)}"
+                print(f"Lỗi tính tải: {e}")
+                msg_update = f"❌ Lỗi: {str(e)}"
             
-            # QUAN TRỌNG: Giữ người dùng ở lại tab Calc
             active_tab = 'calc'
 
     # --- 7. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
