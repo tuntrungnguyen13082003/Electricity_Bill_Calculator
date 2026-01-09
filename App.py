@@ -158,14 +158,13 @@ def home():
             if del_u not in ['admin', current_user]: del USERS[del_u]; save_json_file(users_path, USERS)
             active_tab = 'users'
 
-        # 3. CẬP NHẬT GIÁ (ĐÃ SỬA LỖI NAME ERROR VÀ SYNTAX ERROR Ở ĐÂY)
+        # 3. CẬP NHẬT GIÁ
         elif 'btn_update_price' in request.form and current_role == 'admin':
             try:
-                # --- HÀM CON ĐỂ XỬ LÝ SỐ LIỆU ---
                 def get_float(key, default=0):
                     val = request.form.get(key, str(default))
                     if not val: return default
-                    return float(val.replace(',', '.')) # Đổi phẩy thành chấm
+                    return float(val.replace(',', '.'))
 
                 SETTINGS['evn_bac'] = [get_float(f'b{i}') for i in range(1, 7)]
                 SETTINGS['gia_kinh_doanh'] = get_float('gia_kd')
@@ -174,22 +173,19 @@ def home():
                 
                 if 'he_so_nhom' not in SETTINGS: SETTINGS['he_so_nhom'] = {}
                 
-                # Lưu hệ số Hộ GĐ
                 for k in ['gd_co_nguoi', 'gd_di_lam', 'gd_ban_dem']:
                     raw = get_float(f'hs_{k}')
                     SETTINGS['he_so_nhom'][k] = min(1.0, max(0.0, raw))
 
-                # Lưu hệ số Min/Max KD/SX
                 for k in ['kd_min', 'kd_max', 'sx_min', 'sx_max']:
                     raw = get_float(f'hs_{k}')
                     SETTINGS['he_so_nhom'][k] = min(1.0, max(0.0, raw))
                     
                 save_json_file(settings_path, {k:v for k,v in SETTINGS.items() if k != 'tinh_thanh'})
                 msg_update = "✅ Đã lưu giá!"
-                
             except Exception as e: 
                 print(f"Lỗi update price: {e}") 
-                msg_update = "❌ Lỗi nhập số! Hãy kiểm tra lại các ô trống."
+                msg_update = "❌ Lỗi nhập số!"
             active_tab = 'config'
         
         # 4. QUẢN LÝ TỈNH
@@ -214,7 +210,6 @@ def home():
                 except: msg_update = "❌ Lỗi file!"
             active_tab = 'config'
         
-        # (Thêm lại chức năng Upload Lịch sử - đề phòng bạn cần dùng)
         elif 'btn_upload_history' in request.form and current_role == 'admin':
             if 'file_history' not in request.files: msg_update = "❌ Chưa chọn file!"
             else:
@@ -223,7 +218,7 @@ def home():
                     try: file.save(history_path); msg_update = "✅ Đã cập nhật file Lịch Sử!"; active_tab = 'history'
                     except Exception as e: msg_update = f"❌ Lỗi: {e}"
 
-        # 5. TÍNH TOÁN & LƯU EXCEL
+        # 5. TÍNH TOÁN CÔNG SUẤT (DỰ TOÁN)
         elif 'btn_calc' in request.form:
             try:
                 ten_kh = request.form.get('ten_khach_hang', 'Khách vãng lai')
@@ -256,22 +251,18 @@ def home():
                 try:
                     map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
                     ten_sheet = map_sheet.get(lh, 'Khác')
-                    
                     thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                     new_row = pd.DataFrame([{
-                        "Tên Khách Hàng": ten_kh, 
-                        "Thời Gian": thoi_gian, 
+                        "Tên Khách Hàng": ten_kh, "Thời Gian": thoi_gian, 
                         "Khu Vực": f"{tc} - {ten_sheet}", 
                         "Đầu Vào": f"{raw_gt} {'VNĐ' if cd=='theo_tien' else 'kWh'}/Month", 
                         "Kết Quả (kWp)": excel_res
                     }])
                     
                     all_sheets = pd.read_excel(history_path, sheet_name=None) if os.path.exists(history_path) else {}
-                    
                     if ten_sheet in all_sheets: 
                         all_sheets[ten_sheet] = pd.concat([all_sheets[ten_sheet], new_row], ignore_index=True)
-                    else: 
-                        all_sheets[ten_sheet] = new_row
+                    else: all_sheets[ten_sheet] = new_row
                     
                     with pd.ExcelWriter(history_path) as writer:
                         for s_name, data in all_sheets.items(): data.to_excel(writer, sheet_name=s_name, index=False)
@@ -280,31 +271,14 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-    # --- 6. ĐỌC LỊCH SỬ GỘP ---
-    lich_su_data = []
-    if os.path.exists(history_path):
-        try:
-            all_sheets = pd.read_excel(history_path, sheet_name=None)
-            for s_name, df in all_sheets.items():
-                if not df.empty:
-                    df['id_row'] = df.index     # ID dòng để xóa
-                    df['sheet_source'] = s_name # Tên sheet để biết nguồn
-                    lich_su_data.extend(df.to_dict('records'))
-            
-            # Sắp xếp mới nhất lên đầu
-            lich_su_data.sort(key=lambda x: datetime.strptime(x['Thời Gian'], "%d/%m/%Y %H:%M:%S"), reverse=True)
-        except: pass
-
-        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (Đã sửa lỗi nhập liệu)
+        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (ĐÃ CHUYỂN LÊN ĐÂY CHO ĐÚNG CẤU TRÚC IF/ELIF)
         elif 'btn_calc_load' in request.form:
             try:
-                # Hàm con để lấy số an toàn (tránh lỗi khi để trống)
                 def get_float_safe(key):
                     val = request.form.get(key, '')
                     if not val or val.strip() == '': return 0.0
                     return float(val)
 
-                # Lấy dữ liệu an toàn
                 kwh_cd = get_float_safe('kwh_cd')
                 kwh_td = get_float_safe('kwh_td')
                 kwh_bt = get_float_safe('kwh_bt')
@@ -312,7 +286,6 @@ def home():
                 d_start = request.form.get('ngay_dau')
                 d_end = request.form.get('ngay_cuoi')
                 
-                # Cập nhật lại input để không bị mất chữ khi reload
                 du_lieu_nhap.update({
                     'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                     'ngay_dau': d_start, 'ngay_cuoi': d_end,
@@ -320,24 +293,20 @@ def home():
                     'gio_lam_den': request.form.get('gio_lam_den')
                 })
 
-                # Kiểm tra ngày tháng
                 if d_start and d_end:
                     date_format = "%Y-%m-%d"
                     delta = datetime.strptime(d_end, date_format) - datetime.strptime(d_start, date_format)
                     so_ngay = delta.days + 1
                     
                     if so_ngay > 0:
-                        # 1. Tính trung bình ngày
                         avg_day_cd = kwh_cd / so_ngay
                         avg_day_td = kwh_td / so_ngay
                         avg_day_bt = kwh_bt / so_ngay
                         
-                        # 2. Chia công suất trung bình (TD: 6h, CD: 5h, BT: 13h)
                         p_td = avg_day_td / 6 if avg_day_td > 0 else 0
                         p_cd = avg_day_cd / 5 if avg_day_cd > 0 else 0
                         p_bt = avg_day_bt / 13 if avg_day_bt > 0 else 0
                         
-                        # 3. Tạo dữ liệu biểu đồ
                         chart_data = {'labels': [], 'values': [], 'colors': []}
                         for h in range(24):
                             chart_data['labels'].append(f"{h}h")
@@ -352,15 +321,26 @@ def home():
                                 chart_data['colors'].append('rgba(52, 152, 219, 0.8)')
                                 
                         du_lieu_nhap['chart_data'] = chart_data
-            
             except Exception as e: 
                 print(f"Lỗi tính tải: {e}")
                 msg_update = f"❌ Lỗi tính toán: {e}"
-            
             active_tab = 'calc'
 
+    # --- 7. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
+    lich_su_data = []
+    if os.path.exists(history_path):
+        try:
+            all_sheets = pd.read_excel(history_path, sheet_name=None)
+            for s_name, df in all_sheets.items():
+                if not df.empty:
+                    df['id_row'] = df.index
+                    df['sheet_source'] = s_name
+                    lich_su_data.extend(df.to_dict('records'))
+            lich_su_data.sort(key=lambda x: datetime.strptime(x['Thời Gian'], "%d/%m/%Y %H:%M:%S"), reverse=True)
+        except: pass
 
     return render_template('index.html', role=current_role, settings=SETTINGS, users=USERS, ket_qua=ket_qua, dien_tich=dien_tich, du_lieu_nhap=du_lieu_nhap, msg_update=msg_update, active_tab=active_tab, gio_nang_da_dung=gio_nang_da_dung, lich_su=lich_su_data)
+
 
 # --- ROUTE XÓA LỊCH SỬ ---
 @app.route('/delete_history', methods=['POST'])
