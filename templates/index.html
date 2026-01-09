@@ -263,24 +263,46 @@
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
                                 
-                                // Vẽ các biểu đồ tồn tại
-                                renderLineChart('chart_weekday', chartDataRaw.weekday_work);
+                                // --- BƯỚC 1: TÌM GIÁ TRỊ LỚN NHẤT TRONG TẤT CẢ CÁC BIỂU ĐỒ (ĐỂ ĐỒNG BỘ TRỤC Y) ---
+                                let maxVal = 0;
+                                const allDatasets = [
+                                    chartDataRaw.weekday_work, 
+                                    chartDataRaw.sunday_work, 
+                                    chartDataRaw.off_weekday, 
+                                    chartDataRaw.off_sunday
+                                ];
+
+                                allDatasets.forEach(data => {
+                                    if (data) {
+                                        // Tính tổng công suất tại mỗi giờ để tìm đỉnh cao nhất
+                                        const hourlyTotals = data.td.map((val, i) => {
+                                            return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
+                                        });
+                                        const currentMax = Math.max(...hourlyTotals);
+                                        if (currentMax > maxVal) maxVal = currentMax;
+                                    }
+                                });
+
+                                // Cộng thêm 10% cho thoáng
+                                const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.1) : 50;
+
+                                // --- BƯỚC 2: VẼ CÁC BIỂU ĐỒ ---
+                                renderLineChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_sunday')) 
-                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work);
+                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_off_wd')) 
-                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday);
+                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_off_sun')) 
-                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday);
+                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y);
                             });
 
-                            function renderLineChart(canvasId, dataSrc) {
+                            function renderLineChart(canvasId, dataSrc, maxYValue) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
 
                                 // 1. TÍNH TỔNG CÔNG SUẤT (Gộp tất cả các thành phần lại)
-                                // Backend gửi xuống dạng mảnh nhỏ (td, bt_l, cd_l...), ta cộng lại để ra đường tổng
                                 const totalLoad = dataSrc.td.map((val, i) => {
                                     return val + 
                                            (dataSrc.bt_l[i] || 0) + 
@@ -289,7 +311,7 @@
                                            (dataSrc.cd_u[i] || 0);
                                 });
 
-                                // 2. VẼ BIỂU ĐỒ 1 ĐƯỜNG DUY NHẤT
+                                // 2. VẼ BIỂU ĐỒ
                                 new Chart(ctx, {
                                     type: 'line',
                                     data: {
@@ -315,6 +337,7 @@
                                         scales: {
                                             y: { 
                                                 beginAtZero: true, 
+                                                max: maxYValue, // <--- ĐỒNG BỘ TRỤC Y
                                                 title: {display: true, text: 'Công suất (kW)'},
                                                 grid: { color: '#f0f0f0' }
                                             },
@@ -324,7 +347,7 @@
                                             }
                                         },
                                         plugins: {
-                                            legend: { display: false }, // Ẩn chú thích (vì chỉ có 1 đường)
+                                            legend: { display: false }, 
                                             tooltip: {
                                                 mode: 'index',
                                                 intersect: false,
