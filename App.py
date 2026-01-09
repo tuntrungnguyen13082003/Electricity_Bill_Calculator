@@ -271,10 +271,10 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-# 6. TÍNH BIỂU ĐỒ PHỤ TẢI (FIX: MÀU NGÀY NGHỈ & LỖI 500)
+# 6. TÍNH BIỂU ĐỒ PHỤ TẢI (FINAL 2: TÁCH RIÊNG NGÀY NGHỈ T7 & CN)
         elif 'btn_calc_load' in request.form:
             try:
-                # 1. HÀM HỖ TRỢ
+                # --- A. HÀM HỖ TRỢ ---
                 def get_float_safe(key):
                     val = request.form.get(key, '')
                     return float(val) if val and val.strip() else 0.0
@@ -285,7 +285,7 @@ def home():
                     try: return int(val.split(':')[0])
                     except: return default_h
 
-                # 2. INPUT
+                # --- B. LẤY INPUT ---
                 kwh_cd = get_float_safe('kwh_cd')
                 kwh_td = get_float_safe('kwh_td')
                 kwh_bt = get_float_safe('kwh_bt')
@@ -315,25 +315,32 @@ def home():
                     except: total_days = 0
                     
                     if total_days > 0:
-                        # --- BƯỚC 1: ĐẾM SỐ NGÀY ---
-                        count_days = {'total': total_days, 'week_work': 0, 'sun_work': 0, 'off': 0}
+                        # --- C. PHÂN LOẠI CHI TIẾT SỐ NGÀY ---
+                        count_days = {
+                            'total': total_days, 
+                            'week_work': 0, 'sun_work': 0, 
+                            'off_weekday': 0, 'off_sunday': 0
+                        }
                         
                         for i in range(total_days):
                             current_day = start_date + timedelta(days=i)
                             wd = current_day.weekday() # 0=T2...6=CN
                             
                             if wd in list_ngay_nghi:
-                                count_days['off'] += 1
-                            elif wd == 6: 
-                                count_days['sun_work'] += 1
-                            else: 
-                                count_days['week_work'] += 1
+                                if wd == 6: count_days['off_sunday'] += 1
+                                else: count_days['off_weekday'] += 1
+                            else:
+                                if wd == 6: count_days['sun_work'] += 1
+                                else: count_days['week_work'] += 1
                         
-                        # --- BƯỚC 2: TÍNH TẢI NỀN (P_BASE) ---
+                        # Tổng số ngày nghỉ (để tính toán trừ tải nền)
+                        total_off_days = count_days['off_weekday'] + count_days['off_sunday']
+
+                        # --- D. TÍNH TẢI NỀN ---
                         avg_total_day_td = kwh_td / total_days
                         p_base = avg_total_day_td / 6 if avg_total_day_td > 0 else 0
 
-                        # --- BƯỚC 3: PHÂN TÍCH CA LÀM VIỆC ---
+                        # --- E. PHÂN TÍCH CA LÀM VIỆC ---
                         hours_cd_in_shift = 0 
                         hours_bt_in_shift = 0
                         real_h_end = max(h_start + 1, h_end)
@@ -345,39 +352,40 @@ def home():
                                 hours_cd_in_shift += 0.5; hours_bt_in_shift += 0.5
                             else: hours_bt_in_shift += 1
 
-                        # --- BƯỚC 4: TÍNH CÔNG SUẤT MÁY (P_ADD) ---
+                        # --- F. TÍNH CÔNG SUẤT MÁY (P_ADD) ---
                         
-                        # A. Cao điểm (Chỉ tính trên ngày thường đi làm)
+                        # 1. Cao điểm (Chỉ ngày thường đi làm mới gánh)
                         total_hours_cd_run = hours_cd_in_shift * count_days['week_work']
                         base_kwh_cd = p_base * 5 * count_days['week_work']
                         prod_kwh_cd = max(0, kwh_cd - base_kwh_cd)
-                        
                         p_add_cd = prod_kwh_cd / total_hours_cd_run if total_hours_cd_run > 0 else 0
 
-                        # B. Bình thường (Trừ nền tất cả các ngày)
-                        total_base_kwh_bt = (count_days['off'] * 18 * p_base) + \
+                        # 2. Bình thường (Trừ nền tất cả các ngày)
+                        # - Nghỉ thường: 13h BT
+                        # - Nghỉ CN: 18h BT
+                        # - Làm thường: 13h BT
+                        # - Làm CN: 18h BT
+                        total_base_kwh_bt = (count_days['off_weekday'] * 13 * p_base) + \
+                                            (count_days['off_sunday'] * 18 * p_base) + \
                                             (count_days['week_work'] * 13 * p_base) + \
                                             (count_days['sun_work'] * 18 * p_base)
                         
-                        # Trừ năng lượng giả Peak vào CN đi làm
                         energy_fake_peak_sun = count_days['sun_work'] * hours_cd_in_shift * p_add_cd
                         prod_kwh_bt = max(0, kwh_bt - total_base_kwh_bt - energy_fake_peak_sun)
                         
                         total_hours_bt_run = (count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift
                         p_add_bt = prod_kwh_bt / total_hours_bt_run if total_hours_bt_run > 0 else 0
 
-                        # --- BƯỚC 5: TẠO DATASET ---
+                        # --- G. TẠO DATASET ---
                         def create_profile(mode):
+                            # mode: 'week_work', 'sun_work', 'off_weekday', 'off_sunday'
                             data = {'td': [], 'bt_l': [], 'cd_l': [], 'bt_u': [], 'cd_u': []}
                             
-                            is_off = (mode == 'off')
-                            # QUAN TRỌNG: Xác định xem có áp dụng giá CN (Full xanh) không?
-                            # 1. Nếu là CN đi làm (sun_work) -> Chắc chắn giá CN.
-                            # 2. Nếu là Ngày nghỉ (off) VÀ trong list nghỉ có chứa số 6 (CN) -> Giá CN.
-                            use_sunday_pricing = (mode == 'sun_work') or (is_off and 6 in list_ngay_nghi)
+                            is_off = 'off' in mode
+                            is_sunday_mode = (mode == 'sun_work' or mode == 'off_sunday')
                             
                             for h in range(24):
-                                # 1. Máy chạy hay không?
+                                # 1. Máy chạy? (Chỉ khi KHÔNG nghỉ và TRONG ca)
                                 is_machine_running = (not is_off) and (h_start <= h < real_h_end)
                                 
                                 p_machine = 0
@@ -390,16 +398,16 @@ def home():
                                 p_total = p_base + p_machine
                                 v_td, v_bt_l, v_cd_l, v_bt_u, v_cd_u = 0, 0, 0, 0, 0
                                 
-                                # 2. Tô màu
-                                if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
+                                # 2. Tô màu (Quan trọng)
+                                if h in [22, 23, 0, 1, 2, 3]: 
                                     v_td = p_base 
                                 
-                                elif use_sunday_pricing: 
-                                    # GIÁ CHỦ NHẬT (Kể cả ngày nghỉ là CN): Full Xanh
+                                elif is_sunday_mode: 
+                                    # Giá CN (Full Xanh) - Dù nghỉ hay làm
                                     v_bt_l = p_total
                                     
                                 else: 
-                                    # GIÁ NGÀY THƯỜNG (Kể cả nghỉ T7): Có Đỏ/Xanh
+                                    # Giá Ngày Thường (Có Đỏ/Xanh) - Áp dụng cho cả Nghỉ T7
                                     if h == 9: 
                                         v_bt_l = p_total * 0.5
                                         v_cd_u = p_total * 0.5
@@ -423,19 +431,21 @@ def home():
                             'stats': {
                                 'total': total_days, 
                                 'work': count_days['week_work'] + count_days['sun_work'], 
-                                'off': count_days['off'],
-                                'sun': count_days['off'], # Hỗ trợ template cũ
-                                'sun_work': count_days['sun_work']
+                                'off': total_off_days,
+                                # Gửi chi tiết các loại ngày nghỉ xuống Frontend
+                                'off_weekday_count': count_days['off_weekday'],
+                                'off_sunday_count': count_days['off_sunday'],
+                                'sun_work_count': count_days['sun_work']
                             },
                             'weekday_work': create_profile('week_work'),
                             'sunday_work': create_profile('sun_work'),
-                            'off_day': create_profile('off')
+                            'off_weekday': create_profile('off_weekday'), # Biểu đồ nghỉ T7 (thấp nhưng có đỏ)
+                            'off_sunday': create_profile('off_sunday')    # Biểu đồ nghỉ CN (thấp và xanh)
                         }
 
             except Exception as e: 
                 print(f"Lỗi: {e}")
                 msg_update = f"❌ Lỗi: {str(e)}"
-            
             active_tab = 'calc'
 
     # --- 7. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
