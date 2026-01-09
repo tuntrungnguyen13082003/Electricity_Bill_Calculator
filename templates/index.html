@@ -252,169 +252,148 @@
                         </div>
 
                         <script>
-                                function toggleDropdown() {
-                                    var checkList = document.getElementById('list1');
-                                    if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
-                                    else checkList.classList.add('visible');
-                                }
+    function toggleDropdown() {
+        var checkList = document.getElementById('list1');
+        if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
+        else checkList.classList.add('visible');
+    }
 
-                                const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+    const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
 
-                                document.addEventListener("DOMContentLoaded", function() {
-                                    openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
-                                    
-                                    // --- 1. TÍNH MAX Y ĐỂ ĐỒNG BỘ TỈ LỆ ---
-                                    let maxVal = 0;
-                                    const allDatasets = [
-                                        chartDataRaw.weekday_work, chartDataRaw.sunday_work, 
-                                        chartDataRaw.off_weekday, chartDataRaw.off_sunday
-                                    ];
+    document.addEventListener("DOMContentLoaded", function() {
+        openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
+        
+        // 1. TÍNH MAX Y ĐỂ ĐỒNG BỘ TỈ LỆ
+        let maxVal = 0;
+        const allDatasets = [
+            chartDataRaw.weekday_work, chartDataRaw.sunday_work, 
+            chartDataRaw.off_weekday, chartDataRaw.off_sunday
+        ];
 
-                                    allDatasets.forEach(data => {
-                                        if (data) {
-                                            const hourlyTotals = data.td.map((val, i) => {
-                                                return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
-                                            });
-                                            const currentMax = Math.max(...hourlyTotals);
-                                            if (currentMax > maxVal) maxVal = currentMax;
-                                        }
-                                    });
-                                    // Dư ra 20% để có không gian kéo thả thoải mái
-                                    const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
+        allDatasets.forEach(data => {
+            if (data) {
+                const hourlyTotals = data.td.map((val, i) => {
+                    return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
+                });
+                const currentMax = Math.max(...hourlyTotals);
+                if (currentMax > maxVal) maxVal = currentMax;
+            }
+        });
+        const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
 
-                                    // --- 2. VẼ BIỂU ĐỒ ---
-                                    renderInteractiveChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
-                                    
-                                    if(document.getElementById('chart_sunday')) 
-                                        renderInteractiveChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y);
-                                    
-                                    if(document.getElementById('chart_off_wd')) 
-                                        renderInteractiveChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y);
-                                    
-                                    if(document.getElementById('chart_off_sun')) 
-                                        renderInteractiveChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y);
-                                });
+        // 2. VẼ BIỂU ĐỒ (Dùng biến myChart để lưu instance)
+        renderInteractiveChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y, false); // false = không phải CN
+        
+        if(document.getElementById('chart_sunday')) 
+            renderInteractiveChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y, true); // true = là CN
+        
+        if(document.getElementById('chart_off_wd')) 
+            renderInteractiveChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y, false);
+        
+        if(document.getElementById('chart_off_sun')) 
+            renderInteractiveChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y, true);
+    });
 
-                                function renderInteractiveChart(canvasId, dataSrc, maxYValue) {
-                                    const ctx = document.getElementById(canvasId).getContext('2d');
-                                    const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+    function renderInteractiveChart(canvasId, dataSrc, maxYValue, isSundayMode) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
 
-                                    // Tính toán dữ liệu tổng ban đầu
-                                    const totalLoad = dataSrc.td.map((val, i) => {
-                                        return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
-                                    });
+        // Tính dữ liệu tổng ban đầu cho đường Line
+        const totalLoad = dataSrc.td.map((val, i) => {
+            return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
+        });
 
-                                    new Chart(ctx, {
-                                        type: 'bar',
-                                        data: {
-                                            labels: chartDataRaw.labels, // 0h, 1h, ...
-                                            datasets: [
-                                                // --- LỚP 1: ĐƯỜNG TỔNG (CÓ THỂ KÉO THẢ) ---
-                                                {
-                                                    type: 'line',
-                                                    label: 'Tổng công suất (Kéo tôi đi!)', // Hướng dẫn người dùng
-                                                    data: totalLoad,
-                                                    borderColor: DARK_YELLOW,
-                                                    borderWidth: 3,
-                                                    pointRadius: 6,           // Điểm to ra để dễ nắm kéo
-                                                    pointHoverRadius: 10,     // Hover vào thì to hơn nữa
-                                                    pointBackgroundColor: 'white',
-                                                    pointBorderColor: DARK_YELLOW,
-                                                    pointBorderWidth: 2,
-                                                    tension: 0.4,
-                                                    fill: false,
-                                                    order: 0,
-                                                    // Cấu hình riêng cho plugin dragData
-                                                    dragData: true 
-                                                },
-                                                
-                                                // --- LỚP 2: CÁC CỘT (TỰ ĐỘNG THAY ĐỔI THEO LINE) ---
-                                                // Index 1: Thấp điểm (Xanh lá)
-                                                { label: 'Thấp điểm', data: dataSrc.td, backgroundColor: '#2ecc71', order: 1, stack: 'Stack 0', dragData: false },
-                                                // Index 2: Bình thường (Xanh dương)
-                                                { label: 'Bình thường', data: dataSrc.bt_l, backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
-                                                // Index 3: Cao điểm (Đỏ)
-                                                { label: 'Cao điểm', data: dataSrc.cd_l, backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false },
-                                                
-                                                // Các phần phụ (Ẩn hoặc giữ nguyên, ko cho kéo)
-                                                { label: '', data: dataSrc.bt_u, backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
-                                                { label: '', data: dataSrc.cd_u, backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false }
-                                            ]
-                                        },
-                                        options: {
-                                            responsive: true,
-                                            maintainAspectRatio: false,
-                                            scales: {
-                                                y: { 
-                                                    beginAtZero: true, stacked: true, max: maxYValue, 
-                                                    title: {display: true, text: 'Công suất (kW)'}
-                                                },
-                                                x: { stacked: true, grid: { display: false } }
-                                            },
-                                            // --- CẤU HÌNH KÉO THẢ (MAGIC HAPPENS HERE) ---
-                                            plugins: {
-                                                dragData: {
-                                                    round: 1, // Làm tròn 1 số thập phân
-                                                    showTooltip: true, // Hiện giá trị khi đang kéo
-                                                    // Hàm xử lý khi đang kéo
-                                                    onDrag: function(e, datasetIndex, index, value) {
-                                                        // Chỉ xử lý khi kéo đường Line (datasetIndex == 0)
-                                                        if (datasetIndex !== 0) return;
+        // Khai báo biến chart để dùng trong onDrag
+        let myChart;
 
-                                                        // Hủy sự kiện mặc định để tránh lỗi
-                                                        e.target.style.cursor = 'grabbing';
-                                                    },
-                                                    // Hàm xử lý sau khi kéo xong (Cập nhật cột)
-                                                    onDragEnd: function(e, datasetIndex, index, value) {
-                                                        if (datasetIndex !== 0) return;
-                                                        
-                                                        e.target.style.cursor = 'default';
-                                                        
-                                                        // 1. Xác định giờ hiện tại là giờ gì (Dựa vào index 0-23)
-                                                        // index = 10 -> 10h
-                                                        const h = index;
-                                                        
-                                                        // Logic phân loại giờ của EVN để cập nhật cột tương ứng
-                                                        let targetBarDatasetIndex = 2; // Mặc định là Bình thường (Blue) - Index 2
+        const config = {
+            type: 'bar',
+            data: {
+                labels: chartDataRaw.labels,
+                datasets: [
+                    // --- LỚP 1: ĐƯỜNG TỔNG (KÉO ĐƯỢC) ---
+                    {
+                        type: 'line',
+                        label: 'Tổng công suất (Kéo tôi đi!)',
+                        data: totalLoad,
+                        borderColor: DARK_YELLOW, borderWidth: 3,
+                        pointRadius: 6, pointHoverRadius: 10,
+                        pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
+                        tension: 0.4, fill: false, order: 0,
+                        dragData: true // Cho phép kéo
+                    },
+                    // --- LỚP 2: CÁC CỘT (INDEX 1, 2, 3) ---
+                    { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'Stack 0', dragData: false },
+                    { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
+                    { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false },
+                    // Các lớp phụ (nếu có)
+                    { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
+                    { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'Công suất (kW)'} },
+                    x: { stacked: true, grid: { display: false } }
+                },
+                plugins: {
+                    dragData: {
+                        round: 1, showTooltip: true,
+                        // --- XỬ LÝ KHI ĐANG KÉO (REAL-TIME) ---
+                        onDrag: function(e, datasetIndex, index, value) {
+                            if (datasetIndex !== 0) return; // Chỉ cho kéo đường Line
+                            e.target.style.cursor = 'grabbing';
+                            
+                            // Gọi hàm cập nhật cột ngay lập tức
+                            updateBarFromLine(myChart, index, value, isSundayMode);
+                        },
+                        onDragEnd: function(e, datasetIndex, index, value) {
+                            if (datasetIndex !== 0) return;
+                            e.target.style.cursor = 'default';
+                        }
+                    },
+                    legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
+                    tooltip: { mode: 'index', intersect: false }
+                }
+            }
+        };
 
-                                                        if ([22, 23, 0, 1, 2, 3].includes(h)) {
-                                                            targetBarDatasetIndex = 1; // Thấp điểm (Green) - Index 1
-                                                        } 
-                                                        else if ([10, 11, 17, 18, 19].includes(h)) { // Lưu ý: 9h và 11h hơi đặc biệt, ta gộp tạm vào đây
-                                                            targetBarDatasetIndex = 3; // Cao điểm (Red) - Index 3
-                                                        }
+        myChart = new Chart(ctx, config);
+    }
 
-                                                        // 2. Cập nhật giá trị cột
-                                                        // Chart instance được lưu trong 'this.chart'
-                                                        const chartInstance = this.chart;
-                                                        
-                                                        // Reset các cột khác về 0 (để tránh bị cộng dồn ảo) và dồn hết giá trị vào cột mục tiêu
-                                                        // Tuy nhiên, để giữ tải nền, ta làm đơn giản: Cập nhật cột chính bằng giá trị Line
-                                                        
-                                                        // Tắt các cột khác tại giờ đó (để tránh thanh bar vượt quá đường line)
-                                                        chartInstance.data.datasets[1].data[index] = 0; // Tắt Green
-                                                        chartInstance.data.datasets[2].data[index] = 0; // Tắt Blue
-                                                        chartInstance.data.datasets[3].data[index] = 0; // Tắt Red
-                                                        chartInstance.data.datasets[4].data[index] = 0; // Tắt phụ
-                                                        chartInstance.data.datasets[5].data[index] = 0; // Tắt phụ
+    // --- HÀM LOGIC CẬP NHẬT CỘT ---
+    function updateBarFromLine(chart, index, value, isSundayMode) {
+        if (!chart) return;
 
-                                                        // Bật lại cột đúng màu với giá trị mới (value)
-                                                        chartInstance.data.datasets[targetBarDatasetIndex].data[index] = value;
-                                                        
-                                                        chartInstance.update(); // Vẽ lại biểu đồ
-                                                    }
-                                                },
-                                                legend: { 
-                                                    position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } 
-                                                },
-                                                tooltip: {
-                                                    mode: 'index', intersect: false
-                                                }
-                                            }
-                                        }
-                                    });
-                                }
-                            </script>
+        // 1. Xác định giờ hiện tại (index) thuộc loại gì
+        const h = index;
+        let targetDatasetIndex = 2; // Mặc định là Bình thường (Xanh dương) - Index 2
+
+        // Logic giờ EVN
+        if ([22, 23, 0, 1, 2, 3].includes(h)) {
+            targetDatasetIndex = 1; // Thấp điểm (Xanh lá) - Index 1
+        } 
+        else if (!isSundayMode && [10, 11, 17, 18, 19].includes(h)) {
+            // Chỉ ngày thường mới có Cao điểm
+            targetDatasetIndex = 3; // Cao điểm (Đỏ) - Index 3
+        }
+
+        // 2. Cập nhật dữ liệu
+        // Tắt hết các cột khác tại giờ đó
+        chart.data.datasets[1].data[index] = 0;
+        chart.data.datasets[2].data[index] = 0;
+        chart.data.datasets[3].data[index] = 0;
+        chart.data.datasets[4].data[index] = 0; // Phụ
+        chart.data.datasets[5].data[index] = 0; // Phụ
+
+        // Bật cột đúng màu lên bằng giá trị đường Line
+        chart.data.datasets[targetDatasetIndex].data[index] = value;
+
+        // 3. QUAN TRỌNG: Vẽ lại ngay lập tức (không animation)
+        chart.update('none');
+    }
+</script>
                         {% endif %}
                     </div>
 
