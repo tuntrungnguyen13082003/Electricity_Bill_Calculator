@@ -181,59 +181,81 @@
                         </form>
 
                         {% if du_lieu_nhap.get('chart_data') %}
-                        <div style="margin-top: 30px; height: 400px;">
+                        
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #e9ecef;">
+                            <div style="display: flex; justify-content: space-around; text-align: center;">
+                                <div>
+                                    <div style="font-size: 12px; color: #7f8c8d;">Tổng số ngày</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">{{ du_lieu_nhap.chart_data.stats.total }}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 12px; color: #27ae60;">Ngày làm việc</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #27ae60;">{{ du_lieu_nhap.chart_data.stats.work }}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 12px; color: #e74c3c;">Ngày nghỉ (CN)</div>
+                                    <div style="font-size: 20px; font-weight: bold; color: #e74c3c;">{{ du_lieu_nhap.chart_data.stats.sun }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; text-align: center;">
+                            <div class="btn-group" role="group" style="display: inline-flex; background: #eee; padding: 3px; border-radius: 5px;">
+                                <button type="button" onclick="switchChart('working')" id="btn_work" style="padding: 8px 15px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-weight: bold;">🏭 Ngày Làm Việc</button>
+                                <button type="button" onclick="switchChart('sunday')" id="btn_sun" style="padding: 8px 15px; border: none; border-radius: 4px; background: transparent; color: #555; cursor: pointer; font-weight: bold;">☕ Ngày Chủ Nhật</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; height: 400px;">
                             <canvas id="loadChart"></canvas>
                         </div>
+
                         <script>
+                            let myChart = null;
+                            const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
+                                renderChart('working'); // Mặc định vẽ ngày làm việc trước
+                            });
 
-                                const ctx = document.getElementById('loadChart').getContext('2d');
-                                const chartData = {{ du_lieu_nhap.chart_data | tojson }};
+                            function switchChart(mode) {
+                                // Đổi màu nút
+                                const btnWork = document.getElementById('btn_work');
+                                const btnSun = document.getElementById('btn_sun');
                                 
-                                new Chart(ctx, {
+                                if(mode === 'working') {
+                                    btnWork.style.background = '#3498db'; btnWork.style.color = 'white';
+                                    btnSun.style.background = 'transparent'; btnSun.style.color = '#555';
+                                } else {
+                                    btnSun.style.background = '#3498db'; btnSun.style.color = 'white';
+                                    btnWork.style.background = 'transparent'; btnWork.style.color = '#555';
+                                }
+                                renderChart(mode);
+                            }
+
+                            function renderChart(mode) {
+                                const ctx = document.getElementById('loadChart').getContext('2d');
+                                const dataSrc = chartDataRaw[mode]; // Lấy data theo mode (working hoặc sunday)
+
+                                if (myChart) myChart.destroy(); // Xóa biểu đồ cũ
+
+                                myChart = new Chart(ctx, {
                                     type: 'bar',
                                     data: {
-                                        labels: chartData.labels,
+                                        labels: chartDataRaw.labels,
                                         datasets: [
-                                            // LỚP 1: CÁC KHỐI NẰM DƯỚI CÙNG (Vẽ trước)
-                                            {
-                                                label: 'Thấp điểm',
-                                                data: chartData.datasets.td,
-                                                backgroundColor: 'rgba(46, 204, 113, 0.8)', // Xanh lá
-                                                stack: 'Stack 0',
-                                            },
-                                            {
-                                                label: 'Bình thường',
-                                                data: chartData.datasets.bt_lower,
-                                                backgroundColor: 'rgba(52, 152, 219, 0.8)', // Xanh biển
-                                                stack: 'Stack 0',
-                                            },
-                                            {
-                                                label: 'Cao điểm',
-                                                data: chartData.datasets.cd_lower,
-                                                backgroundColor: 'rgba(231, 76, 60, 0.8)', // Đỏ
-                                                stack: 'Stack 0',
-                                            },
-                                            
-                                            // LỚP 2: CÁC KHỐI NẰM ĐÈ LÊN TRÊN (Vẽ sau)
-                                            {
-                                                label: 'Bình thường (Top)', // Tên tạm, sẽ ẩn đi
-                                                data: chartData.datasets.bt_upper,
-                                                backgroundColor: 'rgba(52, 152, 219, 0.8)', // Xanh biển (giống màu BT dưới)
-                                                stack: 'Stack 0',
-                                            },
-                                            {
-                                                label: 'Cao điểm (Top)', // Tên tạm, sẽ ẩn đi
-                                                data: chartData.datasets.cd_upper,
-                                                backgroundColor: 'rgba(231, 76, 60, 0.8)', // Đỏ (giống màu CD dưới)
-                                                stack: 'Stack 0',
-                                            }
+                                            { label: 'Thấp điểm', data: dataSrc.td, backgroundColor: 'rgba(46, 204, 113, 0.8)', stack: 'Stack 0' },
+                                            { label: 'Bình thường', data: dataSrc.bt_lower, backgroundColor: 'rgba(52, 152, 219, 0.8)', stack: 'Stack 0' },
+                                            { label: 'Cao điểm', data: dataSrc.cd_lower, backgroundColor: 'rgba(231, 76, 60, 0.8)', stack: 'Stack 0' },
+                                            { label: '', data: dataSrc.bt_upper, backgroundColor: 'rgba(52, 152, 219, 0.8)', stack: 'Stack 0' },
+                                            { label: '', data: dataSrc.cd_upper, backgroundColor: 'rgba(231, 76, 60, 0.8)', stack: 'Stack 0' }
                                         ]
                                     },
                                     options: {
                                         responsive: true,
                                         maintainAspectRatio: false,
+                                        animation: { duration: 500 },
                                         scales: {
                                             y: { beginAtZero: true, stacked: true, title: {display: true, text: 'kW'} },
                                             x: { stacked: true, title: {display: true, text: 'Giờ (0h-23h)'} }
@@ -241,29 +263,20 @@
                                         plugins: {
                                             legend: {
                                                 position: 'bottom',
-                                                labels: {
-                                                    // Chỉ hiện chú thích cho 3 lớp dưới, ẩn 2 lớp trên đi cho đỡ rối
-                                                    filter: function(item, chart) {
-                                                        // item.datasetIndex tương ứng thứ tự trong mảng datasets (0,1,2,3,4)
-                                                        // Chỉ hiện 0, 1, 2
-                                                        return item.datasetIndex < 3; 
-                                                    }
-                                                }
+                                                labels: { filter: function(item) { return item.text !== ''; } } // Ẩn label rỗng
                                             },
                                             tooltip: {
                                                 callbacks: {
-                                                    // Sửa tooltip để không hiện chữ "(Top)" gây khó hiểu
                                                     label: function(context) {
-                                                        let label = context.dataset.label || '';
-                                                        label = label.replace(' (Top)', ''); // Xóa chữ Top nếu có
-                                                        return label + ': ' + context.parsed.y + ' kW';
+                                                        if (!context.dataset.label) return null;
+                                                        return context.dataset.label + ': ' + context.parsed.y + ' kW';
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 });
-                            });
+                            }
                         </script>
                         {% endif %}
                     </div>
