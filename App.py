@@ -398,7 +398,7 @@ def home():
 
                         p_add_bt = prod_kwh_bt / total_hours_bt_run if total_hours_bt_run > 0 else 0
 
-                        # --- G. TẠO DATASET ---
+                        # --- G. TẠO DATASET (THUẬT TOÁN FINAL - CHUẨN KỸ THUẬT) ---
                         def create_profile(mode):
                             data = {'td': [], 'bt_l': [], 'cd_l': [], 'bt_u': [], 'cd_u': []}
                             
@@ -406,32 +406,57 @@ def home():
                             is_sunday_mode = (mode == 'sun_work' or mode == 'off_sunday')
                             
                             for h in range(24):
-                                is_machine_running = (not is_off) and (h_start <= h < real_h_end)
+                                # 1. Xác định: Giờ này máy có chạy không?
+                                # Máy chỉ chạy nếu: KHÔNG PHẢI NGÀY NGHỈ và TRONG GIỜ LÀM
+                                in_shift = (h_start <= h < real_h_end)
+                                is_machine_running = (not is_off) and in_shift
                                 
-                                p_machine = 0
-                                if is_machine_running:
-                                    if h in [22, 23, 0, 1, 2, 3]: p_machine = 0 
-                                    elif h == 10 or h in [17, 18, 19]: p_machine = p_add_cd
-                                    elif h == 9 or h == 11: p_machine = (p_add_cd + p_add_bt)/2
-                                    else: p_machine = p_add_bt
-                                
-                                p_total = p_base + p_machine
+                                # 2. Tính công suất TIỀM NĂNG tại giờ h (Nếu chạy full load giờ đó)
+                                # P_full_CD: Công suất nếu giờ này là Cao điểm
+                                p_full_cd = p_base + (p_add_cd if is_machine_running else 0)
+                                # P_full_BT: Công suất nếu giờ này là Bình thường
+                                p_full_bt = p_base + (p_add_bt if is_machine_running else 0)
+                                # P_Base_Only: Chỉ tải nền
+                                p_base_only = p_base
+
                                 v_td, v_bt_l, v_cd_l, v_bt_u, v_cd_u = 0, 0, 0, 0, 0
                                 
-                                # Phân màu
+                                # 3. Phân bổ màu sắc (Logic chuẩn)
                                 if h in [22, 23, 0, 1, 2, 3]: 
-                                    v_td = p_base 
-                                elif is_sunday_mode: # Giá CN (Full Xanh)
-                                    v_bt_l = p_total
-                                else: # Giá Ngày Thường (Có Đỏ)
+                                    v_td = p_base_only
+                                
+                                elif is_sunday_mode: 
+                                    # CHỦ NHẬT (Full Xanh):
+                                    # Dù máy chạy mạnh cỡ P_full_cd thì vẫn tô màu xanh
+                                    if h == 10 or h in [17, 18, 19]: val = p_full_cd
+                                    elif h == 9 or h == 11: val = (p_full_cd * 0.5) + (p_full_bt * 0.5)
+                                    else: val = p_full_bt
+                                    
+                                    v_bt_l = val
+                                    
+                                else: 
+                                    # NGÀY THƯỜNG (Có Đỏ/Xanh):
                                     if h == 9: 
-                                        v_bt_l = p_total * 0.5; v_cd_u = p_total * 0.5
+                                        # 9h: 30p Bình thường + 30p Cao điểm
+                                        # Xanh dưới = 0.5 * P_BT
+                                        v_bt_l = p_full_bt * 0.5
+                                        # Đỏ trên = 0.5 * P_CD
+                                        v_cd_u = p_full_cd * 0.5
+                                        
                                     elif h == 11: 
-                                        v_cd_l = p_total * 0.5; v_bt_u = p_total * 0.5
+                                        # 11h: 30p Cao điểm + 30p Bình thường
+                                        # Đỏ dưới = 0.5 * P_CD
+                                        v_cd_l = p_full_cd * 0.5
+                                        # Xanh trên = 0.5 * P_BT
+                                        v_bt_u = p_full_bt * 0.5
+                                        
                                     elif h == 10 or h in [17, 18, 19]: 
-                                        v_cd_l = p_total
+                                        # Full Cao điểm
+                                        v_cd_l = p_full_cd
+                                        
                                     else: 
-                                        v_bt_l = p_total
+                                        # Full Bình thường
+                                        v_bt_l = p_full_bt
                                 
                                 data['td'].append(round(v_td, 2))
                                 data['bt_l'].append(round(v_bt_l, 2))
