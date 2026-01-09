@@ -108,7 +108,7 @@ def login():
         USERS = load_json_file(users_path, DEFAULT_USERS)
         if user in USERS and USERS[user]['password'] == pwd:
             session['user'], session['role'] = user, USERS[user]['role']
-            return redirect(url_for('home'))
+            return redirect(url_for('home', init=1))
         error = "Sai tài khoản hoặc mật khẩu!"
     return render_template('login.html', error=error)
 
