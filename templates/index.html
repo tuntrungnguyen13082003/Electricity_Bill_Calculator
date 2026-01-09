@@ -252,166 +252,246 @@
                         </div>
 
                         <script>
-                            // 1. KHO CHỨA CÁC BIỂU ĐỒ (Global Store)
-                            window.charts = {}; 
+    window.charts = {}; 
 
-                            function toggleDropdown() {
-                                var checkList = document.getElementById('list1');
-                                if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
-                                else checkList.classList.add('visible');
-                            }
+    function toggleDropdown() {
+        var checkList = document.getElementById('list1');
+        if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
+        else checkList.classList.add('visible');
+    }
 
-                            const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+    // Dữ liệu gốc từ Server
+    const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+    
+    // Biến lưu trữ dữ liệu "sống" (để tính toán lại)
+    // Ta sẽ thao tác trên biến này thay vì chartDataRaw gốc
+    let liveData = JSON.parse(JSON.stringify(chartDataRaw));
 
-                            document.addEventListener("DOMContentLoaded", function() {
-                                openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
-                                
-                                // --- TÍNH TOÁN TRỤC Y CHUNG (Để các biểu đồ cao bằng nhau) ---
-                                let maxVal = 0;
-                                const allDatasets = [
-                                    chartDataRaw.weekday_work, chartDataRaw.sunday_work, 
-                                    chartDataRaw.off_weekday, chartDataRaw.off_sunday
-                                ];
+    document.addEventListener("DOMContentLoaded", function() {
+        openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
+        initAllCharts();
+    });
 
-                                allDatasets.forEach(data => {
-                                    if (data) {
-                                        const hourlyTotals = data.td.map((val, i) => {
-                                            return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
-                                        });
-                                        const currentMax = Math.max(...hourlyTotals);
-                                        if (currentMax > maxVal) maxVal = currentMax;
-                                    }
-                                });
-                                const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
+    // Hàm khởi tạo lại toàn bộ (được gọi lần đầu và sau khi tính toán lại)
+    function initAllCharts() {
+        // 1. Tìm Max Y chung
+        let maxVal = 0;
+        const allDatasets = [
+            liveData.weekday_work, liveData.sunday_work, 
+            liveData.off_weekday, liveData.off_sunday
+        ];
 
-                                // --- KHỞI TẠO CÁC BIỂU ĐỒ ---
-                                // Lưu ý: Tham số cuối cùng (true/false) là chế độ Chủ Nhật (để quyết định màu)
-                                
-                                if(document.getElementById('chart_weekday'))
-                                    window.charts['chart_weekday'] = initChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y, false);
-                                
-                                if(document.getElementById('chart_sunday')) 
-                                    window.charts['chart_sunday'] = initChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y, true);
-                                
-                                if(document.getElementById('chart_off_wd')) 
-                                    window.charts['chart_off_wd'] = initChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y, false);
-                                
-                                if(document.getElementById('chart_off_sun')) 
-                                    window.charts['chart_off_sun'] = initChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y, true);
-                            });
+        allDatasets.forEach(data => {
+            if (data) {
+                const hourlyTotals = data.td.map((val, i) => {
+                    return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
+                });
+                const currentMax = Math.max(...hourlyTotals);
+                if (currentMax > maxVal) maxVal = currentMax;
+            }
+        });
+        const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
 
-                            // --- HÀM TẠO BIỂU ĐỒ ---
-                            function initChart(canvasId, dataSrc, maxYValue, isSundayMode) {
-                                const ctx = document.getElementById(canvasId).getContext('2d');
-                                const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+        // 2. Vẽ biểu đồ (Nếu đã có thì destroy trước để vẽ mới)
+        if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
+        window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
+        
+        if(document.getElementById('chart_sunday')) {
+            if(window.charts['chart_sunday']) window.charts['chart_sunday'].destroy();
+            window.charts['chart_sunday'] = createChart('chart_sunday', liveData.sunday_work, COMMON_MAX_Y, true);
+        }
+        
+        if(document.getElementById('chart_off_wd')) {
+            if(window.charts['chart_off_wd']) window.charts['chart_off_wd'].destroy();
+            window.charts['chart_off_wd'] = createChart('chart_off_wd', liveData.off_weekday, COMMON_MAX_Y, false);
+        }
+        
+        if(document.getElementById('chart_off_sun')) {
+            if(window.charts['chart_off_sun']) window.charts['chart_off_sun'].destroy();
+            window.charts['chart_off_sun'] = createChart('chart_off_sun', liveData.off_sunday, COMMON_MAX_Y, true);
+        }
+    }
 
-                                // Tính tổng ban đầu
-                                const totalLoad = dataSrc.td.map((val, i) => {
-                                    return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
-                                });
+    function createChart(canvasId, dataSrc, maxYValue, isSundayMode) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
 
-                                return new Chart(ctx, {
-                                    type: 'bar',
-                                    data: {
-                                        labels: chartDataRaw.labels,
-                                        datasets: [
-                                            // LỚP 1: LINE (Kéo được) - Index 0
-                                            {
-                                                type: 'line', label: 'Tổng công suất',
-                                                data: totalLoad,
-                                                borderColor: DARK_YELLOW, borderWidth: 3,
-                                                pointRadius: 6, pointHoverRadius: 10,
-                                                pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
-                                                tension: 0.4, fill: false, order: 0,
-                                                dragData: true
-                                            },
-                                            // LỚP 2: CÁC CỘT MÀU - Index 1->5
-                                            { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'Stack 0', dragData: false },
-                                            { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0', dragData: false }
-                                        ]
-                                    },
-                                    options: {
-                                        responsive: true, maintainAspectRatio: false,
-                                        scales: {
-                                            y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'Công suất (kW)'} },
-                                            x: { stacked: true, grid: { display: false } }
-                                        },
-                                        plugins: {
-                                            dragData: {
-                                                round: 1, showTooltip: true,
-                                                // --- SỰ KIỆN KHI KÉO ---
-                                                onDrag: function(e, datasetIndex, index, value) {
-                                                    if (datasetIndex !== 0) return; // Chỉ cho kéo Line
-                                                    e.target.style.cursor = 'grabbing';
-                                                    
-                                                    // GỌI HÀM ĐỒNG BỘ HÓA (BROADCAST)
-                                                    broadcastChange(canvasId, index, value);
-                                                },
-                                                onDragEnd: function(e, datasetIndex, index, value) {
-                                                    if (datasetIndex !== 0) return;
-                                                    e.target.style.cursor = 'default';
-                                                }
-                                            },
-                                            legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
-                                            tooltip: { mode: 'index', intersect: false }
-                                        }
-                                    }
-                                });
-                            }
+        // Tính tổng line
+        const totalLoad = dataSrc.td.map((val, i) => {
+            return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
+        });
 
-                            // --- HÀM QUẢN LÝ ĐỒNG BỘ (TRÁI TIM CỦA HỆ THỐNG) ---
-                            function broadcastChange(sourceId, index, value) {
-                                // Danh sách ID các biểu đồ có thể có
-                                const allIds = ['chart_weekday', 'chart_sunday', 'chart_off_wd', 'chart_off_sun'];
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: liveData.labels,
+                datasets: [
+                    // Line (Kéo được)
+                    {
+                        type: 'line', label: 'Tổng công suất',
+                        data: totalLoad,
+                        borderColor: DARK_YELLOW, borderWidth: 3,
+                        pointRadius: 6, pointHoverRadius: 10,
+                        pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
+                        tension: 0.4, fill: false, order: 0,
+                        dragData: true
+                    },
+                    // Cột màu
+                    { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
+                    { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                    { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false },
+                    { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                    { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                animation: false, // Tắt animation để vẽ lại cho nhanh
+                scales: {
+                    y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} },
+                    x: { stacked: true, grid: { display: false } }
+                },
+                plugins: {
+                    dragData: {
+                        round: 1, showTooltip: true,
+                        onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
+                        onDrag: function(e, datasetIndex, index, value) {
+                            if (datasetIndex !== 0) return false; // Chỉ kéo line
+                        },
+                        onDragEnd: function(e, datasetIndex, index, newValue) {
+                            if (datasetIndex !== 0) return;
+                            e.target.style.cursor = 'default';
+                            
+                            // GỌI HÀM TÍNH TOÁN LẠI TOÀN BỘ HỆ THỐNG
+                            recalculateSystem(canvasId, index, newValue);
+                        }
+                    },
+                    legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
+                    tooltip: { mode: 'index', intersect: false }
+                }
+            }
+        });
+    }
 
-                                allIds.forEach(targetId => {
-                                    // Lấy biểu đồ từ kho
-                                    const chart = window.charts[targetId];
-                                    
-                                    if (chart) {
-                                        // 1. Cập nhật đường Line (Dataset 0) cho TẤT CẢ biểu đồ (kể cả chính nó)
-                                        chart.data.datasets[0].data[index] = value;
+    // --- LOGIC TÍNH TOÁN LẠI (TRÁI TIM CỦA YÊU CẦU) ---
+    function recalculateSystem(sourceId, targetHour, newTotalValue) {
+        // 1. Xác định chúng ta đang sửa loại ngày nào
+        // Giả sử chỉ cho phép sửa trên 'chart_weekday' (Ngày thường) để làm chuẩn
+        // Nếu sửa các biểu đồ khác thì chỉ update hiển thị cục bộ
+        
+        // Lấy dữ liệu ngày thường hiện tại
+        const wdData = liveData.weekday_work;
+        
+        // Tính giá trị cũ tại giờ đó để biết chênh lệch
+        const oldTotalValue = wdData.td[targetHour] + wdData.bt_l[targetHour] + wdData.cd_l[targetHour] + wdData.bt_u[targetHour] + wdData.cd_u[targetHour];
+        
+        // Độ chênh lệch năng lượng (Delta)
+        // Ví dụ: Cũ 30, Mới 25 => Delta = 25 - 30 = -5kW
+        // Ta cần phân bổ -5kW này (tức là cộng thêm 5kW) cho các giờ khác để bù vào? 
+        // HOẶC: Ý bạn là chỉ thay đổi hình dáng (Profile) nhưng giữ nguyên tổng kWh?
+        // -> Logic: Thay đổi giá trị tại giờ này, các giờ khác tự động co giãn để TỔNG kWh KHÔNG ĐỔI.
+        
+        const delta = newTotalValue - oldTotalValue;
 
-                                        // 2. Cập nhật cột màu bên dưới cho đúng luật
-                                        // Xác định xem biểu đồ đích này có phải là CN không?
-                                        const isTargetSunday = (targetId === 'chart_sunday' || targetId === 'chart_off_sun');
-                                        
-                                        updateColumns(chart, index, value, isTargetSunday);
-                                    }
-                                });
-                            }
+        // 2. Cập nhật giá trị mới vào giờ mục tiêu (Target Hour)
+        // Phải phân bổ newTotalValue vào các thành phần (td, bt, cd) cho đúng luật
+        distributeValueToComponents(wdData, targetHour, newTotalValue, false); // false = weekday
 
-                            // --- HÀM VẼ LẠI CỘT ---
-                            function updateColumns(chart, index, value, isSundayMode) {
-                                const h = index;
-                                let targetIdx = 2; // Mặc định Bình thường (Blue)
+        // 3. Phân bổ ngược Delta cho các giờ còn lại (Re-balancing)
+        // Tìm các giờ CÓ LÀM VIỆC khác để chia sẻ gánh nặng
+        // Chỉ chia cho các giờ đang có công suất > tải nền (tức là giờ có sản xuất)
+        let otherActiveHours = [];
+        let totalWeight = 0;
 
-                                // Logic EVN:
-                                if ([22, 23, 0, 1, 2, 3].includes(h)) {
-                                    targetIdx = 1; // Thấp điểm (Green)
-                                } 
-                                else if (!isSundayMode && [10, 11, 17, 18, 19].includes(h)) {
-                                    // Nếu không phải CN mà trúng giờ cao điểm -> Đỏ
-                                    targetIdx = 3; 
-                                }
+        for (let h = 0; h < 24; h++) {
+            if (h === targetHour) continue; // Bỏ qua giờ đang kéo
+            
+            // Tính công suất hiện tại
+            const val = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h];
+            // Chỉ chỉnh những giờ có máy chạy (lớn hơn tải nền 1 chút)
+            // Hoặc đơn giản là chia đều cho tất cả các giờ làm việc (8h-17h)
+            // Ở đây tôi dùng logic: Chia đều cho các giờ làm việc khác
+            
+            // Kiểm tra xem giờ h có phải giờ làm việc ko? (Dựa vào việc nó có > tải nền ko)
+            // Cách đơn giản nhất: Lấy từ input giờ làm việc nếu có, hoặc check dữ liệu > 0
+            if (val > wdData.td[h] + 1) { // Giả sử lớn hơn nền 1kW là có làm
+                otherActiveHours.push(h);
+            }
+        }
 
-                                // Reset các cột về 0
-                                chart.data.datasets[1].data[index] = 0;
-                                chart.data.datasets[2].data[index] = 0;
-                                chart.data.datasets[3].data[index] = 0;
-                                chart.data.datasets[4].data[index] = 0;
-                                chart.data.datasets[5].data[index] = 0;
+        if (otherActiveHours.length > 0) {
+            // Phần năng lượng cần bù trừ = -Delta
+            // Ví dụ: Giảm 10h đi 5kW (Delta = -5) -> Cần bù +5kW cho các giờ khác
+            const compensationPerHour = -delta / otherActiveHours.length;
 
-                                // Gán giá trị mới cho cột đúng màu
-                                chart.data.datasets[targetIdx].data[index] = value;
+            otherActiveHours.forEach(h => {
+                const currentVal = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h] + wdData.bt_u[h] + wdData.cd_u[h];
+                let newVal = currentVal + compensationPerHour;
+                if (newVal < 0) newVal = 0; // Không được âm
 
-                                // Vẽ lại ngay lập tức (không animation)
-                                chart.update('none');
-                            }
-                        </script>
+                // Cập nhật lại các thành phần con
+                distributeValueToComponents(wdData, h, newVal, false);
+            });
+        }
+
+        // 4. ĐỒNG BỘ DỮ LIỆU SANG BIỂU ĐỒ CHỦ NHẬT (NẾU CÓ)
+        // Vì CN chạy máy giống hệt ngày thường
+        if (liveData.sunday_work) {
+            for (let h = 0; h < 24; h++) {
+                // Lấy tổng công suất của ngày thường tại giờ h (sau khi đã tính toán lại ở trên)
+                const wdTotal = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h] + wdData.bt_u[h] + wdData.cd_u[h];
+                
+                // Áp sang CN (nhưng nhớ set isSundayMode = true để nó tô màu xanh)
+                distributeValueToComponents(liveData.sunday_work, h, wdTotal, true);
+            }
+        }
+
+        // 5. VẼ LẠI TOÀN BỘ (REFRESH)
+        initAllCharts();
+    }
+
+    // Hàm phụ: Chia giá trị tổng (Total) vào các ô màu (TD, BT, CD) cho đúng luật EVN
+    function distributeValueToComponents(dataSet, h, totalValue, isSundayMode) {
+        // Reset về 0
+        dataSet.td[h] = 0; 
+        dataSet.bt_l[h] = 0; dataSet.cd_l[h] = 0;
+        dataSet.bt_u[h] = 0; dataSet.cd_u[h] = 0;
+
+        // Logic phân loại giờ (Hardcode theo luật EVN chuẩn)
+        // 22h - 04h: Thấp điểm
+        if ([22, 23, 0, 1, 2, 3].includes(h)) {
+            dataSet.td[h] = totalValue;
+        }
+        else if (isSundayMode) {
+            // Chủ nhật: Chỉ có Bình thường
+            dataSet.bt_l[h] = totalValue;
+        }
+        else {
+            // Ngày thường: Có Cao điểm (9h30-11h30, 17h-20h)
+            // Xử lý các giờ trọn vẹn
+            if ([10, 18].includes(h)) { // 10h-11h, 18h-19h (Full CD) -> Thực ra luật mới 17h-20h tùy vùng
+                // Ở đây dùng logic đơn giản: 
+                // Cao điểm: 9h30-11h30 (tức 10h full, 9h & 11h nưả)
+                //          17h00-20h00 (tức 17, 18, 19 full)
+                dataSet.cd_l[h] = totalValue; 
+            }
+            else if ([17, 19].includes(h)) {
+                 dataSet.cd_l[h] = totalValue;
+            }
+            else if (h === 9) { // 9h-10h (30p BT, 30p CD) -> Chia đôi
+                dataSet.bt_l[h] = totalValue * 0.5;
+                dataSet.cd_u[h] = totalValue * 0.5;
+            }
+            else if (h === 11) { // 11h-12h (30p CD, 30p BT) -> Chia đôi
+                dataSet.cd_l[h] = totalValue * 0.5;
+                dataSet.bt_u[h] = totalValue * 0.5;
+            }
+            else { // Các giờ còn lại là Bình thường
+                dataSet.bt_l[h] = totalValue;
+            }
+        }
+    }
+</script>
                         {% endif %}
                     </div>
 
