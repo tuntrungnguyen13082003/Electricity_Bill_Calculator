@@ -279,81 +279,50 @@
                             function renderLineChart(canvasId, dataSrc) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
                                 new Chart(ctx, {
-                                    type: 'line', // <--- QUAN TRỌNG: CHUYỂN SANG LINE
+                                    type: 'line', 
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
                                             { 
                                                 label: 'Thấp điểm', 
                                                 data: dataSrc.td, 
-                                                backgroundColor: 'rgba(46, 204, 113, 0.4)', // Màu nền mờ
-                                                borderColor: '#2ecc71', // Màu đường đậm
-                                                borderWidth: 2,
-                                                fill: true, 
-                                                tension: 0.4, // Độ cong
-                                                pointRadius: 0, // Ẩn chấm tròn
-                                                stack: 'Stack 0' // Chồng lên nhau
+                                                backgroundColor: 'rgba(46, 204, 113, 0.4)', 
+                                                borderColor: '#2ecc71',
+                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
                                             },
                                             { 
                                                 label: 'Bình thường', 
-                                                data: dataSrc.bt_lower, 
+                                                data: dataSrc.bt_l,  // <--- ĐÃ SỬA: bt_l
                                                 backgroundColor: 'rgba(52, 152, 219, 0.4)', 
                                                 borderColor: '#3498db',
-                                                borderWidth: 2,
-                                                fill: true, 
-                                                tension: 0.4,
-                                                pointRadius: 0,
-                                                stack: 'Stack 0' 
+                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
                                             },
                                             { 
                                                 label: 'Cao điểm', 
-                                                data: dataSrc.cd_lower, 
+                                                data: dataSrc.cd_l,  // <--- ĐÃ SỬA: cd_l
                                                 backgroundColor: 'rgba(231, 76, 60, 0.4)', 
                                                 borderColor: '#e74c3c',
-                                                borderWidth: 2,
-                                                fill: true, 
-                                                tension: 0.4,
-                                                pointRadius: 0,
-                                                stack: 'Stack 0' 
+                                                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' 
                                             },
-                                            // Các lớp phụ để vẽ phần dư (nếu có)
-                                            { label: '', data: dataSrc.bt_upper, backgroundColor: 'rgba(52, 152, 219, 0.4)', borderColor: '#3498db', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' },
-                                            { label: '', data: dataSrc.cd_upper, backgroundColor: 'rgba(231, 76, 60, 0.4)', borderColor: '#e74c3c', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' }
+                                            // Các lớp phụ
+                                            { label: '', data: dataSrc.bt_u, backgroundColor: 'rgba(52, 152, 219, 0.4)', borderColor: '#3498db', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' }, // <--- ĐÃ SỬA: bt_u
+                                            { label: '', data: dataSrc.cd_u, backgroundColor: 'rgba(231, 76, 60, 0.4)', borderColor: '#e74c3c', borderWidth:0, fill: true, tension: 0.4, pointRadius: 0, stack: 'Stack 0' }  // <--- ĐÃ SỬA: cd_u
                                         ]
                                     },
                                     options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
+                                        responsive: true, maintainAspectRatio: false,
                                         scales: {
-                                            y: { 
-                                                beginAtZero: true, 
-                                                stacked: true, 
-                                                title: {display: true, text: 'Công suất (kW)'},
-                                                grid: { color: '#f0f0f0' }
-                                            },
-                                            x: { 
-                                                title: {display: true, text: 'Giờ trong ngày'},
-                                                grid: { display: false }
-                                            }
+                                            y: { beginAtZero: true, stacked: true, title: {display: true, text: 'Công suất (kW)'}, grid: { color: '#f0f0f0' } },
+                                            x: { title: {display: true, text: 'Giờ trong ngày'}, grid: { display: false } }
                                         },
                                         plugins: {
                                             legend: { position: 'bottom', labels: { filter: i => i.text !== '' } },
                                             tooltip: {
-                                                mode: 'index',
-                                                intersect: false,
-                                                callbacks: { 
-                                                    label: function(context) { 
-                                                        if (!context.dataset.label) return null; 
-                                                        return context.dataset.label + ': ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
-                                                    } 
-                                                }
+                                                mode: 'index', intersect: false,
+                                                callbacks: { label: function(context) { if (!context.dataset.label) return null; return context.dataset.label + ': ' + Number(context.parsed.y).toFixed(1) + ' kW'; } }
                                             }
                                         },
-                                        interaction: {
-                                            mode: 'nearest',
-                                            axis: 'x',
-                                            intersect: false
-                                        }
+                                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
                                     }
                                 });
                             }
