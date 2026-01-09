@@ -263,43 +263,20 @@
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
                                 
-
-                                let maxVal = 0;
-                                const allDatasets = [
-                                    chartDataRaw.weekday_work, 
-                                    chartDataRaw.sunday_work, 
-                                    chartDataRaw.off_weekday, 
-                                    chartDataRaw.off_sunday
-                                ];
-
-                                allDatasets.forEach(data => {
-                                    if (data) {
-                                        // Gộp tất cả các mảng dữ liệu lại để tìm số to nhất
-                                        const allNumbers = [
-                                            ...data.td, ...data.bt_l, ...data.cd_l, 
-                                            ...data.bt_u, ...data.cd_u
-                                        ];
-                                        const currentMax = Math.max(...allNumbers);
-                                        if (currentMax > maxVal) maxVal = currentMax;
-                                    }
-                                });
-
-                                const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.1) : 50;
-
                                 // Vẽ các biểu đồ tồn tại
-                                renderLineChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
+                                renderLineChart('chart_weekday', chartDataRaw.weekday_work);
                                 
                                 if(document.getElementById('chart_sunday')) 
-                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y);
+                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work);
                                 
                                 if(document.getElementById('chart_off_wd')) 
-                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y);
+                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday);
                                 
                                 if(document.getElementById('chart_off_sun')) 
-                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y);
+                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday);
                             });
 
-                            function renderLineChart(canvasId, dataSrc, maxYValue) {
+                            function renderLineChart(canvasId, dataSrc) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
 
                                 // 1. TÍNH TỔNG CÔNG SUẤT (Gộp tất cả các thành phần lại)
