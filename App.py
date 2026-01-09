@@ -308,57 +308,67 @@ def home():
                         p_bt = avg_day_bt / 13 if avg_day_bt > 0 else 0
                         
                         # 3. Tạo dữ liệu biểu đồ dạng STACKED (Chồng cột)
-                        # Thay vì 1 mảng value, ta tạo 3 mảng cho 3 loại giờ
-                        data_td = [] # Thấp điểm
-                        data_bt = [] # Bình thường
-                        data_cd = [] # Cao điểm
+                        # ... (Đoạn tính p_td, p_cd, p_bt giữ nguyên) ...
+
+                        # 3. Tạo dữ liệu biểu đồ dạng 5 LỚP (Để xếp hình tùy ý)
+                        data_td = []       # Thấp điểm (Xanh lá)
+                        data_bt_lower = [] # BT nằm dưới (Xanh biển)
+                        data_cd_lower = [] # CD nằm dưới (Đỏ)
+                        data_bt_upper = [] # BT nằm trên (Xanh biển) - Dành cho giờ 11h
+                        data_cd_upper = [] # CD nằm trên (Đỏ) - Dành cho giờ 9h
+                        
                         labels = []
 
                         for h in range(24):
                             labels.append(f"{h}h")
-                            # Khởi tạo giá trị 0 cho giờ này
-                            val_td = 0
-                            val_bt = 0
-                            val_cd = 0
-                            # --- LOGIC KHUNG GIỜ EVN CHÍNH XÁC ---
-                            # 1. THẤP ĐIỂM (22h - 04h)
+                            
+                            # Reset giá trị
+                            v_td = 0
+                            v_bt_lower = 0
+                            v_cd_lower = 0
+                            v_bt_upper = 0
+                            v_cd_upper = 0
+
+                            # --- LOGIC XẾP HÌNH ---
+                            
+                            # 1. Thấp điểm (22h - 4h)
                             if h in [22, 23, 0, 1, 2, 3]:
-                                val_td = p_td
-                            # 2. CAO ĐIỂM & BÌNH THƯỜNG (Có chia tách phút)
-                            # Giờ 9 (09:00 - 10:00): Nửa đầu BT, Nửa sau CĐ
+                                v_td = p_td
+
+                            # 2. Giờ 9h: BT dưới, CD trên
                             elif h == 9:
-                                val_bt = p_bt * 0.5
-                                val_cd = p_cd * 0.5
+                                v_bt_lower = p_bt * 0.5
+                                v_cd_upper = p_cd * 0.5
                             
-                            # Giờ 10 (10:00 - 11:00): Full Cao điểm
-                            elif h == 10:
-                                val_cd = p_cd
-
-                            # Giờ 11 (11:00 - 12:00): Nửa đầu CĐ, Nửa sau BT
+                            # 3. Giờ 11h: CD dưới, BT trên (Yêu cầu của bạn)
                             elif h == 11:
-                                val_cd = p_cd * 0.5
-                                val_bt = p_bt * 0.5
+                                v_cd_lower = p_cd * 0.5
+                                v_bt_upper = p_bt * 0.5
                             
-                            # Khung chiều (17h - 20h): Full Cao điểm
-                            elif h in [17, 18, 19]:
-                                val_cd = p_cd
-                                
-                            # Các giờ còn lại: Full Bình thường
-                            else:
-                                val_bt = p_bt
+                            # 4. Full Cao điểm (10h, 17h-20h) -> Nằm ở layer dưới
+                            elif h == 10 or h in [17, 18, 19]:
+                                v_cd_lower = p_cd
 
-                            # Thêm vào mảng (Làm tròn 2 số lẻ)
-                            data_td.append(round(val_td, 2))
-                            data_bt.append(round(val_bt, 2))
-                            data_cd.append(round(val_cd, 2))
+                            # 5. Full Bình thường -> Nằm ở layer dưới
+                            else:
+                                v_bt_lower = p_bt
+
+                            # Thêm vào mảng
+                            data_td.append(round(v_td, 2))
+                            data_bt_lower.append(round(v_bt_lower, 2))
+                            data_cd_lower.append(round(v_cd_lower, 2))
+                            data_bt_upper.append(round(v_bt_upper, 2))
+                            data_cd_upper.append(round(v_cd_upper, 2))
                                 
-                        # Đóng gói dữ liệu gửi sang Frontend
+                        # Đóng gói 5 datasets gửi sang Frontend
                         du_lieu_nhap['chart_data'] = {
                             'labels': labels,
                             'datasets': {
                                 'td': data_td,
-                                'bt': data_bt,
-                                'cd': data_cd
+                                'bt_lower': data_bt_lower,
+                                'cd_lower': data_cd_lower,
+                                'bt_upper': data_bt_upper,
+                                'cd_upper': data_cd_upper
                             }
                         }
             except Exception as e: 

@@ -196,22 +196,37 @@
                                     data: {
                                         labels: chartData.labels,
                                         datasets: [
+                                            // LỚP 1: CÁC KHỐI NẰM DƯỚI CÙNG (Vẽ trước)
                                             {
-                                                label: 'Thấp điểm (Xanh lá)',
+                                                label: 'Thấp điểm',
                                                 data: chartData.datasets.td,
-                                                backgroundColor: 'rgba(46, 204, 113, 0.8)',
-                                                stack: 'Stack 0', // Cùng stack để chồng lên nhau
-                                            },
-                                            {
-                                                label: 'Bình thường (Xanh biển)',
-                                                data: chartData.datasets.bt,
-                                                backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                                                backgroundColor: 'rgba(46, 204, 113, 0.8)', // Xanh lá
                                                 stack: 'Stack 0',
                                             },
                                             {
-                                                label: 'Cao điểm (Đỏ)',
-                                                data: chartData.datasets.cd,
-                                                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                                                label: 'Bình thường',
+                                                data: chartData.datasets.bt_lower,
+                                                backgroundColor: 'rgba(52, 152, 219, 0.8)', // Xanh biển
+                                                stack: 'Stack 0',
+                                            },
+                                            {
+                                                label: 'Cao điểm',
+                                                data: chartData.datasets.cd_lower,
+                                                backgroundColor: 'rgba(231, 76, 60, 0.8)', // Đỏ
+                                                stack: 'Stack 0',
+                                            },
+                                            
+                                            // LỚP 2: CÁC KHỐI NẰM ĐÈ LÊN TRÊN (Vẽ sau)
+                                            {
+                                                label: 'Bình thường (Top)', // Tên tạm, sẽ ẩn đi
+                                                data: chartData.datasets.bt_upper,
+                                                backgroundColor: 'rgba(52, 152, 219, 0.8)', // Xanh biển (giống màu BT dưới)
+                                                stack: 'Stack 0',
+                                            },
+                                            {
+                                                label: 'Cao điểm (Top)', // Tên tạm, sẽ ẩn đi
+                                                data: chartData.datasets.cd_upper,
+                                                backgroundColor: 'rgba(231, 76, 60, 0.8)', // Đỏ (giống màu CD dưới)
                                                 stack: 'Stack 0',
                                             }
                                         ]
@@ -220,24 +235,30 @@
                                         responsive: true,
                                         maintainAspectRatio: false,
                                         scales: {
-                                            y: { 
-                                                beginAtZero: true, 
-                                                stacked: true, // QUAN TRỌNG: Bật chế độ chồng Y
-                                                title: {display: true, text: 'Công suất trung bình (kW)'} 
-                                            },
-                                            x: { 
-                                                stacked: true, // QUAN TRỌNG: Bật chế độ chồng X
-                                                title: {display: true, text: 'Giờ trong ngày (0h-23h)'} 
-                                            }
+                                            y: { beginAtZero: true, stacked: true, title: {display: true, text: 'kW'} },
+                                            x: { stacked: true, title: {display: true, text: 'Giờ (0h-23h)'} }
                                         },
                                         plugins: {
-                                            tooltip: {
-                                                mode: 'index',
-                                                intersect: false
-                                            },
                                             legend: {
-                                                display: true, // Hiện chú thích màu cho chuyên nghiệp
-                                                position: 'bottom'
+                                                position: 'bottom',
+                                                labels: {
+                                                    // Chỉ hiện chú thích cho 3 lớp dưới, ẩn 2 lớp trên đi cho đỡ rối
+                                                    filter: function(item, chart) {
+                                                        // item.datasetIndex tương ứng thứ tự trong mảng datasets (0,1,2,3,4)
+                                                        // Chỉ hiện 0, 1, 2
+                                                        return item.datasetIndex < 3; 
+                                                    }
+                                                }
+                                            },
+                                            tooltip: {
+                                                callbacks: {
+                                                    // Sửa tooltip để không hiện chữ "(Top)" gây khó hiểu
+                                                    label: function(context) {
+                                                        let label = context.dataset.label || '';
+                                                        label = label.replace(' (Top)', ''); // Xóa chữ Top nếu có
+                                                        return label + ': ' + context.parsed.y + ' kW';
+                                                    }
+                                                }
                                             }
                                         }
                                     }
