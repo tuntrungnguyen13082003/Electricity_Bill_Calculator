@@ -263,7 +263,7 @@
                             document.addEventListener("DOMContentLoaded", function() {
                                 openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
                                 
-                                // --- BƯỚC 1: TÌM GIÁ TRỊ LỚN NHẤT TRONG TẤT CẢ CÁC BIỂU ĐỒ (ĐỂ ĐỒNG BỘ TRỤC Y) ---
+                                // --- BƯỚC 1: TÍNH MAX Y ĐỂ ĐỒNG BỘ ---
                                 let maxVal = 0;
                                 const allDatasets = [
                                     chartDataRaw.weekday_work, 
@@ -274,7 +274,6 @@
 
                                 allDatasets.forEach(data => {
                                     if (data) {
-                                        // Tính tổng công suất tại mỗi giờ để tìm đỉnh cao nhất
                                         const hourlyTotals = data.td.map((val, i) => {
                                             return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
                                         });
@@ -283,52 +282,63 @@
                                     }
                                 });
 
-                                // Cộng thêm 10% cho thoáng
                                 const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.1) : 50;
 
-                                // --- BƯỚC 2: VẼ CÁC BIỂU ĐỒ ---
-                                renderLineChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
+                                // --- BƯỚC 2: VẼ BIỂU ĐỒ COMBO ---
+                                renderComboChart('chart_weekday', chartDataRaw.weekday_work, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_sunday')) 
-                                    renderLineChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y);
+                                    renderComboChart('chart_sunday', chartDataRaw.sunday_work, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_off_wd')) 
-                                    renderLineChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y);
+                                    renderComboChart('chart_off_wd', chartDataRaw.off_weekday, COMMON_MAX_Y);
                                 
                                 if(document.getElementById('chart_off_sun')) 
-                                    renderLineChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y);
+                                    renderComboChart('chart_off_sun', chartDataRaw.off_sunday, COMMON_MAX_Y);
                             });
 
-                            function renderLineChart(canvasId, dataSrc, maxYValue) {
+                            function renderComboChart(canvasId, dataSrc, maxYValue) {
                                 const ctx = document.getElementById(canvasId).getContext('2d');
 
-                                // 1. TÍNH TỔNG CÔNG SUẤT (Gộp tất cả các thành phần lại)
+                                // 1. Tính đường tổng (Line)
                                 const totalLoad = dataSrc.td.map((val, i) => {
-                                    return val + 
-                                           (dataSrc.bt_l[i] || 0) + 
-                                           (dataSrc.cd_l[i] || 0) + 
-                                           (dataSrc.bt_u[i] || 0) + 
-                                           (dataSrc.cd_u[i] || 0);
+                                    return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
                                 });
 
-                                // 2. VẼ BIỂU ĐỒ
                                 new Chart(ctx, {
-                                    type: 'line',
+                                    type: 'bar', // Mặc định là CỘT
                                     data: {
                                         labels: chartDataRaw.labels,
                                         datasets: [
+                                            // --- LỚP 1: ĐƯỜNG CONG (LINE) NẰM TRÊN CÙNG ---
+                                            {
+                                                type: 'line',
+                                                label: 'Tổng công suất',
+                                                data: totalLoad,
+                                                borderColor: '#2980b9', // Xanh biển đậm
+                                                borderWidth: 3,
+                                                tension: 0.4,       // Cong mềm mại
+                                                fill: false,        // KHÔNG TÔ NỀN DƯỚI
+                                                pointRadius: 0,     // Ẩn chấm tròn
+                                                order: 0            // Ưu tiên vẽ sau cùng (đè lên cột)
+                                            },
+                                            
+                                            // --- LỚP 2: CÁC CỘT CHỒNG (STACKED BAR) ---
                                             { 
-                                                label: 'Công suất tiêu thụ', 
-                                                data: totalLoad, 
-                                                // Màu xanh biển (Sea Blue)
-                                                borderColor: '#2980b9', 
-                                                backgroundColor: 'rgba(52, 152, 219, 0.3)', 
-                                                borderWidth: 2, 
-                                                fill: true,         // Tô màu nền dưới
-                                                tension: 0.4,       // Đường cong mềm mại
-                                                pointRadius: 0,     // Ẩn chấm tròn cho mượt
-                                                pointHoverRadius: 6 // Hiện chấm khi di chuột vào
-                                            }
+                                                label: 'Thấp điểm', data: dataSrc.td, 
+                                                backgroundColor: '#2ecc71', order: 1, stack: 'Stack 0' 
+                                            },
+                                            { 
+                                                label: 'Bình thường', data: dataSrc.bt_l, 
+                                                backgroundColor: '#3498db', order: 1, stack: 'Stack 0' 
+                                            },
+                                            { 
+                                                label: 'Cao điểm', data: dataSrc.cd_l, 
+                                                backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0' 
+                                            },
+                                            // Các phần phụ để lấp đầy cột (nếu có chia nhỏ giờ)
+                                            { label: '', data: dataSrc.bt_u, backgroundColor: '#3498db', order: 1, stack: 'Stack 0' },
+                                            { label: '', data: dataSrc.cd_u, backgroundColor: '#e74c3c', order: 1, stack: 'Stack 0' }
                                         ]
                                     },
                                     options: {
@@ -337,23 +347,29 @@
                                         scales: {
                                             y: { 
                                                 beginAtZero: true, 
-                                                max: maxYValue, // <--- ĐỒNG BỘ TRỤC Y
-                                                title: {display: true, text: 'Công suất (kW)'},
-                                                grid: { color: '#f0f0f0' }
+                                                stacked: true, // Cột chồng lên nhau
+                                                max: maxYValue, 
+                                                title: {display: true, text: 'Công suất (kW)'}
                                             },
                                             x: { 
+                                                stacked: true, // Cột chồng lên nhau
                                                 title: {display: true, text: 'Giờ trong ngày'},
                                                 grid: { display: false }
                                             }
                                         },
                                         plugins: {
-                                            legend: { display: false }, 
+                                            legend: { 
+                                                position: 'bottom', 
+                                                labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } 
+                                                // Ẩn label "Tổng công suất" nếu muốn gọn, hoặc để lại tùy bạn
+                                            },
                                             tooltip: {
                                                 mode: 'index',
                                                 intersect: false,
                                                 callbacks: { 
                                                     label: function(context) { 
-                                                        return 'Công suất: ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
+                                                        if (!context.dataset.label) return null;
+                                                        return context.dataset.label + ': ' + Number(context.parsed.y).toFixed(1) + ' kW'; 
                                                     } 
                                                 }
                                             }
