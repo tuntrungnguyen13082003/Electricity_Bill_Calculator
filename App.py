@@ -271,7 +271,7 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (PHIÊN BẢN FIX TOÀN DIỆN)
+        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (BẢN FIX LỖI NGÀY NGHỈ & LỖI 500)
         elif 'btn_calc_load' in request.form:
             try:
                 # --- A. HÀM HỖ TRỢ ---
@@ -285,7 +285,7 @@ def home():
                     try: return int(val.split(':')[0])
                     except: return default_h
 
-                # --- B. LẤY DỮ LIỆU ĐẦU VÀO ---
+                # --- B. LẤY INPUT ---
                 kwh_cd = get_float_safe('kwh_cd')
                 kwh_td = get_float_safe('kwh_td')
                 kwh_bt = get_float_safe('kwh_bt')
@@ -295,11 +295,10 @@ def home():
                 h_start = get_hour_safe('gio_lam_tu', 8)
                 h_end = get_hour_safe('gio_lam_den', 17)
 
-                # Xử lý danh sách ngày nghỉ (checkbox)
+                # Lấy danh sách ngày nghỉ (checkbox)
                 list_ngay_nghi_str = request.form.getlist('ngay_nghi')
                 list_ngay_nghi = [int(x) for x in list_ngay_nghi_str] if list_ngay_nghi_str else []
 
-                # Lưu lại input để form không bị trắng
                 du_lieu_nhap.update({
                     'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                     'ngay_dau': d_start, 'ngay_cuoi': d_end,
@@ -317,7 +316,7 @@ def home():
                     except: total_days = 0
                     
                     if total_days > 0:
-                        # --- C. PHÂN TÍCH SỐ LƯỢNG NGÀY ---
+                        # --- C. PHÂN LOẠI NGÀY ---
                         count_days = {'total': total_days, 'week_work': 0, 'sun_work': 0, 'off': 0}
                         
                         for i in range(total_days):
@@ -333,110 +332,110 @@ def home():
                         
                         # --- D. TÍNH TẢI NỀN (P_BASE) ---
                         # Tải nền được tính trung bình từ giờ Thấp điểm (nuôi thiết bị 24/7)
+                        # Lưu ý: P_base tồn tại cả khi nghỉ lẫn khi làm
                         avg_total_day_td = kwh_td / total_days
                         p_base = avg_total_day_td / 6 if avg_total_day_td > 0 else 0
 
-                        # --- E. ĐẾM SỐ GIỜ LÀM VIỆC & TRỪ TẢI NỀN ---
+                        # --- E. PHÂN TÍCH CA LÀM VIỆC (ĐỂ TÍNH P_MÁY_MÓC) ---
                         
-                        # 1. Đếm giờ làm việc thực tế trong ca (h_start -> h_end)
-                        hours_cd_in_shift = 0 # Số giờ CD trong 1 ca
-                        hours_bt_in_shift = 0 # Số giờ BT trong 1 ca
+                        # Đếm số giờ CD và BT trong 1 ca làm việc
+                        hours_cd_in_shift = 0 
+                        hours_bt_in_shift = 0
                         
-                        # Fix lỗi range: đảm bảo h_end > h_start
-                        real_h_end = max(h_start + 1, h_end)
+                        real_h_end = max(h_start + 1, h_end) # Chặn lỗi h_start >= h_end
                         
                         for h in range(h_start, real_h_end):
-                            if h in [22, 23, 0, 1, 2, 3]: pass 
+                            if h in [22, 23, 0, 1, 2, 3]: pass # Thấp điểm (thường ko làm)
                             elif h == 10 or h in [17, 18, 19]: hours_cd_in_shift += 1
                             elif h == 9 or h == 11: 
                                 hours_cd_in_shift += 0.5
                                 hours_bt_in_shift += 0.5
                             else: hours_bt_in_shift += 1
 
-                        # 2. Tính tổng năng lượng dành cho máy móc (P_add)
+                        # --- F. TÍNH CÔNG SUẤT CỘNG THÊM KHI MÁY CHẠY (P_ADD) ---
                         
-                        # --- XỬ LÝ CAO ĐIỂM (CD) ---
-                        # Tổng giờ CD làm việc của cả kỳ (chỉ tính ngày thường)
-                        total_hours_cd_working = hours_cd_in_shift * count_days['week_work']
+                        # 1. Tính P_ADD cho CAO ĐIỂM (Chỉ có ở ngày thường làm việc)
+                        # Tổng giờ CD máy chạy trong cả kỳ
+                        total_hours_cd_run = hours_cd_in_shift * count_days['week_work']
                         
-                        # Năng lượng nền tốn cho giờ CD (5 tiếng/ngày x số ngày thường làm)
-                        # Lưu ý: EVN quy định ngày thường có 5h CD, ta phải trừ nền cho đủ 5h
+                        # Năng lượng nền tiêu tốn cho giờ CD (5 tiếng x số ngày làm)
+                        # (Vì đồng hồ điện vẫn quay số tải nền dù máy có chạy hay ko)
                         base_kwh_cd = p_base * 5 * count_days['week_work']
                         
+                        # Năng lượng thực tế cho máy móc
                         prod_kwh_cd = max(0, kwh_cd - base_kwh_cd)
-                        p_add_cd = prod_kwh_cd / total_hours_cd_working if total_hours_cd_working > 0 else 0
+                        
+                        # Công suất máy chạy giờ CD
+                        p_add_cd = prod_kwh_cd / total_hours_cd_run if total_hours_cd_run > 0 else 0
 
-                        # --- XỬ LÝ BÌNH THƯỜNG (BT) ---
-                        # Tổng tải nền BT phải trừ cho TẤT CẢ các ngày
-                        # - Ngày nghỉ: 18h BT (vì ko có CD)
+                        # 2. Tính P_ADD cho BÌNH THƯỜNG
+                        # Tổng tải nền BT phải trừ cho TẤT CẢ các ngày (Kể cả ngày nghỉ)
+                        # - Ngày nghỉ: 18h BT
                         # - Ngày thường làm: 13h BT
                         # - CN làm: 18h BT
                         total_base_kwh_bt = (count_days['off'] * 18 * p_base) + \
                                             (count_days['week_work'] * 13 * p_base) + \
                                             (count_days['sun_work'] * 18 * p_base)
                         
-                        # Năng lượng đỉnh giả định trên CN (máy chạy giờ CD nhưng tính giá BT)
-                        # Chỉ tính những giờ CÓ TRONG CA LÀM
-                        energy_peak_on_sun = count_days['sun_work'] * hours_cd_in_shift * p_add_cd
+                        # Nếu CN đi làm: Máy chạy như điên vào giờ 9h-11h, 17h-20h nhưng tính giá BT
+                        # Ta phải trừ bớt phần điện năng "giả Peak" này ra khỏi quỹ BT
+                        energy_fake_peak_sun = count_days['sun_work'] * hours_cd_in_shift * p_add_cd
                         
-                        prod_kwh_bt = max(0, kwh_bt - total_base_kwh_bt - energy_peak_on_sun)
+                        prod_kwh_bt = max(0, kwh_bt - total_base_kwh_bt - energy_fake_peak_sun)
                         
-                        # Tổng giờ làm việc BT (Ngày thường + CN)
-                        total_hours_bt_working = (count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift
+                        # Tổng giờ máy chạy chế độ BT (Ngày thường + CN)
+                        total_hours_bt_run = (count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift
                         
-                        p_add_bt = prod_kwh_bt / total_hours_bt_working if total_hours_bt_working > 0 else 0
+                        p_add_bt = prod_kwh_bt / total_hours_bt_run if total_hours_bt_run > 0 else 0
 
-                        # --- F. TẠO DATASET ---
+                        # --- G. TẠO DATASET ---
                         def create_profile(mode):
                             # mode: 'week_work', 'sun_work', 'off'
                             data = {'td': [], 'bt_l': [], 'cd_l': [], 'bt_u': [], 'cd_u': []}
                             
                             is_off = (mode == 'off')
-                            is_sun = (mode == 'sun_work')
-                            # Ngày nghỉ cũng là CN theo EVN nếu nó rơi vào CN, nhưng ở đây ta xét ngày nghỉ chung
-                            # Để đơn giản: Ngày nghỉ => Không có sản xuất.
+                            is_sun_work = (mode == 'sun_work')
                             
                             for h in range(24):
-                                # 1. Xác định công suất máy (chỉ có khi đi làm)
-                                in_shift = (not is_off) and (h_start <= h < real_h_end)
+                                # 1. Xác định: Giờ này máy có chạy không?
+                                # Máy chỉ chạy nếu: KHÔNG PHẢI NGÀY NGHỈ và TRONG GIỜ LÀM
+                                is_machine_running = (not is_off) and (h_start <= h < real_h_end)
                                 
                                 p_machine = 0
-                                if in_shift:
-                                    if h in [22, 23, 0, 1, 2, 3]: p_machine = 0
+                                if is_machine_running:
+                                    if h in [22, 23, 0, 1, 2, 3]: p_machine = 0 
                                     elif h == 10 or h in [17, 18, 19]: p_machine = p_add_cd
                                     elif h == 9 or h == 11: p_machine = (p_add_cd + p_add_bt)/2
                                     else: p_machine = p_add_bt
                                 
-                                # Tổng công suất = Nền + Máy
+                                # Tổng công suất = Nền + Máy (Nếu nghỉ thì p_machine=0 -> chỉ còn nền)
                                 p_total = p_base + p_machine
                                 
-                                # 2. Phân màu theo EVN
+                                # 2. Phân màu (Theo luật EVN)
                                 v_td, v_bt_l, v_cd_l, v_bt_u, v_cd_u = 0, 0, 0, 0, 0
                                 
                                 if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
-                                    v_td = p_base # Luôn là nền (trừ khi làm đêm, ở đây giả sử ko)
+                                    v_td = p_base # Luôn là nền (trừ khi làm đêm)
                                 
-                                elif is_sun or (is_off and True): 
-                                    # CHỦ NHẬT hoặc NGÀY NGHỈ (Giả sử nghỉ T7 cũng tính giá BT/CD theo ngày thường nhưng p_total thấp)
-                                    # À khoan, nếu nghỉ Thứ 7 thì Thứ 7 vẫn có giờ Cao điểm (Đỏ) nhưng công suất thấp.
-                                    # Nếu nghỉ CN thì CN toàn màu Xanh.
-                                    # Để đơn giản hóa hiển thị "Ngày Nghỉ": Ta sẽ hiển thị theo khung giờ ngày thường (có đỏ có xanh) 
-                                    # để người dùng biết là "Nghỉ vào giờ cao điểm".
+                                elif is_sun_work: # Chủ nhật đi làm (Full Xanh)
+                                    v_bt_l = p_total
+                                
+                                else: 
+                                    # Ngày thường (Làm) HOẶC Ngày nghỉ (Off)
+                                    # Kể cả ngày nghỉ (Off) thì vẫn tô màu Đỏ/Xanh theo giờ EVN 
+                                    # nhưng cột sẽ rất thấp (vì p_total = p_base)
                                     
-                                    if is_sun: # Làm việc CN -> Full Xanh
+                                    if h == 9: 
+                                        v_bt_l = p_total * 0.5
+                                        v_cd_u = p_total * 0.5
+                                    elif h == 11: 
+                                        v_cd_l = p_total * 0.5
+                                        v_bt_u = p_total * 0.5
+                                    elif h == 10 or h in [17, 18, 19]: 
+                                        v_cd_l = p_total
+                                    else: 
                                         v_bt_l = p_total
-                                    else: # Ngày thường hoặc Ngày nghỉ (theo khung giờ chuẩn)
-                                        if h == 9: 
-                                            v_bt_l = p_total * 0.5
-                                            v_cd_u = p_total * 0.5
-                                        elif h == 11: 
-                                            v_cd_l = p_total * 0.5
-                                            v_bt_u = p_total * 0.5
-                                        elif h == 10 or h in [17, 18, 19]: 
-                                            v_cd_l = p_total
-                                        else: 
-                                            v_bt_l = p_total
-
+                                
                                 data['td'].append(round(v_td, 2))
                                 data['bt_l'].append(round(v_bt_l, 2))
                                 data['cd_l'].append(round(v_cd_l, 2))
@@ -453,9 +452,8 @@ def home():
                         }
 
             except Exception as e: 
-                print(f"Lỗi Backend: {e}")
+                print(f"Lỗi: {e}")
                 msg_update = f"❌ Lỗi: {str(e)}"
-            
             active_tab = 'calc'
 
     # --- 7. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
