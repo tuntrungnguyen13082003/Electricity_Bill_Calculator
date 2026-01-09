@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Dashboard Solar</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     
@@ -28,7 +29,7 @@
             }
         });
     </script>
-    
+
     <style>
         /* CSS CƠ BẢN */
         :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; --tab-bg: #dfe1e5; --tab-active: #ffffff; --danger: #e74c3c; }
@@ -97,49 +98,140 @@
         </div>
 
         <div id="calc" class="tab-content {{ 'active' if active_tab == 'calc' else '' }}">
-            <h2 style="color: var(--secondary); margin-top: 0; text-align: center;">Dự Toán Công Suất</h2>
-            <form method="POST">
-                <label>Tên Khách Hàng:</label>
-                <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_kh', '') }}" required>
-                <label>Khu vực lắp đặt:</label>
-                <select name="tinh_thanh_chon">{% for t in settings.tinh_thanh %}<option value="{{ t }}" {{ 'selected' if du_lieu_nhap.tinh_chon == t else '' }}>{{ t }}</option>{% endfor %}</select>
-                <label>Mô hình lắp đặt:</label>
-                <select name="loai_hinh" id="loai_hinh" class="form-control">
-                    <option value="can_ho" {{ 'selected' if du_lieu_nhap.loai_hinh == 'can_ho' else '' }}>🏡 Hộ gia đình</option>
-                    <option value="kinh_doanh" {{ 'selected' if du_lieu_nhap.loai_hinh == 'kinh_doanh' else '' }}>🏢 Kinh doanh</option>
-                    <option value="san_xuat" {{ 'selected' if du_lieu_nhap.loai_hinh == 'san_xuat' else '' }}>🏭 Sản xuất</option>
-                </select>
-                <label>Nhập liệu theo:</label>
-                <div class="input-mode-group">
-                    <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_tien" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_tien' else '' }}> Số tiền</label>
-                    <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_kwh" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_kwh' else '' }}> Số điện</label>
+            <h2 style="color: var(--secondary); margin-top: 0; text-align: center; margin-bottom: 20px;">Tính Toán & Phân Tích</h2>
+            
+            <div class="history-container" style="height: auto; min-height: 600px;">
+                <div class="history-sidebar" style="width: 220px;">
+                    <button class="v-tab-btn active" onclick="openSubTab('sub_du_toan', this)">⚡ Dự Toán Công Suất</button>
+                    <button class="v-tab-btn" onclick="openSubTab('sub_bieu_do', this)">📊 Biểu Đồ Phụ Tải</button>
                 </div>
-                <label id="input-label">{% if du_lieu_nhap.che_do == 'theo_kwh' %}Sản lượng tiêu thụ (kWh/Month):{% else %}Tiền điện trung bình tháng (VNĐ/Month):{% endif %}</label>
-                <input type="text" inputmode="numeric" name="gia_tri_dau_vao" id="gia_tri_input" required value="{{ du_lieu_nhap.gia_tri }}" oninput="formatCurrency(this)">
-                <div style="margin-bottom: 20px;">
-                    <input type="hidden" name="he_so_nhap" id="he_so_nhap" value="{{ du_lieu_nhap.he_so }}">
-                    <div id="khung_dac_diem">
-                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Đặc điểm sử dụng điện:</label>
-                        <select id="chon_ngu_canh" name="ngu_canh_chon" class="form-control">
-                            <option value="gd_co_nguoi" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_co_nguoi' else '' }}>👴👶 Có người già/trẻ nhỏ</option>
-                            <option value="gd_di_lam" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_di_lam' else '' }}>💼 Đi làm hành chính</option>
-                            <option value="gd_ban_dem" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_ban_dem' else '' }}>🌙 Dùng ban đêm</option>
-                        </select>
+
+                <div class="history-main-area" style="padding: 20px; overflow-y: auto;">
+                    
+                    <div id="sub_du_toan" class="v-tab-content active">
+                        <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Dự toán theo hóa đơn</h3>
+                        <form method="POST">
+                            <label>Tên Khách Hàng:</label>
+                            <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_kh', '') }}" required>
+                            
+                            <label>Khu vực lắp đặt:</label>
+                            <select name="tinh_thanh_chon">
+                                {% for t in settings.tinh_thanh %}<option value="{{ t }}" {{ 'selected' if du_lieu_nhap.tinh_chon == t else '' }}>{{ t }}</option>{% endfor %}
+                            </select>
+                    
+                            <label>Mô hình lắp đặt:</label>
+                            <select name="loai_hinh" id="loai_hinh" class="form-control">
+                                <option value="can_ho" {{ 'selected' if du_lieu_nhap.loai_hinh == 'can_ho' else '' }}>🏡 Hộ gia đình</option>
+                                <option value="kinh_doanh" {{ 'selected' if du_lieu_nhap.loai_hinh == 'kinh_doanh' else '' }}>🏢 Kinh doanh</option>
+                                <option value="san_xuat" {{ 'selected' if du_lieu_nhap.loai_hinh == 'san_xuat' else '' }}>🏭 Sản xuất</option>
+                            </select>
+                    
+                            <label>Nhập liệu theo:</label>
+                            <div class="input-mode-group">
+                                <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_tien" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_tien' else '' }}> Số tiền</label>
+                                <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_kwh" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_kwh' else '' }}> Số điện</label>
+                            </div>
+                    
+                            <label id="input-label">{% if du_lieu_nhap.che_do == 'theo_kwh' %}Sản lượng (kWh/Month):{% else %}Tiền điện (VNĐ/Month):{% endif %}</label>
+                            <input type="text" inputmode="numeric" name="gia_tri_dau_vao" id="gia_tri_input" required value="{{ du_lieu_nhap.gia_tri }}" oninput="formatCurrency(this)">
+                            
+                            <div style="margin-bottom: 20px;">
+                                <input type="hidden" name="he_so_nhap" id="he_so_nhap" value="{{ du_lieu_nhap.he_so }}">
+                                <div id="khung_dac_diem">
+                                    <label>Đặc điểm sử dụng:</label>
+                                    <select id="chon_ngu_canh" name="ngu_canh_chon" class="form-control">
+                                        <option value="gd_co_nguoi" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_co_nguoi' else '' }}>👴👶 Có người ở nhà</option>
+                                        <option value="gd_di_lam" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_di_lam' else '' }}>💼 Đi làm hành chính</option>
+                                        <option value="gd_ban_dem" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_ban_dem' else '' }}>🌙 Dùng ban đêm</option>
+                                    </select>
+                                </div>
+                                <div id="thong_bao_he_so" style="margin-top: 10px; padding: 10px; background: #e8f6f3; color: #16a085; border-radius: 5px; display: none; font-size: 13px;"></div>
+                            </div>
+                            <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN CÔNG SUẤT</button>
+                        </form>
+                        {% if ket_qua is not none and not du_lieu_nhap.get('chart_data') %}
+                        <div class="result-box">
+                            <div>Công suất đề xuất:</div>
+                            <h1 style="color: var(--secondary); margin: 5px 0; font-size: 36px;">{{ ket_qua }} kWp</h1>
+                            <div style="margin-top: 15px; border-top: 1px solid #ddd; padding-top:10px">Diện tích mái: <strong style="color:#e67e22">{{ dien_tich }} m²</strong></div>
+                        </div>
+                        {% endif %}
                     </div>
-                    <div id="thong_bao_he_so" style="margin-top: 10px; padding: 10px; background: #e8f6f3; color: #16a085; border-radius: 5px; display: none; font-size: 13px;"></div>
-                </div>
-                <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN NGAY</button>
-            </form>
-            {% if ket_qua is not none %}
-            <div class="result-box">
-                <div>Công suất đề xuất:</div>
-                <h1 style="color: var(--secondary); margin: 5px 0; font-size: 36px;">{{ ket_qua }} kWp</h1>
-                <div style="margin-top: 15px; font-size: 16px; color: #555; border-top: 1px solid #d1f2eb; padding-top: 10px;">
-                    Diện tích mái cần thiết:<br>
-                    <strong style="color: #e67e22; font-size: 20px;">≈ {{ dien_tich }} m²</strong>
+
+                    <div id="sub_bieu_do" class="v-tab-content">
+                        <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Phân tích Phụ tải 3 Giá</h3>
+                        <form method="POST">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div><label style="color:#c0392b">Cao điểm (kWh):</label><input type="number" name="kwh_cd" class="form-control" value="{{ du_lieu_nhap.get('kwh_cd', '') }}" required></div>
+                                <div><label style="color:#2980b9">Bình thường (kWh):</label><input type="number" name="kwh_bt" class="form-control" value="{{ du_lieu_nhap.get('kwh_bt', '') }}" required></div>
+                                <div><label style="color:#27ae60">Thấp điểm (kWh):</label><input type="number" name="kwh_td" class="form-control" value="{{ du_lieu_nhap.get('kwh_td', '') }}" required></div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
+                                <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                <div><label>Giờ làm việc (Từ):</label><input type="time" name="gio_lam_tu" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_tu', '08:00') }}"></div>
+                                <div><label>Giờ làm việc (Đến):</label><input type="time" name="gio_lam_den" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_den', '17:00') }}"></div>
+                            </div>
+
+                            <button type="submit" name="btn_calc_load" class="btn-calc" style="background: #8e44ad; margin-top: 20px;">VẼ BIỂU ĐỒ</button>
+                        </form>
+
+                        {% if du_lieu_nhap.get('chart_data') %}
+                        <div style="margin-top: 30px; height: 400px;">
+                            <canvas id="loadChart"></canvas>
+                        </div>
+                        <script>
+                            document.addEventListener("DOMContentLoaded", function() {
+                                // Tự động chuyển sang tab biểu đồ nếu vừa ấn nút vẽ
+                                openSubTab('sub_bieu_do', document.querySelectorAll('.history-sidebar button')[1]);
+
+                                const ctx = document.getElementById('loadChart').getContext('2d');
+                                const chartData = {{ du_lieu_nhap.chart_data | tojson }};
+                                
+                                new Chart(ctx, {
+                                    type: 'bar',
+                                    data: {
+                                        labels: chartData.labels,
+                                        datasets: [{
+                                            label: 'Công suất tiêu thụ (kW)',
+                                            data: chartData.values,
+                                            backgroundColor: chartData.colors,
+                                            borderWidth: 1
+                                        }]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        scales: {
+                                            y: { beginAtZero: true, title: {display: true, text: 'Công suất (kW)'} },
+                                            x: { title: {display: true, text: 'Giờ trong ngày (0h-23h)'} }
+                                        },
+                                        plugins: {
+                                            legend: { display: false },
+                                            tooltip: {
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        let label = context.dataset.label || '';
+                                                        if (label) label += ': ';
+                                                        label += context.parsed.y + ' kW';
+                                                        return label;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+                            });
+                        </script>
+                        {% endif %}
+                    </div>
+
                 </div>
             </div>
-            {% endif %}
         </div>
 
         {% if role == 'admin' %}

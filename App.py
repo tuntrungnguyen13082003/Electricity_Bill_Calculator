@@ -1,6 +1,7 @@
 import os
 import json
 import pandas as pd
+from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
 from flask import Flask, render_template, request, session, redirect, url_for, send_file
 
@@ -293,6 +294,68 @@ def home():
             # Sắp xếp mới nhất lên đầu
             lich_su_data.sort(key=lambda x: datetime.strptime(x['Thời Gian'], "%d/%m/%Y %H:%M:%S"), reverse=True)
         except: pass
+
+    elif 'btn_calc_load' in request.form:
+            try:
+                # Lấy dữ liệu từ form
+                kwh_cd = float(request.form.get('kwh_cd', 0))
+                kwh_td = float(request.form.get('kwh_td', 0))
+                kwh_bt = float(request.form.get('kwh_bt', 0))
+                
+                d_start = request.form.get('ngay_dau')
+                d_end = request.form.get('ngay_cuoi')
+                
+                # Tính số ngày
+                date_format = "%Y-%m-%d"
+                delta = datetime.strptime(d_end, date_format) - datetime.strptime(d_start, date_format)
+                so_ngay = delta.days + 1
+                
+                if so_ngay > 0:
+                    # 1. Tính trung bình ngày
+                    avg_day_cd = kwh_cd / so_ngay
+                    avg_day_td = kwh_td / so_ngay
+                    avg_day_bt = kwh_bt / so_ngay
+                    
+                    # 2. Chia ra công suất trung bình giờ (kW) theo quy định EVN
+                    # - Thấp điểm (22h-4h): 6 tiếng
+                    # - Cao điểm (9h30-11h30 & 17h-20h): 5 tiếng
+                    # - Bình thường: 13 tiếng còn lại
+                    
+                    p_td = avg_day_td / 6
+                    p_cd = avg_day_cd / 5
+                    p_bt = avg_day_bt / 13
+                    
+                    # 3. Tạo mảng dữ liệu cho 24 giờ (0h -> 23h)
+                    # Màu sắc: Đỏ (CD), Xanh Biển (BT), Xanh Lá (TD)
+                    chart_data = {'labels': [], 'values': [], 'colors': []}
+                    
+                    for h in range(24):
+                        chart_data['labels'].append(f"{h}h")
+                        
+                        # Logic khung giờ EVN (Giản lược 9h30 thành khung 10h để vẽ biểu đồ cột)
+                        if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
+                            chart_data['values'].append(round(p_td, 2))
+                            chart_data['colors'].append('rgba(46, 204, 113, 0.8)') # Xanh lá
+                        elif h in [10, 11, 17, 18, 19]: # Cao điểm (xấp xỉ)
+                            chart_data['values'].append(round(p_cd, 2))
+                            chart_data['colors'].append('rgba(231, 76, 60, 0.8)') # Đỏ
+                        else: # Bình thường
+                            chart_data['values'].append(round(p_bt, 2))
+                            chart_data['colors'].append('rgba(52, 152, 219, 0.8)') # Xanh biển
+                            
+                    # Gửi dữ liệu sang Frontend (dạng biến chart_data)
+                    du_lieu_nhap['chart_data'] = chart_data
+                    # Lưu lại các input để không bị mất khi reload
+                    du_lieu_nhap.update({
+                        'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
+                        'ngay_dau': d_start, 'ngay_cuoi': d_end,
+                        'gio_lam_tu': request.form.get('gio_lam_tu'),
+                        'gio_lam_den': request.form.get('gio_lam_den')
+                    })
+                    
+                active_tab = 'calc' # Giữ nguyên tab tính toán
+            except Exception as e: print(f"Lỗi tính tải: {e}")
+
 
     return render_template('index.html', role=current_role, settings=SETTINGS, users=USERS, ket_qua=ket_qua, dien_tich=dien_tich, du_lieu_nhap=du_lieu_nhap, msg_update=msg_update, active_tab=active_tab, gio_nang_da_dung=gio_nang_da_dung, lich_su=lich_su_data)
 
