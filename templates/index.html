@@ -103,7 +103,7 @@
             <div class="history-container" style="height: auto; min-height: 600px;">
                 <div class="history-sidebar" style="width: 220px;">
                     <button class="v-tab-btn active" onclick="openSubTab('sub_du_toan', this)">⚡ Dự Toán Công Suất</button>
-                    <button class="v-tab-btn" onclick="openSubTab('sub_bieu_do', this)">📊 Biểu Đồ Phụ Tải</button>
+                    <button id="btn_tab_bieu_do" class="v-tab-btn" onclick="openSubTab('sub_bieu_do', this)">📊 Biểu Đồ Phụ Tải</button>
                 </div>
 
                 <div class="history-main-area" style="padding: 20px; overflow-y: auto;">
@@ -187,7 +187,7 @@
                         <script>
                             document.addEventListener("DOMContentLoaded", function() {
                                 // Tự động chuyển sang tab biểu đồ nếu vừa ấn nút vẽ
-                                openSubTab('sub_bieu_do', document.querySelectorAll('.history-sidebar button')[1]);
+                                openSubTab('sub_bieu_do', document.getElementById('btn_tab_bieu_do'));
 
                                 const ctx = document.getElementById('loadChart').getContext('2d');
                                 const chartData = {{ du_lieu_nhap.chart_data | tojson }};
