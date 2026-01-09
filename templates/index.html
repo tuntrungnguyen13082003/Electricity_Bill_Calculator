@@ -225,12 +225,16 @@
                             <div class="btn-group" role="group" style="display: inline-flex; background: #eee; padding: 3px; border-radius: 5px;">
                                 <button type="button" onclick="switchChart('weekday_work')" id="btn_week" class="chart-btn active">🏭 Ngày Thường</button>
                                 
-                                {% if du_lieu_nhap.chart_data.stats.sun_work > 0 %}
+                                {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
                                 <button type="button" onclick="switchChart('sunday_work')" id="btn_sun" class="chart-btn">☀️ Làm việc (CN)</button>
                                 {% endif %}
                                 
-                                {% if du_lieu_nhap.chart_data.stats.off > 0 %}
-                                <button type="button" onclick="switchChart('off_day')" id="btn_off" class="chart-btn">☕ Ngày Nghỉ</button>
+                                {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
+                                <button type="button" onclick="switchChart('off_weekday')" id="btn_off_wd" class="chart-btn">☕ Nghỉ (Ngày thường)</button>
+                                {% endif %}
+
+                                {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
+                                <button type="button" onclick="switchChart('off_sunday')" id="btn_off_sun" class="chart-btn">☕ Nghỉ (CN)</button>
                                 {% endif %}
                             </div>
                         </div>
@@ -255,10 +259,24 @@
                             }
 
                             function switchChart(mode) {
+                                // Reset tất cả nút về mặc định
                                 document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+                                
+                                // Bật active cho nút tương ứng
                                 if(mode === 'weekday_work') document.getElementById('btn_week').classList.add('active');
-                                else if(mode === 'sunday_work') document.getElementById('btn_sun').classList.add('active');
-                                else document.getElementById('btn_off').classList.add('active');
+                                else if(mode === 'sunday_work') {
+                                    const btn = document.getElementById('btn_sun');
+                                    if(btn) btn.classList.add('active');
+                                }
+                                else if(mode === 'off_weekday') {
+                                    const btn = document.getElementById('btn_off_wd');
+                                    if(btn) btn.classList.add('active');
+                                }
+                                else if(mode === 'off_sunday') {
+                                    const btn = document.getElementById('btn_off_sun');
+                                    if(btn) btn.classList.add('active');
+                                }
+                                
                                 renderChart(mode);
                             }
 
