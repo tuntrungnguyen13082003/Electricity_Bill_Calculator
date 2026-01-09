@@ -271,16 +271,15 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (ĐÃ FIX LỖI BIẾN p_td)
+        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (CÓ TRỪ NGÀY CHỦ NHẬT & TỰ ĐỘNG ĐẾM)
         elif 'btn_calc_load' in request.form:
             try:
-                # 1. Hàm lấy số an toàn
+                # 1. Các hàm lấy dữ liệu an toàn
                 def get_float_safe(key):
                     val = request.form.get(key, '')
                     if not val or val.strip() == '': return 0.0
                     return float(val)
 
-                # 2. Hàm lấy giờ an toàn
                 def get_hour_safe(key, default_h):
                     val = request.form.get(key)
                     if not val or ':' not in val: return default_h
@@ -307,22 +306,53 @@ def home():
                 if d_start and d_end:
                     date_format = "%Y-%m-%d"
                     try:
-                        delta = datetime.strptime(d_end, date_format) - datetime.strptime(d_start, date_format)
-                        so_ngay = delta.days + 1
-                    except: so_ngay = 0
+                        start_date = datetime.strptime(d_start, date_format)
+                        end_date = datetime.strptime(d_end, date_format)
+                        delta = end_date - start_date
+                        total_days = delta.days + 1
+                    except: total_days = 0
                     
-                    if so_ngay > 0:
-                        avg_day_cd = kwh_cd / so_ngay
-                        avg_day_td = kwh_td / so_ngay
-                        avg_day_bt = kwh_bt / so_ngay
+                    if total_days > 0:
+                        # --- BƯỚC 1: TỰ ĐỘNG ĐẾM CHỦ NHẬT ---
+                        sunday_count = 0
+                        # Chạy vòng lặp kiểm tra từng ngày
+                        for i in range(total_days):
+                            current_day = start_date + timedelta(days=i)
+                            if current_day.weekday() == 6: # 0 là Thứ 2, ..., 6 là Chủ Nhật
+                                sunday_count += 1
                         
-                        # Tải nền (P_base) = TB giờ thấp điểm
-                        p_base = avg_day_td / 6 if avg_day_td > 0 else 0
+                        working_days = total_days - sunday_count
+                        if working_days <= 0: working_days = 1 # Tránh chia cho 0 nếu chọn toàn CN
+
+                        # --- BƯỚC 2: TÍNH TẢI NỀN (P_base) ---
+                        # Tải nền luôn tồn tại 365 ngày, nên tính trên tổng ngày
+                        avg_total_day_td = kwh_td / total_days
+                        p_base = avg_total_day_td / 6 if avg_total_day_td > 0 else 0
                         
-                        # --- XỬ LÝ BÌNH THƯỜNG ---
+                        # --- BƯỚC 3: TRỪ ĐIỆN NGÀY CHỦ NHẬT ---
+                        # Giả định CN chỉ chạy tải nền (P_base) cho tất cả khung giờ
+                        # Công thức: P_base * (số giờ khung đó) * (số ngày CN)
+                        
+                        loss_sun_td = p_base * 6 * sunday_count
+                        loss_sun_bt = p_base * 13 * sunday_count
+                        loss_sun_cd = p_base * 5 * sunday_count
+                        
+                        # Điện thực tế phục vụ sản xuất (cho các ngày làm việc)
+                        real_work_kwh_td = max(0, kwh_td - loss_sun_td)
+                        real_work_kwh_bt = max(0, kwh_bt - loss_sun_bt)
+                        real_work_kwh_cd = max(0, kwh_cd - loss_sun_cd)
+                        
+                        # --- BƯỚC 4: TÍNH TRUNG BÌNH 1 NGÀY LÀM VIỆC ---
+                        avg_work_td = real_work_kwh_td / working_days
+                        avg_work_bt = real_work_kwh_bt / working_days
+                        avg_work_cd = real_work_kwh_cd / working_days
+                        
+                        # --- BƯỚC 5: PHÂN BỔ VÀO GIỜ LÀM (Giống logic cũ nhưng dùng avg_work) ---
+                        
+                        # -- Xử lý BT (Ngày làm việc) --
                         total_hours_bt = 13 
                         energy_base_bt = p_base * total_hours_bt
-                        energy_remain_bt = max(0, avg_day_bt - energy_base_bt)
+                        energy_remain_bt = max(0, avg_work_bt - energy_base_bt)
                         
                         count_work_bt = 0
                         for h in range(24):
@@ -330,13 +360,12 @@ def home():
                             if not is_working: continue
                             if h in [4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 20, 21]: count_work_bt += 1
                             elif h == 9 or h == 11: count_work_bt += 0.5
-                            
                         p_add_bt = energy_remain_bt / count_work_bt if count_work_bt > 0 else 0
 
-                        # --- XỬ LÝ CAO ĐIỂM ---
+                        # -- Xử lý CD (Ngày làm việc) --
                         total_hours_cd = 5
                         energy_base_cd = p_base * total_hours_cd
-                        energy_remain_cd = max(0, avg_day_cd - energy_base_cd)
+                        energy_remain_cd = max(0, avg_work_cd - energy_base_cd)
                         
                         count_work_cd = 0
                         for h in range(24):
@@ -344,10 +373,9 @@ def home():
                             if not is_working: continue
                             if h in [10, 17, 18, 19]: count_work_cd += 1
                             elif h == 9 or h == 11: count_work_cd += 0.5
-                            
                         p_add_cd = energy_remain_cd / count_work_cd if count_work_cd > 0 else 0
 
-                        # --- TẠO DỮ LIỆU ---
+                        # --- BƯỚC 6: TẠO DỮ LIỆU ---
                         data_td, data_bt_lower, data_cd_lower, data_bt_upper, data_cd_upper, labels = [], [], [], [], [], []
 
                         for h in range(24):
@@ -360,7 +388,7 @@ def home():
                             v_td, v_bt_lower, v_cd_lower, v_bt_upper, v_cd_upper = 0, 0, 0, 0, 0
 
                             if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
-                                v_td = p_base  # <--- ĐÃ SỬA: Dùng p_base thay vì p_td (biến cũ)
+                                v_td = p_base 
                             
                             elif h == 9: 
                                 v_bt_lower = get_p(p_add_bt) * 0.5
@@ -390,7 +418,9 @@ def home():
                                 'cd_lower': data_cd_lower,
                                 'bt_upper': data_bt_upper,
                                 'cd_upper': data_cd_upper
-                            }
+                            },
+                            # Gửi thêm thông tin này để hiển thị ra cho User biết (nếu muốn)
+                            'info': f"Đã trừ {sunday_count} ngày CN. Tính toán trên {working_days} ngày làm việc."
                         }
             except Exception as e: 
                 print(f"Lỗi tính tải: {e}")
