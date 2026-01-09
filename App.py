@@ -271,14 +271,23 @@ def home():
                 active_tab = 'calc'
             except: pass
 
-        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (LOGIC NÂNG CAO: TẢI NỀN & GIỜ LÀM VIỆC)
+        # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (LOGIC NÂNG CAO & ĐÃ FIX LỖI TIME)
         elif 'btn_calc_load' in request.form:
             try:
+                # 1. Hàm lấy số an toàn
                 def get_float_safe(key):
                     val = request.form.get(key, '')
                     if not val or val.strip() == '': return 0.0
                     return float(val)
 
+                # 2. Hàm lấy giờ an toàn (Chống sập khi ô giờ bị trống)
+                def get_hour_safe(key, default_h):
+                    val = request.form.get(key)
+                    if not val or ':' not in val: return default_h
+                    try: return int(val.split(':')[0])
+                    except: return default_h
+
+                # Lấy dữ liệu
                 kwh_cd = get_float_safe('kwh_cd')
                 kwh_td = get_float_safe('kwh_td')
                 kwh_bt = get_float_safe('kwh_bt')
@@ -286,14 +295,11 @@ def home():
                 d_start = request.form.get('ngay_dau')
                 d_end = request.form.get('ngay_cuoi')
                 
-                # Lấy giờ làm việc (Chỉ lấy phần giờ, bỏ phút)
-                # Ví dụ: 08:00 -> 8, 17:00 -> 17
-                try:
-                    h_start = int(request.form.get('gio_lam_tu', '8').split(':')[0])
-                    h_end = int(request.form.get('gio_lam_den', '17').split(':')[0])
-                except: h_start, h_end = 8, 17 # Mặc định nếu lỗi
+                # Lấy giờ làm việc (Mặc định 8h -> 17h nếu lỗi)
+                h_start = get_hour_safe('gio_lam_tu', 8)
+                h_end = get_hour_safe('gio_lam_den', 17)
 
-                # Cập nhật lại input
+                # Cập nhật lại input để form không bị trắng
                 du_lieu_nhap.update({
                     'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                     'ngay_dau': d_start, 'ngay_cuoi': d_end,
@@ -303,45 +309,37 @@ def home():
 
                 if d_start and d_end:
                     date_format = "%Y-%m-%d"
-                    delta = datetime.strptime(d_end, date_format) - datetime.strptime(d_start, date_format)
-                    so_ngay = delta.days + 1
+                    # Thêm try-catch cho ngày tháng đề phòng nhập sai format
+                    try:
+                        delta = datetime.strptime(d_end, date_format) - datetime.strptime(d_start, date_format)
+                        so_ngay = delta.days + 1
+                    except: so_ngay = 0
                     
                     if so_ngay > 0:
-                        # 1. Tính trung bình ngày
+                        # --- BẮT ĐẦU TÍNH TOÁN ---
                         avg_day_cd = kwh_cd / so_ngay
                         avg_day_td = kwh_td / so_ngay
                         avg_day_bt = kwh_bt / so_ngay
                         
-                        # 2. TÍNH TẢI NỀN (P_base) = Công suất trung bình giờ thấp điểm
-                        # Giờ thấp điểm: 6 tiếng (22h-4h)
+                        # Tải nền (P_base) = TB giờ thấp điểm (chia 6h)
                         p_base = avg_day_td / 6 if avg_day_td > 0 else 0
                         
-                        # 3. PHÂN BỔ NĂNG LƯỢNG CHO BÌNH THƯỜNG & CAO ĐIỂM
-                        # Logic: 
-                        # - Tổng năng lượng có sẵn = avg_day_bt (hoặc cd)
-                        # - Năng lượng "nuôi" tải nền = p_base * Tổng số giờ (13h hoặc 5h)
-                        # - Năng lượng "sản xuất" còn lại = Tổng - Năng lượng nền
-                        # - Công suất cộng thêm vào giờ làm = Năng lượng sản xuất / Số giờ làm thực tế
-                        
                         # --- XỬ LÝ BÌNH THƯỜNG (BT) ---
-                        total_hours_bt = 13 # Tổng giờ BT trong ngày
-                        energy_base_bt = p_base * total_hours_bt # Điện tốn cho tải nền
-                        energy_remain_bt = max(0, avg_day_bt - energy_base_bt) # Điện dành cho sx
+                        total_hours_bt = 13 
+                        energy_base_bt = p_base * total_hours_bt
+                        energy_remain_bt = max(0, avg_day_bt - energy_base_bt)
                         
-                        # Đếm số giờ làm việc nằm trong khung BT
                         count_work_bt = 0
                         for h in range(24):
-                            is_working = h_start <= h < h_end # Kiểm tra giờ h có phải giờ làm ko
-                            if not is_working: continue # Không làm thì bỏ qua
-                            
+                            is_working = h_start <= h < h_end
+                            if not is_working: continue
                             if h in [4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 20, 21]: count_work_bt += 1
-                            elif h == 9 or h == 11: count_work_bt += 0.5 # Giờ ghép tính 0.5
+                            elif h == 9 or h == 11: count_work_bt += 0.5
                             
-                        # Công suất cộng thêm vào giờ làm (P_add)
                         p_add_bt = energy_remain_bt / count_work_bt if count_work_bt > 0 else 0
 
                         # --- XỬ LÝ CAO ĐIỂM (CD) ---
-                        total_hours_cd = 5 # Tổng giờ CD trong ngày
+                        total_hours_cd = 5
                         energy_base_cd = p_base * total_hours_cd
                         energy_remain_cd = max(0, avg_day_cd - energy_base_cd)
                         
@@ -349,13 +347,12 @@ def home():
                         for h in range(24):
                             is_working = h_start <= h < h_end
                             if not is_working: continue
-                            
                             if h in [10, 17, 18, 19]: count_work_cd += 1
                             elif h == 9 or h == 11: count_work_cd += 0.5
                             
                         p_add_cd = energy_remain_cd / count_work_cd if count_work_cd > 0 else 0
 
-                        # 4. TẠO DỮ LIỆU BIỂU ĐỒ (ÁP DỤNG P_BASE VÀ P_ADD)
+                        # --- TẠO DỮ LIỆU BIỂU ĐỒ ---
                         data_td = []
                         data_bt_lower = []
                         data_cd_lower = []
@@ -365,18 +362,15 @@ def home():
 
                         for h in range(24):
                             labels.append(f"{h}h")
-                            is_working = h_start <= h < h_end # Kiểm tra giờ này có làm việc ko
+                            is_working = h_start <= h < h_end
                             
-                            # Hàm tính công suất tại giờ h: Nền + (Cộng thêm nếu đang làm)
                             def get_p(p_added):
                                 return p_base + (p_added if is_working else 0)
 
-                            # Reset biến
                             v_td, v_bt_lower, v_cd_lower, v_bt_upper, v_cd_upper = 0, 0, 0, 0, 0
 
-                            # -- PHÂN LOẠI GIỜ --
                             if h in [22, 23, 0, 1, 2, 3]: # Thấp điểm
-                                v_td = p_td # Thấp điểm giữ nguyên như cũ
+                                v_td = p_td # Thấp điểm giữ nguyên
                             
                             elif h == 9: # 9h: BT dưới, CD trên
                                 v_bt_lower = get_p(p_add_bt) * 0.5
@@ -392,7 +386,6 @@ def home():
                             else: # Full Bình thường
                                 v_bt_lower = get_p(p_add_bt)
 
-                            # Thêm vào mảng
                             data_td.append(round(v_td, 2))
                             data_bt_lower.append(round(v_bt_lower, 2))
                             data_cd_lower.append(round(v_cd_lower, 2))
@@ -410,8 +403,10 @@ def home():
                             }
                         }
             except Exception as e: 
-                print(f"Lỗi tính tải: {e}")
-                msg_update = f"❌ Lỗi tính toán: {e}"
+                print(f"Lỗi tính tải: {e}") # Xem lỗi ở log server nếu cần
+                msg_update = f"❌ Lỗi tính toán: {str(e)}"
+            
+            # QUAN TRỌNG: Giữ người dùng ở lại tab Calc
             active_tab = 'calc'
 
     # --- 7. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
