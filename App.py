@@ -274,15 +274,27 @@ def home():
 # 6. TÍNH BIỂU ĐỒ PHỤ TẢI (BẢN FIX LỖI KEY ERROR)
         elif 'btn_calc_load' in request.form:
             try:
-                # --- A. HÀM HỖ TRỢ ---
+                # --- A. HÀM HỖ TRỢ (ĐÃ NÂNG CẤP XỬ LÝ 12H/24H) ---
                 def get_float_safe(key):
                     val = request.form.get(key, '')
                     return float(val) if val and val.strip() else 0.0
 
                 def get_hour_safe(key, default_h):
-                    val = request.form.get(key)
-                    if not val or ':' not in val: return default_h
-                    try: return int(val.split(':')[0])
+                    val = request.form.get(key) # VD: "05:00 CH" hoặc "17:00"
+                    if not val: return default_h
+                    try:
+                        # Lấy phần số giờ đầu tiên
+                        h = int(val.split(':')[0])
+                        
+                        # Kiểm tra xem có phải định dạng 12h (CH/PM) không
+                        # Nếu có chữ CH/PM mà giờ < 12 thì cộng thêm 12
+                        is_pm = 'CH' in val.upper() or 'PM' in val.upper()
+                        is_am = 'SA' in val.upper() or 'AM' in val.upper()
+                        
+                        if is_pm and h < 12: h += 12
+                        if is_am and h == 12: h = 0 # 12h đêm là 0h
+                        
+                        return h
                     except: return default_h
 
                 # --- B. LẤY INPUT ---
