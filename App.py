@@ -8,10 +8,7 @@ from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_file
 
-os.environ["GOOGLE_API_KEY"] = "AIzaSyAkDousFLZy33pXCo3by3zZ8ar3Pphuy0c"
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-
-
+API_KEY = "AIzaSyAkDousFLZy33pXCo3by3zZ8ar3Pphuy0c"
 
 # --- CẤU HÌNH ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
