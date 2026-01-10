@@ -536,6 +536,68 @@
             }
         }); 
     </script>
+    <script>
+        function uploadVaQuetAnh(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const btn = document.getElementById('btn_scan_trigger');
+                
+                // Hiệu ứng loading
+                if(btn) {
+                    btn.innerHTML = "⏳ Đang đọc...";
+                    btn.style.opacity = "0.7";
+                    btn.disabled = true;
+                }
+
+                const formData = new FormData();
+                formData.append('file_anh', file);
+
+                fetch('/scan_invoice', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(res => {
+                    if (res.success && res.data) {
+                        const d = res.data;
+                        
+                        // Code điền dữ liệu
+                        if(d.kwh_bt) document.querySelector('input[name="kwh_bt"]').value = d.kwh_bt.toString().replace(/\./g, '');
+                        if(d.kwh_cd) document.querySelector('input[name="kwh_cd"]').value = d.kwh_cd.toString().replace(/\./g, '');
+                        if(d.kwh_td) document.querySelector('input[name="kwh_td"]').value = d.kwh_td.toString().replace(/\./g, '');
+                        
+                        // Xử lý ngày tháng
+                        const chuanHoaNgay = (strNgay) => {
+                            if (!strNgay) return "";
+                            if (strNgay.includes('/')) {
+                                let parts = strNgay.split('/');
+                                if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                            }
+                            return strNgay;
+                        };
+                        if(d.ngay_dau) document.querySelector('input[name="ngay_dau"]').value = chuanHoaNgay(d.ngay_dau);
+                        if(d.ngay_cuoi) document.querySelector('input[name="ngay_cuoi"]').value = chuanHoaNgay(d.ngay_cuoi);
+                        
+                        alert("✅ Đã trích xuất xong!");
+                    } else {
+                        alert("⚠️ Không tìm thấy dữ liệu.");
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("❌ Lỗi kết nối server.");
+                })
+                .finally(() => {
+                    if(btn) {
+                        btn.innerHTML = "Tải ảnh lên";
+                        btn.style.opacity = "1";
+                        btn.disabled = false;
+                    }
+                    input.value = ''; 
+                });
+            }
+        }
+    </script>
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
         window.charts = {}; 
@@ -730,68 +792,7 @@
             
             return 1; // Còn lại là Bình thường
         }
-
-
-        function uploadVaQuetAnh(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                const btn = document.getElementById('btn_scan_trigger');
-                
-                // Hiệu ứng loading
-                btn.innerHTML = "⏳ Đang đọc...";
-                btn.style.opacity = "0.7";
-                btn.disabled = true;
-
-                const formData = new FormData();
-                formData.append('file_anh', file);
-
-                fetch('/scan_invoice', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(res => {
-                    if (res.success && res.data) {
-                        const d = res.data;
-                        
-                        // 1. Điền số điện (Tự động xóa dấu chấm nếu AI quên xóa)
-                        // Hàm replace(/\./g, '') giúp xóa dấu chấm nếu còn sót
-                        if(d.kwh_bt) document.querySelector('input[name="kwh_bt"]').value = d.kwh_bt.toString().replace(/\./g, '');
-                        if(d.kwh_cd) document.querySelector('input[name="kwh_cd"]').value = d.kwh_cd.toString().replace(/\./g, '');
-                        if(d.kwh_td) document.querySelector('input[name="kwh_td"]').value = d.kwh_td.toString().replace(/\./g, '');
-                        
-                        // 2. Điền ngày tháng (Xử lý thông minh)
-                        // Hàm này giúp chuyển 16/04/2025 -> 2025-04-16 nếu cần
-                        const chuanHoaNgay = (strNgay) => {
-                            if (!strNgay) return "";
-                            if (strNgay.includes('/')) {
-                                // Nếu AI trả về 16/04/2025 -> Đảo lại thành 2025-04-16
-                                let parts = strNgay.split('/');
-                                if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                            }
-                            return strNgay; // Nếu đã là 2025-04-16 thì giữ nguyên
-                        };
-
-                        if(d.ngay_dau) document.querySelector('input[name="ngay_dau"]').value = chuanHoaNgay(d.ngay_dau);
-                        if(d.ngay_cuoi) document.querySelector('input[name="ngay_cuoi"]').value = chuanHoaNgay(d.ngay_cuoi);
-                        
-                        alert("✅ Đã trích xuất xong: \nBT: " + d.kwh_bt + "\nCD: " + d.kwh_cd + "\nTD: " + d.kwh_td);
-                    } else {
-                        alert("⚠️ AI không tìm thấy dữ liệu trong ảnh này.");
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("❌ Lỗi kết nối server.");
-                })
-                .finally(() => {
-                    btn.innerHTML = "Tải ảnh lên";
-                    btn.style.opacity = "1";
-                    btn.disabled = false;
-                    input.value = ''; 
-                });
-            }
-        }
+        
     </script>
     {% endif %}
 </body>
