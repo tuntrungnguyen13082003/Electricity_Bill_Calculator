@@ -625,38 +625,41 @@
             return 1; // Còn lại là Bình thường
         }
 
-        // --- 3. LOGIC TÍNH TOÁN LẠI (SỬA ĐỂ KHÔNG ẢNH HƯỞNG LOẠI GIỜ KHÁC) ---
+        // --- 3. LOGIC TÍNH TOÁN LẠI (PHIÊN BẢN CHẶN SAU 17H) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
             const wdData = liveData.weekday_work;
             // Tính giá trị cũ
             const oldTotalValue = wdData.td[targetIndex] + wdData.bt_l[targetIndex] + wdData.cd_l[targetIndex] + wdData.bt_u[targetIndex] + wdData.cd_u[targetIndex];
             const delta = newTotalValue - oldTotalValue;
 
-            // Xác định Loại giờ của điểm đang bị kéo (TD, BT hay CD?)
-            // Mặc định ta lấy theo Ngày thường (vì đây là nguồn chuẩn)
+            // Xác định Loại giờ của điểm đang bị kéo
             const targetType = getTariffType(targetIndex, false); 
 
             // 1. Cập nhật tại điểm kéo
             distributeValueToComponents(wdData, targetIndex, newTotalValue, false);
 
-            // 2. Chia đều Delta cho các điểm khác NHƯNG CÙNG LOẠI GIỜ
+            // 2. Chia đều Delta cho các điểm khác
             let otherActiveIndices = [];
             for (let i = 0; i < 48; i++) {
+                // Bỏ qua chính nó
                 if (i === targetIndex) continue;
                 
-                // Kiểm tra loại giờ của điểm i
+                // --- QUAN TRỌNG: CHẶN SAU 17H ---
+                // Index 34 tương ứng với 17:00 (17 * 2)
+                // Nếu giờ > 17h thì bỏ qua, không được nhồi thêm điện vào đây
+                if (i >= 34) continue; 
+
+                // Kiểm tra loại giờ (Cùng màu mới chia)
                 const currentType = getTariffType(i, false);
                 
-                // CHỈ CHIA SẺ NẾU CÙNG LOẠI (VÀ CÓ MÁY CHẠY)
-                // Ví dụ: Kéo Cao điểm chỉ ảnh hưởng Cao điểm
                 if (currentType === targetType) {
                     const val = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i];
-                    // Chỉ chia cho những giờ đang có tải thực tế (để tránh chia vào giờ nghỉ trưa nếu ko làm)
+                    // Chỉ chia cho những giờ đang có tải thực tế (> 0.1)
                     if (val > 0.1) otherActiveIndices.push(i);
                 }
             }
 
-            // Nếu tìm thấy các giờ cùng loại để chia sẻ
+            // Nếu tìm thấy các giờ hợp lệ để chia sẻ
             if (otherActiveIndices.length > 0) {
                 const compensationPerIndex = -delta / otherActiveIndices.length;
                 otherActiveIndices.forEach(i => {
@@ -665,9 +668,6 @@
                     if (newVal < 0) newVal = 0;
                     distributeValueToComponents(wdData, i, newVal, false);
                 });
-            } else {
-                // Trường hợp đặc biệt: Không còn giờ nào cùng loại để chia (Hiếm gặp)
-                // Thì chấp nhận chỉ thay đổi mình nó, Tổng kWh sẽ thay đổi theo.
             }
 
             // 3. Đồng bộ sang CN
