@@ -410,65 +410,49 @@ def home():
 
                         p_add_bt = prod_kwh_bt / total_hours_bt_run if total_hours_bt_run > 0 else 0
 
-                        # --- G. TẠO DATASET (THUẬT TOÁN FINAL - CHUẨN KỸ THUẬT) ---
+                        # --- G. TẠO DATASET (PHIÊN BẢN 48 ĐIỂM - 30 PHÚT/ĐIỂM) ---
                         def create_profile(mode):
                             data = {'td': [], 'bt_l': [], 'cd_l': [], 'bt_u': [], 'cd_u': []}
-                            
                             is_off = 'off' in mode
                             is_sunday_mode = (mode == 'sun_work' or mode == 'off_sunday')
                             
-                            for h in range(24):
-                                # 1. Xác định: Giờ này máy có chạy không?
-                                # Máy chỉ chạy nếu: KHÔNG PHẢI NGÀY NGHỈ và TRONG GIỜ LÀM
-                                in_shift = (h_start <= h < real_h_end)
-                                is_machine_running = (not is_off) and in_shift
+                            # Vòng lặp 48 lần (00:00, 00:30, ... 23:30)
+                            for i in range(48):
+                                current_hour = i / 2  # 0, 0.5, 1, 1.5 ...
                                 
-                                # 2. Tính công suất TIỀM NĂNG tại giờ h (Nếu chạy full load giờ đó)
-                                # P_full_CD: Công suất nếu giờ này là Cao điểm
-                                p_full_cd = p_base + (p_add_cd if is_machine_running else 0)
-                                # P_full_BT: Công suất nếu giờ này là Bình thường
-                                p_full_bt = p_base + (p_add_bt if is_machine_running else 0)
-                                # P_Base_Only: Chỉ tải nền
-                                p_base_only = p_base
-
+                                # Kiểm tra máy chạy (Giờ làm việc cũng phải check theo float)
+                                # Ví dụ 8h -> 17h
+                                is_machine_running = (not is_off) and (h_start <= current_hour < real_h_end)
+                                
+                                p_machine = 0
+                                if is_machine_running:
+                                    # Logic máy chạy (đơn giản hóa chia đều công suất)
+                                    # Bạn có thể tùy chỉnh logic cao điểm cho máy ở đây nếu muốn
+                                    if i in [19, 20, 21, 22] or i in range(34, 40): # Giờ cao điểm máy chạy
+                                        p_machine = p_add_cd
+                                    else:
+                                        p_machine = p_add_bt
+                                
+                                p_total = p_base + p_machine
                                 v_td, v_bt_l, v_cd_l, v_bt_u, v_cd_u = 0, 0, 0, 0, 0
                                 
-                                # 3. Phân bổ màu sắc (Logic chuẩn)
-                                if h in [22, 23, 0, 1, 2, 3]: 
-                                    v_td = p_base_only
+                                # --- PHÂN LOẠI GIỜ THEO EVN (QUAN TRỌNG) ---
+                                # Thấp điểm: 22h00 - 04h00 (Index 44-47 và 0-7)
+                                if i >= 44 or i < 8:
+                                    v_td = p_total
                                 
-                                elif is_sunday_mode: 
-                                    # CHỦ NHẬT (Full Xanh):
-                                    # Dù máy chạy mạnh cỡ P_full_cd thì vẫn tô màu xanh
-                                    if h == 10 or h in [17, 18, 19]: val = p_full_cd
-                                    elif h == 9 or h == 11: val = (p_full_cd * 0.5) + (p_full_bt * 0.5)
-                                    else: val = p_full_bt
+                                # Chủ nhật: Còn lại là Bình thường
+                                elif is_sunday_mode:
+                                    v_bt_l = p_total
                                     
-                                    v_bt_l = val
-                                    
-                                else: 
-                                    # NGÀY THƯỜNG (Có Đỏ/Xanh):
-                                    if h == 9: 
-                                        # 9h: 30p Bình thường + 30p Cao điểm
-                                        # Xanh dưới = 0.5 * P_BT
-                                        v_bt_l = p_full_bt * 0.5
-                                        # Đỏ trên = 0.5 * P_CD
-                                        v_cd_u = p_full_cd * 0.5
-                                        
-                                    elif h == 11: 
-                                        # 11h: 30p Cao điểm + 30p Bình thường
-                                        # Đỏ dưới = 0.5 * P_CD
-                                        v_cd_l = p_full_cd * 0.5
-                                        # Xanh trên = 0.5 * P_BT
-                                        v_bt_u = p_full_bt * 0.5
-                                        
-                                    elif h == 10 or h in [17, 18, 19]: 
-                                        # Full Cao điểm
-                                        v_cd_l = p_full_cd
-                                        
-                                    else: 
-                                        # Full Bình thường
-                                        v_bt_l = p_full_bt
+                                # Ngày thường: Xét Cao điểm
+                                else:
+                                    # Cao điểm sáng: 09:30 - 11:30 (Index 19, 20, 21, 22)
+                                    # Cao điểm chiều: 17:00 - 20:00 (Index 34 đến 39)
+                                    if i in [19, 20, 21, 22] or i in range(34, 40):
+                                        v_cd_l = p_total
+                                    else:
+                                        v_bt_l = p_total
                                 
                                 data['td'].append(round(v_td, 2))
                                 data['bt_l'].append(round(v_bt_l, 2))
@@ -477,8 +461,15 @@ def home():
                                 data['cd_u'].append(round(v_cd_u, 2))
                             return data
 
+                        # Tạo nhãn 48 điểm (00:00, 00:30...)
+                        labels_48 = []
+                        for i in range(48):
+                            h = i // 2
+                            m = "30" if i % 2 != 0 else "00"
+                            labels_48.append(f"{h}:{m}")
+
                         du_lieu_nhap['chart_data'] = {
-                            'labels': [f"{h}h" for h in range(24)],
+                            'labels': labels_48, # Gửi nhãn 48 điểm xuống
                             'stats': {
                                 'total': total_days, 
                                 'work': count_days['week_work'] + count_days['sun_work'], 
@@ -494,7 +485,7 @@ def home():
                         }
 
             except Exception as e: 
-                print(f"Lỗi Backend: {e}") # In lỗi ra để kiểm tra
+                print(f"Lỗi Backend: {e}") # In lỗi ra để kiểm tra  
                 msg_update = f"❌ Lỗi: {str(e)}"
             
             active_tab = 'calc' # Đảm bảo dòng này nằm ngoài except để luôn set active tab
