@@ -540,7 +540,7 @@
             let maxVal = 0;
             const allDatasets = [liveData.weekday_work, liveData.sunday_work, liveData.off_weekday, liveData.off_sunday];
             
-            // 1. Tính toán Max dựa trên dữ liệu THỰC TẾ đang có
+            // 1. Tìm giá trị lớn nhất hiện có trong dữ liệu
             allDatasets.forEach(data => {
                 if (data) {
                     const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0));
@@ -549,16 +549,17 @@
                 }
             });
 
-            // 2. Tính trục Y hiển thị (Trả về như cũ: Gấp 1.2 lần dữ liệu thực)
-            // Khung này sẽ KHÔNG bị phóng đại vô lý.
-            const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
-
-            // 3. Tính riêng cái TRẦN để chặn tay kéo (Ví dụ: Gấp 2 lần đỉnh hiện tại)
-            // Biến này chỉ dùng để chặn chuột, không dùng để vẽ khung.
+            // 2. TÍNH TOÁN GIỚI HẠN CỨNG (HARD LIMIT)
+            // Ví dụ: Không cho phép kéo quá 2 lần đỉnh cao nhất hiện tại.
+            // Nếu đỉnh đang là 100kW -> Bạn chỉ kéo được tối đa lên 200kW rồi cột sẽ đứng khựng lại.
             window.HARD_LIMIT = maxVal * 2; 
+            
+            // Nếu dữ liệu quá nhỏ (ví dụ mới nhập toàn 0), gán tối thiểu 100 để có không gian kéo
             if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
 
-            // 4. Vẽ biểu đồ
+            // 3. Thiết lập trục Y (Cao hơn giới hạn chặn một chút để đẹp mắt)
+            const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
+
             if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
             window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
             
@@ -597,7 +598,7 @@
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
                     scales: { 
-                        // Giữ nguyên max theo dữ liệu thực, không can thiệp
+                        // Cố định trục Y theo giá trị đã tính toán
                         y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
                         x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
                     },
@@ -606,15 +607,16 @@
                             round: 1, showTooltip: true,
                             onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
                             
-                            // --- CHỈ CAN THIỆP KHI KÉO ---
+                            // --- XỬ LÝ KHI ĐANG KÉO (QUAN TRỌNG NHẤT) ---
                             onDrag: function(e, datasetIndex, index, value) { 
                                 if (datasetIndex !== 0) return false; 
                                 
-                                // Chặn dưới
+                                // 1. Chặn dưới (Không cho âm)
                                 if (value < 0) return false; 
-                                
-                                // Chặn trên: Dùng biến HARD_LIMIT đã tính riêng
-                                // Nếu vượt quá -> Trả về false -> Cột đứng im
+
+                                // 2. CHẶN TRÊN (KHÔNG CHO CỘT MỌC THÊM)
+                                // Nếu giá trị chuột vượt quá giới hạn -> Dừng lại (return false)
+                                // Lúc này cột sẽ đứng im tại vị trí HARD_LIMIT
                                 if (value > window.HARD_LIMIT) {
                                     return false; 
                                 }
@@ -624,6 +626,7 @@
                                 if (datasetIndex !== 0) return;
                                 e.target.style.cursor = 'default';
                                 
+                                // Kiểm tra lần cuối để đảm bảo dữ liệu chuẩn
                                 if (newValue < 0) newValue = 0;
                                 if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
                                 
