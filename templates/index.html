@@ -544,7 +544,7 @@
             const allDatasets = [liveData.weekday_work, liveData.sunday_work, liveData.off_weekday, liveData.off_sunday];
             allDatasets.forEach(data => {
                 if (data) {
-                    const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0));
+                    const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
                     const currentMax = Math.max(...hourlyTotals);
                     if (currentMax > maxVal) maxVal = currentMax;
                 }
@@ -571,7 +571,7 @@
         function createChart(canvasId, dataSrc, maxYValue, isSundayMode) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-            const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0));
+            const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
 
             return new Chart(ctx, {
                 type: 'bar',
@@ -582,8 +582,6 @@
                         { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
                         { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
                         { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false },
-                        { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
-                        { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
                     ]
                 },
                 options: {
@@ -713,7 +711,7 @@
 
         // --- 4. PHÂN MÀU ---
         function distributeValueToComponents(dataSet, i, totalValue, isSundayMode) {
-            dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0; dataSet.bt_u[i] = 0; dataSet.cd_u[i] = 0;
+            dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0;
             const type = getTariffType(i, isSundayMode);
 
             if (type === 0) dataSet.td[i] = totalValue; 
