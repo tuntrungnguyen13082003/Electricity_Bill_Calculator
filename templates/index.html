@@ -619,29 +619,52 @@
         }
 
         // --- 3. LOGIC TÍNH TOÁN LẠI (CÓ CHẶN SỐ ÂM) ---
+        // --- 3. LOGIC TÍNH TOÁN LẠI (ĐỘC LẬP TỪNG BIỂU ĐỒ) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
-            // Đảm bảo đầu vào không âm
-            if (newTotalValue < 0) newTotalValue = 0;
+            // A. Xác định đang thao tác trên biểu đồ nào
+            let currentData;
+            let isSundayMode = false;
 
-            const wdData = liveData.weekday_work;
-            const oldTotalValue = wdData.td[targetIndex] + wdData.bt_l[targetIndex] + wdData.cd_l[targetIndex] + wdData.bt_u[targetIndex] + wdData.cd_u[targetIndex];
+            if (sourceId === 'chart_weekday') {
+                currentData = liveData.weekday_work;
+                isSundayMode = false;
+            } 
+            else if (sourceId === 'chart_sunday') {
+                currentData = liveData.sunday_work;
+                isSundayMode = true;
+            }
+            else if (sourceId === 'chart_off_wd') {
+                currentData = liveData.off_weekday;
+                isSundayMode = false;
+            }
+            else if (sourceId === 'chart_off_sun') {
+                currentData = liveData.off_sunday;
+                isSundayMode = true;
+            }
+
+            if (!currentData) return;
+
+            // B. Tính toán chênh lệch (Delta) trên chính biểu đồ đó
+            const oldTotalValue = currentData.td[targetIndex] + currentData.bt_l[targetIndex] + currentData.cd_l[targetIndex] + currentData.bt_u[targetIndex] + currentData.cd_u[targetIndex];
             const delta = newTotalValue - oldTotalValue;
 
-            const targetType = getTariffType(targetIndex, false); 
-
             // 1. Cập nhật tại điểm kéo
-            distributeValueToComponents(wdData, targetIndex, newTotalValue, false);
+            distributeValueToComponents(currentData, targetIndex, newTotalValue, isSundayMode);
 
-            // 2. Chia đều Delta cho các điểm khác
+            // 2. Chia đều Delta cho các điểm khác (Cũng trên chính biểu đồ đó)
             let otherActiveIndices = [];
+            
+            // Lấy loại giờ của điểm đang kéo để so sánh
+            const targetType = getTariffType(targetIndex, isSundayMode); 
+
             for (let i = 0; i < 48; i++) {
                 if (i === targetIndex) continue;
-                // CHẶN SAU 17H
-                if (i >= 34) continue; 
+                if (i >= 34) continue; // Chặn sau 17h
 
-                const currentType = getTariffType(i, false);
+                // Chỉ chia sẻ với các giờ CÙNG LOẠI trên biểu đồ này
+                const currentType = getTariffType(i, isSundayMode);
                 if (currentType === targetType) {
-                    const val = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i];
+                    const val = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i];
                     if (val > 0.1) otherActiveIndices.push(i);
                 }
             }
@@ -649,25 +672,19 @@
             if (otherActiveIndices.length > 0) {
                 const compensationPerIndex = -delta / otherActiveIndices.length;
                 otherActiveIndices.forEach(i => {
-                    const currentVal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
+                    const currentVal = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i] + currentData.bt_u[i] + currentData.cd_u[i];
                     let newVal = currentVal + compensationPerIndex;
-                    
-                    // --- CHỐT CHẶN SỐ 0 (KHI BÙ TRỪ) ---
-                    // Nếu bù trừ xong mà bị âm -> Ép về 0
                     if (newVal < 0) newVal = 0;
                     
-                    distributeValueToComponents(wdData, i, newVal, false);
+                    distributeValueToComponents(currentData, i, newVal, isSundayMode);
                 });
             }
 
-            // 3. Đồng bộ sang CN
-            if (liveData.sunday_work) {
-                for (let i = 0; i < 48; i++) {
-                    const wdTotal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
-                    distributeValueToComponents(liveData.sunday_work, i, wdTotal, true);
-                }
-            }
+            // --- ĐÃ XÓA ĐOẠN ĐỒNG BỘ SANG CHỦ NHẬT ---
+            // Trước đây ở chỗ này có đoạn code copy dữ liệu sang CN.
+            // Giờ tôi đã xóa nó đi, nên hai biểu đồ hoàn toàn độc lập.
 
+            // Vẽ lại
             initAllCharts();
         }
 
