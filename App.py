@@ -33,7 +33,7 @@ def ai_doc_hoa_don(image_path):
     try:
         base64_image = encode_image(image_path)
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
         
         headers = {'Content-Type': 'application/json'}
         
