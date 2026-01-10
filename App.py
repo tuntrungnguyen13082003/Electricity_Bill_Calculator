@@ -68,7 +68,11 @@ def ai_doc_hoa_don(image_path):
 
         # 2. Gửi yêu cầu (POST)
         response = requests.post(url, headers=headers, data=json.dumps(payload))
-        
+        print(f"--- TRẠNG THÁI GỬI: {response.status_code} ---")
+        if response.status_code != 200:
+            print("--- NỘI DUNG LỖI TỪ GOOGLE: ---")
+            print(response.text)
+
         # 3. Xử lý kết quả trả về
         if response.status_code == 200:
             result = response.json()
@@ -89,7 +93,7 @@ def ai_doc_hoa_don(image_path):
             return None
 
     except Exception as e:
-        print(f"Lỗi Code: {e}")
+        print(f"--- LỖI CODE PYTHON: {e}")
         return None
     
 # --- 3. TẠO ĐƯỜNG DẪN (ROUTE) ĐỂ WEB GỌI ---
