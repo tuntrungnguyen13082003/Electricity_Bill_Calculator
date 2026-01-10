@@ -539,6 +539,8 @@
         function initAllCharts() {
             let maxVal = 0;
             const allDatasets = [liveData.weekday_work, liveData.sunday_work, liveData.off_weekday, liveData.off_sunday];
+            
+            // 1. Tìm giá trị lớn nhất hiện có
             allDatasets.forEach(data => {
                 if (data) {
                     const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0));
@@ -546,22 +548,32 @@
                     if (currentMax > maxVal) maxVal = currentMax;
                 }
             });
-            const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
 
+            // 2. THIẾT LẬP GIỚI HẠN TRẦN (MAX CAP)
+            // Ví dụ: Gấp 3 lần đỉnh cao nhất. Quá mức này cột sẽ bị chặn lại.
+            window.MAX_Y_LIMIT = maxVal * 3; 
+            
+            // Nếu dữ liệu quá nhỏ (ví dụ mới nhập toàn 0), gán tối thiểu 100kW để dễ kéo
+            if (window.MAX_Y_LIMIT < 100) window.MAX_Y_LIMIT = 100;
+
+            // 3. Thiết lập chiều cao trục Y (Thoáng hơn giới hạn 1 chút để đẹp)
+            const AXIS_HEIGHT = Math.ceil(window.MAX_Y_LIMIT * 1.1);
+
+            // 4. Vẽ lại các biểu đồ
             if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
-            window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
+            window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, AXIS_HEIGHT, false);
             
             if(document.getElementById('chart_sunday')) {
                 if(window.charts['chart_sunday']) window.charts['chart_sunday'].destroy();
-                window.charts['chart_sunday'] = createChart('chart_sunday', liveData.sunday_work, COMMON_MAX_Y, true);
+                window.charts['chart_sunday'] = createChart('chart_sunday', liveData.sunday_work, AXIS_HEIGHT, true);
             }
             if(document.getElementById('chart_off_wd')) {
                 if(window.charts['chart_off_wd']) window.charts['chart_off_wd'].destroy();
-                window.charts['chart_off_wd'] = createChart('chart_off_wd', liveData.off_weekday, COMMON_MAX_Y, false);
+                window.charts['chart_off_wd'] = createChart('chart_off_wd', liveData.off_weekday, AXIS_HEIGHT, false);
             }
             if(document.getElementById('chart_off_sun')) {
                 if(window.charts['chart_off_sun']) window.charts['chart_off_sun'].destroy();
-                window.charts['chart_off_sun'] = createChart('chart_off_sun', liveData.off_sunday, COMMON_MAX_Y, true);
+                window.charts['chart_off_sun'] = createChart('chart_off_sun', liveData.off_sunday, AXIS_HEIGHT, true);
             }
         }
 
@@ -586,27 +598,35 @@
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
                     scales: { 
-                        // THÊM min: 0 ĐỂ TRỤC Y KHÔNG BỊ ÂM
-                        y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
+                        // Trục Y cố định theo maxYValue đã tính ở trên
+                        y: { beginAtZero: true, min: 0, max: maxYValue, stacked: true, title: {display: true, text: 'kW'} }, 
                         x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
                     },
                     plugins: {
                         dragData: {
                             round: 1, showTooltip: true,
                             onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
+                            
+                            // --- XỬ LÝ KHI ĐANG KÉO (REAL-TIME) ---
                             onDrag: function(e, datasetIndex, index, value) { 
                                 if (datasetIndex !== 0) return false; 
                                 
-                                // --- CHỐT CHẶN SỐ 0 (REAL-TIME) ---
-                                // Nếu kéo xuống dưới 0, ép về 0 ngay lập tức
+                                // 1. Chặn Dưới: Không cho âm
                                 if (value < 0) return false; 
+                                
+                                // 2. CHẶN TRÊN (Mới thêm): Không cho vượt quá giới hạn
+                                // Lệnh này làm cột đứng im nếu kéo quá tay
+                                if (value > window.MAX_Y_LIMIT) return false;
                             },
+                            
+                            // --- XỬ LÝ KHI THẢ CHUỘT ---
                             onDragEnd: function(e, datasetIndex, index, newValue) {
                                 if (datasetIndex !== 0) return;
                                 e.target.style.cursor = 'default';
                                 
-                                // --- CHỐT CHẶN SỐ 0 (KHI THẢ CHUỘT) ---
+                                // Kiểm tra lại lần cuối để đảm bảo số liệu an toàn
                                 if (newValue < 0) newValue = 0;
+                                if (newValue > window.MAX_Y_LIMIT) newValue = window.MAX_Y_LIMIT;
                                 
                                 recalculateSystem(canvasId, index, newValue);
                             }
