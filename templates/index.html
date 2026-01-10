@@ -524,7 +524,6 @@
             }
         }); 
     </script>
-
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
         window.charts = {}; 
@@ -545,10 +544,9 @@
             initAllCharts();
         });
 
-        // --- 1. KHỞI TẠO (CHỈ 2 BIỂU ĐỒ) ---
+        // --- 1. KHỞI TẠO ---
         function initAllCharts() {
             let maxVal = 0;
-            // Chỉ quan tâm 2 dataset chính: Làm việc & Nghỉ
             const allDatasets = [liveData.weekday_work, liveData.off_weekday];
             
             allDatasets.forEach(data => {
@@ -567,12 +565,11 @@
 
             const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
 
-            // 1. Vẽ biểu đồ LÀM VIỆC (Dùng dữ liệu weekday_work)
+            // 1. Biểu đồ Ngày Làm Việc
             if(window.charts['chart_work']) window.charts['chart_work'].destroy();
             window.charts['chart_work'] = createChart('chart_work', liveData.weekday_work, COMMON_MAX_Y);
             
-            // 2. Vẽ biểu đồ NGÀY NGHỈ (Dùng dữ liệu off_weekday)
-            // Lưu ý: Dù là ngày nghỉ nhưng ta vẫn vẽ full màu (Cao/Thấp/Bình) để người dùng dễ kéo thả
+            // 2. Biểu đồ Ngày Nghỉ
             if(document.getElementById('chart_off')) {
                 if(window.charts['chart_off']) window.charts['chart_off'].destroy();
                 window.charts['chart_off'] = createChart('chart_off', liveData.off_weekday, COMMON_MAX_Y);
@@ -584,7 +581,7 @@
             const ctx = document.getElementById(canvasId).getContext('2d');
             const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
             
-            if (!dataSrc) return; // Phòng trường hợp không có dữ liệu
+            if (!dataSrc) return;
 
             const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
 
@@ -639,16 +636,12 @@
             });
         }
 
-        // --- 3. TÍNH TOÁN LẠI (CÂN BẰNG NĂNG LƯỢNG TRONG TỪNG BIỂU ĐỒ) ---
+        // --- 3. TÍNH TOÁN LẠI (ĐÃ SỬA CHẶN 4h-8h) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
             let sourceData;
             
-            // Chỉ còn 2 trường hợp
-            if (sourceId === 'chart_work') { 
-                sourceData = liveData.weekday_work; 
-            } else if (sourceId === 'chart_off') { 
-                sourceData = liveData.off_weekday; 
-            }
+            if (sourceId === 'chart_work') { sourceData = liveData.weekday_work; } 
+            else if (sourceId === 'chart_off') { sourceData = liveData.off_weekday; }
             
             if (!sourceData) return;
 
@@ -656,23 +649,34 @@
             const delta = newTotalValue - oldTotal;
 
             // 1. Cập nhật chính điểm đang kéo
-            // Ngày nghỉ cũng dùng logic phân màu chuẩn (isSundayMode = false để nó hiện đủ 3 màu cho dễ nhìn)
-            distributeValueToComponents(sourceData, targetIndex, newTotalValue, false);
+            distributeValueToComponents(sourceData, targetIndex, newTotalValue);
 
-            // 2. Tìm đồng đội để chia sẻ (Cùng loại giờ TRONG CÙNG 1 BIỂU ĐỒ)
-            const targetType = getTariffType(targetIndex, false);
+            // 2. Tìm đồng đội để chia sẻ
+            const targetType = getTariffType(targetIndex);
+            
+            // Nếu đang kéo Thấp điểm (Xanh lá) -> Cho phép chỉnh sửa full 24h
+            // Nếu đang kéo Bình thường/Cao điểm -> Bị chặn tải nền
             const isEditingLowPeak = (targetType === 0); 
             
             let candidates = []; 
 
             for (let i = 0; i < 48; i++) {
-                // Nếu không phải thấp điểm thì chặn sau 17h (để tải nền buổi tối không bị nhảy)
-                if (!isEditingLowPeak && i >= 34) continue; 
-                
+                // Bỏ qua chính nó
                 if (i === targetIndex) continue;
 
-                // Chỉ chia sẻ với giờ cùng loại (Màu nào chia màu nấy)
-                if (getTariffType(i, false) === targetType) {
+                // --- QUAN TRỌNG: VÙNG CẤM BAY ---
+                if (!isEditingLowPeak) {
+                    // 1. Chặn sau 17h (Tan ca) -> Index >= 34
+                    if (i >= 34) continue;
+
+                    // 2. Chặn từ 4h đến 8h (Tải nền sáng sớm)
+                    // 4h = Index 8. 8h = Index 16.
+                    // Nếu i nằm trong khoảng [8, 16) -> Bỏ qua
+                    if (i >= 8 && i < 16) continue;
+                }
+                
+                // Chỉ chia sẻ với giờ cùng màu
+                if (getTariffType(i) === targetType) {
                     const val = sourceData.td[i] + sourceData.bt_l[i] + sourceData.cd_l[i];
                     if (val > 0.1) candidates.push(i);
                 }
@@ -686,7 +690,7 @@
                     const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
                     let neu = cur + compensation;
                     if (neu < 0) neu = 0;
-                    distributeValueToComponents(d, i, neu, false);
+                    distributeValueToComponents(d, i, neu);
                 });
             }
 
@@ -694,22 +698,25 @@
         }
 
         // --- 4. PHÂN MÀU ---
-        function distributeValueToComponents(dataSet, i, totalValue, isSundayMode) {
+        function distributeValueToComponents(dataSet, i, totalValue) {
             dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0; 
-            // Luôn dùng quy tắc phân màu chuẩn (có Cao điểm) cho cả ngày nghỉ để người dùng dễ nhận biết giờ
-            const type = getTariffType(i, false); 
+            const type = getTariffType(i); 
 
             if (type === 0) dataSet.td[i] = totalValue; 
             else if (type === 2) dataSet.cd_l[i] = totalValue; 
             else dataSet.bt_l[i] = totalValue; 
         }
 
-        // --- 5. CHECK LOẠI GIỜ (Theo chuẩn EVN) ---
-        function getTariffType(i, isSunday) {
-            if (i >= 44 || i < 8) return 0; // Thấp điểm
+        // --- 5. CHECK LOẠI GIỜ ---
+        // 0: Thấp điểm, 1: Bình thường, 2: Cao điểm
+        function getTariffType(i) {
+            // Thấp điểm: 22h-04h -> Index 44-47 và 0-7
+            if (i >= 44 || i < 8) return 0; 
+            
             // Cao điểm: 9h30-11h30 (19-22) & 17h-20h (34-39)
             if ((i >= 19 && i <= 22) || (i >= 34 && i <= 39)) return 2; 
-            return 1; // Bình thường
+            
+            return 1; // Còn lại là Bình thường
         }
     </script>
     {% endif %}
