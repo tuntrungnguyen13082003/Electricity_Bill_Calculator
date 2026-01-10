@@ -231,20 +231,25 @@
                         </div>
 
                         <div style="display: flex; gap: 10px; margin-top: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; overflow-x: auto;">
-                            <button class="chart-tab-btn active" onclick="switchChartTab('chart_weekday', this)">🏭 Ngày làm việc</button>
-                            
-                            {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_sunday', this)">☀️ Ngày cuối tuần (làm việc)</button>
-                            {% endif %}
-                            
-                            {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off_wd', this)">☕ Ngày nghỉ (Ngày thường)</button>
-                            {% endif %}
-                            
-                            {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off_sun', this)">☕ Ngày cuối tuần (làm việc)</button>
-                            {% endif %}
+                            <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">🏭 Ngày Làm Việc</button>
+                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">☕ Ngày Nghỉ</button>
                         </div>
+
+                        <div style="margin-top: 20px;">
+                            <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
+                                <canvas id="chart_work"></canvas>
+                            </div>
+
+                            <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
+                                <canvas id="chart_off"></canvas>
+                            </div>
+                        </div>
+
+                        <style>
+                            .chart-tab-btn { padding: 10px 20px; border: none; background: #ecf0f1; cursor: pointer; border-radius: 5px; font-weight: bold; color: #555; white-space: nowrap; }
+                            .chart-tab-btn.active { background: #3498db; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+                            .chart-tab-btn:hover:not(.active) { background: #bdc3c7; }
+                        </style>
 
                         <div style="margin-top: 20px;">
                             <div id="wrapper_chart_weekday" class="chart-wrapper active" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
@@ -526,6 +531,7 @@
         const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
         let liveData = JSON.parse(JSON.stringify(chartDataRaw));
 
+        // --- HÀM CHUYỂN TAB ---
         function switchChartTab(canvasId, btn) {
             document.querySelectorAll('.chart-wrapper').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.chart-tab-btn').forEach(el => el.classList.remove('active'));
@@ -539,9 +545,12 @@
             initAllCharts();
         });
 
+        // --- 1. KHỞI TẠO (CHỈ 2 BIỂU ĐỒ) ---
         function initAllCharts() {
             let maxVal = 0;
-            const allDatasets = [liveData.weekday_work, liveData.sunday_work, liveData.off_weekday, liveData.off_sunday];
+            // Chỉ quan tâm 2 dataset chính: Làm việc & Nghỉ
+            const allDatasets = [liveData.weekday_work, liveData.off_weekday];
+            
             allDatasets.forEach(data => {
                 if (data) {
                     const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
@@ -549,28 +558,34 @@
                     if (currentMax > maxVal) maxVal = currentMax;
                 }
             });
-            const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
 
-            if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
-            window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
+            // Giới hạn trần (Gấp 2 lần đỉnh)
+            if (!window.HARD_LIMIT) {
+                window.HARD_LIMIT = maxVal * 2; 
+                if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
+            }
+
+            const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
+
+            // 1. Vẽ biểu đồ LÀM VIỆC (Dùng dữ liệu weekday_work)
+            if(window.charts['chart_work']) window.charts['chart_work'].destroy();
+            window.charts['chart_work'] = createChart('chart_work', liveData.weekday_work, COMMON_MAX_Y);
             
-            if(document.getElementById('chart_sunday')) {
-                if(window.charts['chart_sunday']) window.charts['chart_sunday'].destroy();
-                window.charts['chart_sunday'] = createChart('chart_sunday', liveData.sunday_work, COMMON_MAX_Y, true);
-            }
-            if(document.getElementById('chart_off_wd')) {
-                if(window.charts['chart_off_wd']) window.charts['chart_off_wd'].destroy();
-                window.charts['chart_off_wd'] = createChart('chart_off_wd', liveData.off_weekday, COMMON_MAX_Y, false);
-            }
-            if(document.getElementById('chart_off_sun')) {
-                if(window.charts['chart_off_sun']) window.charts['chart_off_sun'].destroy();
-                window.charts['chart_off_sun'] = createChart('chart_off_sun', liveData.off_sunday, COMMON_MAX_Y, true);
+            // 2. Vẽ biểu đồ NGÀY NGHỈ (Dùng dữ liệu off_weekday)
+            // Lưu ý: Dù là ngày nghỉ nhưng ta vẫn vẽ full màu (Cao/Thấp/Bình) để người dùng dễ kéo thả
+            if(document.getElementById('chart_off')) {
+                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
+                window.charts['chart_off'] = createChart('chart_off', liveData.off_weekday, COMMON_MAX_Y);
             }
         }
 
-        function createChart(canvasId, dataSrc, maxYValue, isSundayMode) {
+        // --- 2. VẼ BIỂU ĐỒ ---
+        function createChart(canvasId, dataSrc, maxYValue) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+            
+            if (!dataSrc) return; // Phòng trường hợp không có dữ liệu
+
             const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
 
             return new Chart(ctx, {
@@ -579,12 +594,14 @@
                     labels: liveData.labels,
                     datasets: [
                         { type: 'line', label: 'Tổng công suất (kW)', data: totalLoad, borderColor: DARK_YELLOW, borderWidth: 3, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2, tension: 0.4, fill: false, order: 0, dragData: true },
+                        { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
+                        { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                        { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
                     ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
                     scales: { 
-                        // THÊM min: 0 ĐỂ TRỤC Y KHÔNG BỊ ÂM
                         y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
                         x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
                     },
@@ -594,77 +611,83 @@
                             onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
                             onDrag: function(e, datasetIndex, index, value) { 
                                 if (datasetIndex !== 0) return false; 
-                                
-                                // --- CHỐT CHẶN SỐ 0 (REAL-TIME) ---
-                                // Nếu kéo xuống dưới 0, ép về 0 ngay lập tức
                                 if (value < 0) return false; 
+                                if (value > window.HARD_LIMIT) return false; 
                             },
                             onDragEnd: function(e, datasetIndex, index, newValue) {
                                 if (datasetIndex !== 0) return;
                                 e.target.style.cursor = 'default';
-                                
-                                // --- CHỐT CHẶN SỐ 0 (KHI THẢ CHUỘT) ---
                                 if (newValue < 0) newValue = 0;
-                                
+                                if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
                                 recalculateSystem(canvasId, index, newValue);
                             }
                         },
                         legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
                         tooltip: { 
-                                    mode: 'index', 
-                                    intersect: false,
-                                    callbacks: {
-                                        label: function(context) {
-                                            let label = context.dataset.label || '';
-                                            if (label) {
-                                                label += ': ';
-                                            }
-                                            if (context.parsed.y !== null) {
-                                                label += context.parsed.y + ' kW'; // Thêm đơn vị vào sau số
-                                            }
-                                            return label;
-                                        }
-                                    }
+                            mode: 'index', intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) label += context.parsed.y + ' kW';
+                                    return label;
                                 }
+                            }
+                        }
                     }
                 }
             });
         }
 
-        // --- 3. LOGIC TÍNH TOÁN LẠI: CÂN BẰNG TOÀN CỤC (GLOBAL BALANCING) ---
+        // --- 3. TÍNH TOÁN LẠI (CÂN BẰNG NĂNG LƯỢNG TRONG TỪNG BIỂU ĐỒ) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
-            const wdData = liveData.weekday_work;
-            // Tính giá trị cũ tại vị trí index (0-47)
-            const oldTotalValue = wdData.td[targetIndex] + wdData.bt_l[targetIndex] + wdData.cd_l[targetIndex] + wdData.bt_u[targetIndex] + wdData.cd_u[targetIndex];
-            const delta = newTotalValue - oldTotalValue;
+            let sourceData;
+            
+            // Chỉ còn 2 trường hợp
+            if (sourceId === 'chart_work') { 
+                sourceData = liveData.weekday_work; 
+            } else if (sourceId === 'chart_off') { 
+                sourceData = liveData.off_weekday; 
+            }
+            
+            if (!sourceData) return;
 
-            // 1. Cập nhật tại điểm kéo (targetIndex)
-            distributeValueToComponents(wdData, targetIndex, newTotalValue, false);
+            const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
+            const delta = newTotalValue - oldTotal;
 
-            // 2. Chia đều Delta cho các điểm khác (0-47)
-            let otherActiveIndices = [];
+            // 1. Cập nhật chính điểm đang kéo
+            // Ngày nghỉ cũng dùng logic phân màu chuẩn (isSundayMode = false để nó hiện đủ 3 màu cho dễ nhìn)
+            distributeValueToComponents(sourceData, targetIndex, newTotalValue, false);
+
+            // 2. Tìm đồng đội để chia sẻ (Cùng loại giờ TRONG CÙNG 1 BIỂU ĐỒ)
+            const targetType = getTariffType(targetIndex, false);
+            const isEditingLowPeak = (targetType === 0); 
+            
+            let candidates = []; 
+
             for (let i = 0; i < 48; i++) {
+                // Nếu không phải thấp điểm thì chặn sau 17h (để tải nền buổi tối không bị nhảy)
+                if (!isEditingLowPeak && i >= 34) continue; 
+                
                 if (i === targetIndex) continue;
-                const val = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i];
-                if (val > wdData.td[i] + 0.1) otherActiveIndices.push(i);
-            }
 
-            if (otherActiveIndices.length > 0) {
-                const compensationPerIndex = -delta / otherActiveIndices.length;
-                otherActiveIndices.forEach(i => {
-                    const currentVal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
-                    let newVal = currentVal + compensationPerIndex;
-                    if (newVal < 0) newVal = 0;
-                    distributeValueToComponents(wdData, i, newVal, false);
-                });
-            }
-
-            // 3. Đồng bộ sang CN
-            if (liveData.sunday_work) {
-                for (let i = 0; i < 48; i++) {
-                    const wdTotal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
-                    distributeValueToComponents(liveData.sunday_work, i, wdTotal, true);
+                // Chỉ chia sẻ với giờ cùng loại (Màu nào chia màu nấy)
+                if (getTariffType(i, false) === targetType) {
+                    const val = sourceData.td[i] + sourceData.bt_l[i] + sourceData.cd_l[i];
+                    if (val > 0.1) candidates.push(i);
                 }
+            }
+
+            if (candidates.length > 0) {
+                const compensation = -delta / candidates.length;
+
+                candidates.forEach(i => {
+                    const d = sourceData;
+                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
+                    let neu = cur + compensation;
+                    if (neu < 0) neu = 0;
+                    distributeValueToComponents(d, i, neu, false);
+                });
             }
 
             initAllCharts();
@@ -672,21 +695,21 @@
 
         // --- 4. PHÂN MÀU ---
         function distributeValueToComponents(dataSet, i, totalValue, isSundayMode) {
-            dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0;
-            const type = getTariffType(i, isSundayMode);
+            dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0; 
+            // Luôn dùng quy tắc phân màu chuẩn (có Cao điểm) cho cả ngày nghỉ để người dùng dễ nhận biết giờ
+            const type = getTariffType(i, false); 
 
             if (type === 0) dataSet.td[i] = totalValue; 
             else if (type === 2) dataSet.cd_l[i] = totalValue; 
             else dataSet.bt_l[i] = totalValue; 
         }
 
-        // --- 5. HÀM CHECK LOẠI GIỜ ---
+        // --- 5. CHECK LOẠI GIỜ (Theo chuẩn EVN) ---
         function getTariffType(i, isSunday) {
             if (i >= 44 || i < 8) return 0; // Thấp điểm
-            if (isSunday) return 1; 
             // Cao điểm: 9h30-11h30 (19-22) & 17h-20h (34-39)
-            if ((i >= 19 && i <= 22) || (i >= 34 && i <= 39)) return 2;
-            return 1;
+            if ((i >= 19 && i <= 22) || (i >= 34 && i <= 39)) return 2; 
+            return 1; // Bình thường
         }
     </script>
     {% endif %}
