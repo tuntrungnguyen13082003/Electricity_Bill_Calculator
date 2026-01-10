@@ -617,17 +617,18 @@
                 }
             });
         }
-
-        // --- 3. LOGIC TÍNH TOÁN LẠI (CÓ CHẶN SỐ ÂM) ---
-        // --- 3. LOGIC TÍNH TOÁN LẠI (ĐỘC LẬP TỪNG BIỂU ĐỒ) ---
+        
+        // --- 3. LOGIC TÍNH TOÁN LẠI (ĐỒNG BỘ CÓ CHỌN LỌC) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
             // A. Xác định đang thao tác trên biểu đồ nào
             let currentData;
             let isSundayMode = false;
+            let isEditingWeekday = false; // Cờ đánh dấu đang sửa ngày thường
 
             if (sourceId === 'chart_weekday') {
                 currentData = liveData.weekday_work;
                 isSundayMode = false;
+                isEditingWeekday = true;
             } 
             else if (sourceId === 'chart_sunday') {
                 currentData = liveData.sunday_work;
@@ -653,15 +654,12 @@
 
             // 2. Chia đều Delta cho các điểm khác (Cũng trên chính biểu đồ đó)
             let otherActiveIndices = [];
-            
-            // Lấy loại giờ của điểm đang kéo để so sánh
             const targetType = getTariffType(targetIndex, isSundayMode); 
 
             for (let i = 0; i < 48; i++) {
                 if (i === targetIndex) continue;
                 if (i >= 34) continue; // Chặn sau 17h
 
-                // Chỉ chia sẻ với các giờ CÙNG LOẠI trên biểu đồ này
                 const currentType = getTariffType(i, isSundayMode);
                 if (currentType === targetType) {
                     const val = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i];
@@ -680,9 +678,30 @@
                 });
             }
 
-            // --- ĐÃ XÓA ĐOẠN ĐỒNG BỘ SANG CHỦ NHẬT ---
-            // Trước đây ở chỗ này có đoạn code copy dữ liệu sang CN.
-            // Giờ tôi đã xóa nó đi, nên hai biểu đồ hoàn toàn độc lập.
+            // --- C. LOGIC ĐỒNG BỘ "THÔNG MINH" SANG CHỦ NHẬT ---
+            // Chỉ chạy khi đang sửa Ngày thường VÀ có dữ liệu Chủ nhật
+            if (isEditingWeekday && liveData.sunday_work) {
+                
+                // Kiểm tra xem giờ đang kéo có phải là Cao điểm sáng (9:30 - 11:30) hay không?
+                // Index 19 (9:30) đến 22 (11:00) -> Cao điểm
+                const isPeakTime = (targetIndex >= 19 && targetIndex <= 22);
+
+                // NẾU KHÔNG PHẢI CAO ĐIỂM -> ĐỒNG BỘ SANG CHỦ NHẬT
+                if (!isPeakTime) {
+                    // Đồng bộ điểm đang kéo
+                    const wdTotalTarget = currentData.td[targetIndex] + currentData.bt_l[targetIndex] + currentData.cd_l[targetIndex];
+                    distributeValueToComponents(liveData.sunday_work, targetIndex, wdTotalTarget, true);
+
+                    // Đồng bộ các điểm bị ảnh hưởng (các điểm bù trừ)
+                    otherActiveIndices.forEach(i => {
+                        // Chỉ đồng bộ những điểm bù trừ nếu nó cũng KHÔNG phải là giờ cao điểm 9:30-11:30
+                        if (!(i >= 19 && i <= 22)) {
+                            const wdTotalAffected = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i];
+                            distributeValueToComponents(liveData.sunday_work, i, wdTotalAffected, true);
+                        }
+                    });
+                }
+            }
 
             // Vẽ lại
             initAllCharts();
