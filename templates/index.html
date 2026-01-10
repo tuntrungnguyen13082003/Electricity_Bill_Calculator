@@ -210,6 +210,23 @@
 
                         {% if du_lieu_nhap.get('chart_data') %}
                         
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #e9ecef;">
+                            <div style="display: flex; justify-content: space-around; text-align: center;">
+                                <div>
+                                    <div class="small-label">Tổng ngày</div>
+                                    <div class="big-num">{{ du_lieu_nhap.chart_data.stats.total }}</div>
+                                </div>
+                                <div>
+                                    <div class="small-label" style="color:#27ae60">Ngày làm việc</div>
+                                    <div class="big-num" style="color:#27ae60">{{ du_lieu_nhap.chart_data.stats.work }}</div>
+                                </div>
+                                <div>
+                                    <div class="small-label" style="color:#e74c3c">Ngày nghỉ</div>
+                                    <div class="big-num" style="color:#e74c3c">{{ du_lieu_nhap.chart_data.stats.off }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div style="display: flex; gap: 10px; margin-top: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; overflow-x: auto;">
                             <button class="chart-tab-btn active" onclick="switchChartTab('chart_weekday', this)">🏭 Ngày Thường</button>
                             
