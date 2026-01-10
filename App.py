@@ -1,9 +1,14 @@
 import os
 import json
+import google.generativeai as genai
 import pandas as pd
 from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
-from flask import Flask, render_template, request, session, redirect, url_for, send_file
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_file
+
+
+os.environ["GOOGLE_API_KEY"] = "AIzaSyAkDousFLZy33pXCo3by3zZ8ar3Pphuy0c"
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 # --- CẤU HÌNH ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -15,6 +20,77 @@ template_path = os.path.join(base_dir, 'templates')
 
 app = Flask(__name__, template_folder=template_path)
 app.secret_key = 'khoa_bi_mat_cua_du_an_solar'
+
+def ai_doc_hoa_don(image_path):
+    try:
+        # Dùng model Flash cho nhanh và miễn phí
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        sample_file = genai.upload_file(path=image_path, display_name="Hoa don dien")
+
+        # Ra lệnh cho AI (Prompt)
+        # CẬP NHẬT CÂU LỆNH (PROMPT) THÔNG MINH HƠN
+        prompt = """
+        Bạn là một trợ lý nhập liệu chuyên nghiệp. Hãy trích xuất dữ liệu từ hóa đơn tiền điện này và trả về JSON.
+        
+        Quy tắc quan trọng:
+        1. Tìm cột "ĐIỆN TIÊU THỤ (kWh)" để lấy số liệu sản lượng.
+        2. Chú ý: Dấu chấm "." trong ảnh là phân cách hàng nghìn, hãy loại bỏ nó. Ví dụ: "19.619" phải trả về số nguyên 19619 (không phải 19.619).
+        3. Định dạng ngày tháng phải chuyển về chuẩn quốc tế: YYYY-MM-DD (Ví dụ: 2025-04-16).
+        
+        Các trường cần lấy:
+        - kwh_bt: Sản lượng ứng với dòng "Khung giờ bình thường".
+        - kwh_cd: Sản lượng ứng với dòng "Khung giờ cao điểm".
+        - kwh_td: Sản lượng ứng với dòng "Khung giờ thấp điểm".
+        - ngay_dau: Tìm trong câu "từ ngày ... đến ngày ...". Lấy ngày bắt đầu.
+        - ngay_cuoi: Tìm trong câu "từ ngày ... đến ngày ...". Lấy ngày kết thúc.
+
+        Chỉ trả về JSON thuần túy, không markdown, không giải thích.
+        Ví dụ cấu trúc mong muốn:
+        {
+            "kwh_bt": 19619,
+            "kwh_cd": 7158,
+            "kwh_td": 4202,
+            "ngay_dau": "2025-04-16",
+            "ngay_cuoi": "2025-04-30"
+        }
+        """
+
+        response = model.generate_content([sample_file, prompt])
+        
+        # Làm sạch kết quả trả về
+        json_str = response.text.replace('```json', '').replace('```', '').strip()
+        return json.loads(json_str)
+    except Exception as e:
+        print(f"Lỗi AI: {e}")
+        return None
+    
+# --- 3. TẠO ĐƯỜNG DẪN (ROUTE) ĐỂ WEB GỌI ---
+@app.route('/scan_invoice', methods=['POST'])
+def scan_invoice():
+    if 'file_anh' not in request.files:
+        return jsonify({'success': False, 'error': 'Không có file'}), 400
+    
+    file = request.files['file_anh']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'Chưa chọn file'}), 400
+
+    if file:
+        # Lưu tạm ảnh
+        if not os.path.exists("uploads"): os.makedirs("uploads")
+        temp_path = os.path.join("uploads", file.filename)
+        file.save(temp_path)
+        
+        # Gọi AI xử lý
+        data = ai_doc_hoa_don(temp_path)
+        
+        # Xóa ảnh sau khi xong
+        if os.path.exists(temp_path): os.remove(temp_path)
+        
+        if data:
+            return jsonify({'success': True, 'data': data})
+        else:
+            return jsonify({'success': False, 'error': 'AI không đọc được dữ liệu'}), 500
 
 # --- HÀM XỬ LÝ EXCEL (ĐỌC) ---
 def load_excel_provinces():
