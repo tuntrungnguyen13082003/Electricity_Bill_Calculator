@@ -173,7 +173,7 @@
                     </div>
 
                     <div id="sub_bieu_do" class="v-tab-content">
-                        <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Phân tích Phụ tải 3 Giá (Chi tiết 30p)</h3>
+                        <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Biểu đồ phụ tải</h3>
                         
                         <form method="POST">
 
@@ -231,18 +231,18 @@
                         </div>
 
                         <div style="display: flex; gap: 10px; margin-top: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; overflow-x: auto;">
-                            <button class="chart-tab-btn active" onclick="switchChartTab('chart_weekday', this)">🏭 Ngày Thường</button>
+                            <button class="chart-tab-btn active" onclick="switchChartTab('chart_weekday', this)">🏭 Ngày làm việc</button>
                             
                             {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_sunday', this)">☀️ Làm việc (CN)</button>
+                            <button class="chart-tab-btn" onclick="switchChartTab('chart_sunday', this)">☀️ Ngày cuối tuần (làm việc)</button>
                             {% endif %}
                             
                             {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off_wd', this)">☕ Nghỉ (Ngày thường)</button>
+                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off_wd', this)">☕ Ngày nghỉ (Ngày thường)</button>
                             {% endif %}
                             
                             {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off_sun', this)">☕ Nghỉ (Chủ Nhật)</button>
+                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off_sun', this)">☕ Ngày cuối tuần (làm việc)</button>
                             {% endif %}
                         </div>
 
@@ -632,92 +632,41 @@
         }
 
         // --- 3. LOGIC TÍNH TOÁN LẠI: CÂN BẰNG TOÀN CỤC (GLOBAL BALANCING) ---
-        // --- 3. LOGIC TÍNH TOÁN LẠI: CÂN BẰNG TOÀN CỤC (ĐÃ FIX LỖI THẤP ĐIỂM) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
-            // 1. Xác định dữ liệu nguồn
-            let sourceData, sourceIsSunday;
-            
-            if (sourceId === 'chart_weekday') { sourceData = liveData.weekday_work; sourceIsSunday = false; }
-            else if (sourceId === 'chart_sunday') { sourceData = liveData.sunday_work; sourceIsSunday = true; }
-            else if (sourceId === 'chart_off_wd') { sourceData = liveData.off_weekday; sourceIsSunday = false; }
-            else if (sourceId === 'chart_off_sun') { sourceData = liveData.off_sunday; sourceIsSunday = true; }
-            
-            if (!sourceData) return;
+            const wdData = liveData.weekday_work;
+            // Tính giá trị cũ tại vị trí index (0-47)
+            const oldTotalValue = wdData.td[targetIndex] + wdData.bt_l[targetIndex] + wdData.cd_l[targetIndex] + wdData.bt_u[targetIndex] + wdData.cd_u[targetIndex];
+            const delta = newTotalValue - oldTotalValue;
 
-            // 2. Tính Delta (Lượng thay đổi)
-            const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
-            const delta = newTotalValue - oldTotal;
+            // 1. Cập nhật tại điểm kéo (targetIndex)
+            distributeValueToComponents(wdData, targetIndex, newTotalValue, false);
 
-            // 3. Cập nhật ngay cho điểm đang kéo
-            distributeValueToComponents(sourceData, targetIndex, newTotalValue, sourceIsSunday);
-
-            // 4. Tìm "Đồng đội" (Cùng loại giờ) để chia sẻ
-            const targetType = getTariffType(targetIndex, sourceIsSunday);
-            
-            // --- QUAN TRỌNG: KIỂM TRA CÓ PHẢI THẤP ĐIỂM KHÔNG? ---
-            const isEditingLowPeak = (targetType === 0); 
-            
-            let weekdayCandidates = []; 
-            let sundayCandidates = []; 
-
-            // A. Quét Ngày thường
-            if (liveData.weekday_work) {
-                for (let i = 0; i < 48; i++) {
-                    // LOGIC MỚI: 
-                    // - Nếu là Thấp điểm (Xanh lá) -> Cho phép chạy full 24h (để lấy được khúc 22h-24h)
-                    // - Nếu là Bình thường/Cao điểm -> Vẫn chặn sau 17h (Index 34) như cũ
-                    if (!isEditingLowPeak && i >= 34) continue; 
-
-                    if (!sourceIsSunday && i === targetIndex) continue;
-
-                    if (getTariffType(i, false) === targetType) {
-                        const val = liveData.weekday_work.td[i] + liveData.weekday_work.bt_l[i] + liveData.weekday_work.cd_l[i];
-                        if (val > 0.1) weekdayCandidates.push(i);
-                    }
-                }
+            // 2. Chia đều Delta cho các điểm khác (0-47)
+            let otherActiveIndices = [];
+            for (let i = 0; i < 48; i++) {
+                if (i === targetIndex) continue;
+                const val = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i];
+                if (val > wdData.td[i] + 0.1) otherActiveIndices.push(i);
             }
 
-            // B. Quét Chủ nhật
+            if (otherActiveIndices.length > 0) {
+                const compensationPerIndex = -delta / otherActiveIndices.length;
+                otherActiveIndices.forEach(i => {
+                    const currentVal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
+                    let newVal = currentVal + compensationPerIndex;
+                    if (newVal < 0) newVal = 0;
+                    distributeValueToComponents(wdData, i, newVal, false);
+                });
+            }
+
+            // 3. Đồng bộ sang CN
             if (liveData.sunday_work) {
                 for (let i = 0; i < 48; i++) {
-                    // Tương tự: Thấp điểm thì không bị chặn bởi 17h
-                    if (!isEditingLowPeak && i >= 34) continue; 
-
-                    if (sourceIsSunday && i === targetIndex) continue;
-
-                    if (getTariffType(i, true) === targetType) {
-                        const val = liveData.sunday_work.td[i] + liveData.sunday_work.bt_l[i] + liveData.sunday_work.cd_l[i];
-                        if (val > 0.1) sundayCandidates.push(i);
-                    }
+                    const wdTotal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
+                    distributeValueToComponents(liveData.sunday_work, i, wdTotal, true);
                 }
             }
 
-            // 5. Chia đều Delta cho tất cả đồng đội tìm được
-            const totalCandidates = weekdayCandidates.length + sundayCandidates.length;
-
-            if (totalCandidates > 0) {
-                const compensation = -delta / totalCandidates;
-
-                // Cập nhật Ngày thường
-                weekdayCandidates.forEach(i => {
-                    const d = liveData.weekday_work;
-                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
-                    let neu = cur + compensation;
-                    if (neu < 0) neu = 0;
-                    distributeValueToComponents(d, i, neu, false);
-                });
-
-                // Cập nhật Chủ nhật
-                sundayCandidates.forEach(i => {
-                    const d = liveData.sunday_work;
-                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
-                    let neu = cur + compensation;
-                    if (neu < 0) neu = 0;
-                    distributeValueToComponents(d, i, neu, true);
-                });
-            }
-
-            // Vẽ lại
             initAllCharts();
         }
 
