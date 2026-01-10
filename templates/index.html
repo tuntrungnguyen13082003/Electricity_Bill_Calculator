@@ -617,90 +617,88 @@
                 }
             });
         }
-        
-        // --- 3. LOGIC TÍNH TOÁN LẠI (ĐỒNG BỘ CÓ CHỌN LỌC) ---
+
+        // --- 3. LOGIC TÍNH TOÁN LẠI: CÂN BẰNG TOÀN CỤC (GLOBAL BALANCING) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
-            // A. Xác định đang thao tác trên biểu đồ nào
-            let currentData;
-            let isSundayMode = false;
-            let isEditingWeekday = false; // Cờ đánh dấu đang sửa ngày thường
+            // 1. Xác định dữ liệu nguồn đang bị kéo
+            let sourceData, sourceIsSunday;
+            
+            if (sourceId === 'chart_weekday') { sourceData = liveData.weekday_work; sourceIsSunday = false; }
+            else if (sourceId === 'chart_sunday') { sourceData = liveData.sunday_work; sourceIsSunday = true; }
+            else if (sourceId === 'chart_off_wd') { sourceData = liveData.off_weekday; sourceIsSunday = false; }
+            else if (sourceId === 'chart_off_sun') { sourceData = liveData.off_sunday; sourceIsSunday = true; }
+            
+            if (!sourceData) return;
 
-            if (sourceId === 'chart_weekday') {
-                currentData = liveData.weekday_work;
-                isSundayMode = false;
-                isEditingWeekday = true;
-            } 
-            else if (sourceId === 'chart_sunday') {
-                currentData = liveData.sunday_work;
-                isSundayMode = true;
-            }
-            else if (sourceId === 'chart_off_wd') {
-                currentData = liveData.off_weekday;
-                isSundayMode = false;
-            }
-            else if (sourceId === 'chart_off_sun') {
-                currentData = liveData.off_sunday;
-                isSundayMode = true;
-            }
+            // 2. Tính Delta (Lượng thay đổi)
+            const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
+            const delta = newTotalValue - oldTotal;
 
-            if (!currentData) return;
+            // 3. Cập nhật ngay cho điểm đang kéo
+            distributeValueToComponents(sourceData, targetIndex, newTotalValue, sourceIsSunday);
 
-            // B. Tính toán chênh lệch (Delta) trên chính biểu đồ đó
-            const oldTotalValue = currentData.td[targetIndex] + currentData.bt_l[targetIndex] + currentData.cd_l[targetIndex] + currentData.bt_u[targetIndex] + currentData.cd_u[targetIndex];
-            const delta = newTotalValue - oldTotalValue;
+            // 4. Tìm "Đồng đội" để chia sẻ Delta (Trên cả 2 biểu đồ)
+            // Đồng đội là những giờ CÙNG LOẠI (Cùng là Bình thường, hoặc cùng là Thấp điểm...)
+            
+            const targetType = getTariffType(targetIndex, sourceIsSunday);
+            
+            let weekdayCandidates = []; // Danh sách cần sửa bên Ngày thường
+            let sundayCandidates = [];  // Danh sách cần sửa bên Chủ nhật
 
-            // 1. Cập nhật tại điểm kéo
-            distributeValueToComponents(currentData, targetIndex, newTotalValue, isSundayMode);
+            // A. Quét bên Ngày thường
+            if (liveData.weekday_work) {
+                for (let i = 0; i < 48; i++) {
+                    if (i >= 34) continue; // Bỏ qua sau 17h
+                    // Nếu đang kéo ngày thường thì bỏ qua chính điểm đó
+                    if (!sourceIsSunday && i === targetIndex) continue;
 
-            // 2. Chia đều Delta cho các điểm khác (Cũng trên chính biểu đồ đó)
-            let otherActiveIndices = [];
-            const targetType = getTariffType(targetIndex, isSundayMode); 
-
-            for (let i = 0; i < 48; i++) {
-                if (i === targetIndex) continue;
-                if (i >= 34) continue; // Chặn sau 17h
-
-                const currentType = getTariffType(i, isSundayMode);
-                if (currentType === targetType) {
-                    const val = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i];
-                    if (val > 0.1) otherActiveIndices.push(i);
+                    // Chỉ chọn nếu CÙNG LOẠI (Ví dụ cùng là Bình thường)
+                    if (getTariffType(i, false) === targetType) {
+                        const val = liveData.weekday_work.td[i] + liveData.weekday_work.bt_l[i] + liveData.weekday_work.cd_l[i];
+                        if (val > 0.1) weekdayCandidates.push(i);
+                    }
                 }
             }
 
-            if (otherActiveIndices.length > 0) {
-                const compensationPerIndex = -delta / otherActiveIndices.length;
-                otherActiveIndices.forEach(i => {
-                    const currentVal = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i] + currentData.bt_u[i] + currentData.cd_u[i];
-                    let newVal = currentVal + compensationPerIndex;
-                    if (newVal < 0) newVal = 0;
-                    
-                    distributeValueToComponents(currentData, i, newVal, isSundayMode);
+            // B. Quét bên Chủ nhật (Nếu có)
+            if (liveData.sunday_work) {
+                for (let i = 0; i < 48; i++) {
+                    if (i >= 34) continue; // Bỏ qua sau 17h
+                    // Nếu đang kéo chủ nhật thì bỏ qua chính điểm đó
+                    if (sourceIsSunday && i === targetIndex) continue;
+
+                    // Chỉ chọn nếu CÙNG LOẠI 
+                    // (Lưu ý: CN không có cao điểm, nên nếu bạn kéo Cao điểm bên ngày thường, CN sẽ không có ai lọt vào đây -> CN đứng yên. Đúng ý bạn!)
+                    if (getTariffType(i, true) === targetType) {
+                        const val = liveData.sunday_work.td[i] + liveData.sunday_work.bt_l[i] + liveData.sunday_work.cd_l[i];
+                        if (val > 0.1) sundayCandidates.push(i);
+                    }
+                }
+            }
+
+            // 5. Chia đều Delta cho tất cả đồng đội tìm được
+            const totalCandidates = weekdayCandidates.length + sundayCandidates.length;
+
+            if (totalCandidates > 0) {
+                const compensation = -delta / totalCandidates;
+
+                // Cập nhật Ngày thường
+                weekdayCandidates.forEach(i => {
+                    const d = liveData.weekday_work;
+                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
+                    let neu = cur + compensation;
+                    if (neu < 0) neu = 0;
+                    distributeValueToComponents(d, i, neu, false);
                 });
-            }
 
-            // --- C. LOGIC ĐỒNG BỘ "THÔNG MINH" SANG CHỦ NHẬT ---
-            // Chỉ chạy khi đang sửa Ngày thường VÀ có dữ liệu Chủ nhật
-            if (isEditingWeekday && liveData.sunday_work) {
-                
-                // Kiểm tra xem giờ đang kéo có phải là Cao điểm sáng (9:30 - 11:30) hay không?
-                // Index 19 (9:30) đến 22 (11:00) -> Cao điểm
-                const isPeakTime = (targetIndex >= 19 && targetIndex <= 22);
-
-                // NẾU KHÔNG PHẢI CAO ĐIỂM -> ĐỒNG BỘ SANG CHỦ NHẬT
-                if (!isPeakTime) {
-                    // Đồng bộ điểm đang kéo
-                    const wdTotalTarget = currentData.td[targetIndex] + currentData.bt_l[targetIndex] + currentData.cd_l[targetIndex];
-                    distributeValueToComponents(liveData.sunday_work, targetIndex, wdTotalTarget, true);
-
-                    // Đồng bộ các điểm bị ảnh hưởng (các điểm bù trừ)
-                    otherActiveIndices.forEach(i => {
-                        // Chỉ đồng bộ những điểm bù trừ nếu nó cũng KHÔNG phải là giờ cao điểm 9:30-11:30
-                        if (!(i >= 19 && i <= 22)) {
-                            const wdTotalAffected = currentData.td[i] + currentData.bt_l[i] + currentData.cd_l[i];
-                            distributeValueToComponents(liveData.sunday_work, i, wdTotalAffected, true);
-                        }
-                    });
-                }
+                // Cập nhật Chủ nhật
+                sundayCandidates.forEach(i => {
+                    const d = liveData.sunday_work;
+                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
+                    let neu = cur + compensation;
+                    if (neu < 0) neu = 0;
+                    distributeValueToComponents(d, i, neu, true);
+                });
             }
 
             // Vẽ lại
