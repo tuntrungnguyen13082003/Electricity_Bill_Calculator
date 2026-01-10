@@ -4,26 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.3/dist/chartjs-plugin-dragdata.min.js"></script>
     <title>Dashboard Solar</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.3/dist/chartjs-plugin-dragdata.min.js"></script>
+    
     <script>
-        // --- LOGIC: TẮT TAB = ĐĂNG XUẤT ---
+        // LOGIC CHECK PHIÊN LÀM VIỆC
         document.addEventListener("DOMContentLoaded", function() {
             const urlParams = new URLSearchParams(window.location.search);
-            
-            // Trường hợp 1: Vừa đăng nhập xong (có init=1 trên URL)
             if (urlParams.get('init') === '1') {
-                // Đánh dấu vào bộ nhớ tạm của Tab này là "Đã xác thực"
                 sessionStorage.setItem('phien_dang_nhap', 'hop_le');
-                // Xóa chữ ?init=1 trên thanh địa chỉ cho đẹp
                 window.history.replaceState(null, null, window.location.pathname);
-            } 
-            // Trường hợp 2: Vào trang mà KHÔNG có init=1 (F5 hoặc Mở lại tab)
-            else {
-                // Kiểm tra xem Tab này có cái dấu "Đã xác thực" không
+            } else {
                 if (!sessionStorage.getItem('phien_dang_nhap')) {
-                    // Nếu không có (do tắt tab mất rồi) -> BẮT BUỘC LOGOUT
                     window.location.href = "/logout";
                 }
             }
@@ -31,22 +24,36 @@
     </script>
 
     <style>
-        /* CSS CƠ BẢN */
+        /* --- CSS GIAO DIỆN --- */
         :root { --primary: #2ecc71; --secondary: #27ae60; --dark: #2c3e50; --tab-bg: #dfe1e5; --tab-active: #ffffff; --danger: #e74c3c; }
         body { font-family: 'Roboto', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 20px; }
         .logout-btn { background: var(--danger); color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; }
         .main-container { max-width: 98%; margin: 0 auto; }
         
-        /* TAB NGANG */
+        /* TAB CSS */
         .tab-bar { display: flex; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #ccc; justify-content: center; flex-wrap: wrap; }
         .tab-btn { padding: 10px 15px; background: var(--tab-bg); color: #5f6368; border: 1px solid #ccc; border-bottom: none; border-radius: 8px 8px 0 0; margin-right: -1px; cursor: pointer; font-weight: 500; font-size: 14px; }
         .tab-btn.active { background: var(--tab-active); color: var(--secondary); font-weight: bold; border-bottom: 1px solid var(--tab-active); padding-top: 12px; }
         .tab-content { background: white; border: 1px solid #ccc; border-radius: 0 8px 8px 8px; padding: 30px; display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* INPUT & FORM */
+        label { display: block; margin: 15px 0 5px; font-weight: 500; font-size: 14px; color: #333;}
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .btn-calc { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold; font-size: 16px;}
+        .alert { padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 15px; text-align: center;}
         
-        /* CSS TAB DỌC */
+        /* DROPDOWN CHECKLIST (QUAN TRỌNG CHO MENU NGÀY NGHỈ) */
+        .dropdown-check-list { display: inline-block; width: 100%; position: relative; }
+        .dropdown-check-list .anchor { position: relative; cursor: pointer; display: block; padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+        .dropdown-check-list .anchor:after { position: absolute; content: ""; border-left: 2px solid black; border-top: 2px solid black; padding: 3px; right: 10px; top: 30%; transform: rotate(-135deg); }
+        .dropdown-check-list .items { padding: 10px; display: none; margin: 0; border: 1px solid #ccc; border-top: none; position: absolute; width: 100%; background: #fff; z-index: 100; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
+        .dropdown-check-list .items li { list-style: none; margin-bottom: 5px; }
+        .dropdown-check-list.visible .items { display: block; }
+
+        /* Vertical Tabs & Other Layouts */
         .history-container { display: flex; background: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; height: 600px; }
         .history-sidebar { width: 200px; background: #f8f9fa; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         .v-tab-btn { padding: 15px; border: none; background: transparent; text-align: left; cursor: pointer; border-bottom: 1px solid #eee; transition: 0.2s; font-weight: 500; color: #555; display: flex; align-items: center; gap: 10px; }
@@ -55,41 +62,23 @@
         .history-main-area { flex: 1; padding: 0; overflow: hidden; position: relative; }
         .v-tab-content { display: none; height: 100%; overflow-y: auto; }
         .v-tab-content.active { display: block; animation: fadeIn 0.3s; }
-
-        /* CÁC CSS KHÁC */
-        label { display: block; margin: 15px 0 5px; font-weight: 500; font-size: 14px; color: #333;}
-        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .btn-calc { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold; font-size: 16px;}
-        .btn-update { width: 100%; padding: 10px; background: var(--dark); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;}
-        .alert { padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 15px; text-align: center;}
-        table { width: 100% !important; border-collapse: collapse; }
-        .table th, .table td { border: 1px solid #ddd; padding: 10px; vertical-align: middle !important; }
-        .col-center { text-align: center !important; }
-        .btn-danger-circle { border-radius: 50% !important; width: 32px; height: 32px; padding: 0 !important; line-height: 32px; text-align: center; border:none; background: #e74c3c; color: white; cursor: pointer; }
         .input-mode-group { display: flex; gap: 20px; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 5px; }
         .radio-label { display: flex; align-items: center; cursor: pointer; font-weight: normal; margin: 0; }
         .radio-label input { width: auto; margin-right: 8px; }
         .result-box { margin-top: 30px; background: #e8f8f5; padding: 20px; text-align: center; border-radius: 8px; border: 1px solid #d1f2eb;}
-        .management-box { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #ffeeba; }
+        .small-label { font-size: 12px; color: #7f8c8d; }
+        .big-num { font-size: 20px; font-weight: bold; }
+        .btn-danger-circle { border-radius: 50% !important; width: 32px; height: 32px; padding: 0 !important; line-height: 32px; text-align: center; border:none; background: #e74c3c; color: white; cursor: pointer; }
         .config-grid { display: flex; align-items: stretch; }
         .config-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; }
         .config-col-left { padding-right: 30px; margin-right: 30px; border-right: 2px dashed #16a085; }
         .table-scroll-container { height: 615px; overflow-y: auto; border: 1px solid #ddd; background: white; }
         .mt-auto { margin-top: auto; }
-
-        /* --- CSS MỚI: MENU CHỌN NGÀY & NÚT BIỂU ĐỒ --- */
-        .dropdown-check-list { display: inline-block; width: 100%; position: relative; }
-        .dropdown-check-list .anchor { position: relative; cursor: pointer; display: block; padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
-        .dropdown-check-list .anchor:after { position: absolute; content: ""; border-left: 2px solid black; border-top: 2px solid black; padding: 3px; right: 10px; top: 30%; transform: rotate(-135deg); }
-        .dropdown-check-list .items { padding: 10px; display: none; margin: 0; border: 1px solid #ccc; border-top: none; position: absolute; width: 100%; background: #fff; z-index: 100; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
-        .dropdown-check-list .items li { list-style: none; margin-bottom: 5px; }
-        .dropdown-check-list.visible .items { display: block; }
-        
-        .chart-btn { padding: 8px 15px; border: none; border-radius: 4px; background: transparent; color: #555; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .chart-btn.active { background: #3498db; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .chart-btn:hover:not(.active) { background: #ddd; }
-        .small-label { font-size: 12px; color: #7f8c8d; }
-        .big-num { font-size: 20px; font-weight: bold; }
+        .btn-update { width: 100%; padding: 10px; background: var(--dark); color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;}
+        table { width: 100% !important; border-collapse: collapse; }
+        .table th, .table td { border: 1px solid #ddd; padding: 10px; vertical-align: middle !important; }
+        .col-center { text-align: center !important; }
+        .management-box { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
@@ -121,7 +110,6 @@
                 </div>
 
                 <div class="history-main-area" style="padding: 20px; overflow-y: auto;">
-                    
                     <div id="sub_du_toan" class="v-tab-content active">
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Dự toán theo hóa đơn</h3>
                         <form method="POST">
@@ -174,19 +162,16 @@
 
                     <div id="sub_bieu_do" class="v-tab-content">
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Phân tích Phụ tải 3 Giá</h3>
-                        
                         <form method="POST">
                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                                 <div><label style="color:#c0392b">Cao điểm (kWh):</label><input type="number" name="kwh_cd" class="form-control" value="{{ du_lieu_nhap.get('kwh_cd', '') }}" required></div>
                                 <div><label style="color:#2980b9">Bình thường (kWh):</label><input type="number" name="kwh_bt" class="form-control" value="{{ du_lieu_nhap.get('kwh_bt', '') }}" required></div>
                                 <div><label style="color:#27ae60">Thấp điểm (kWh):</label><input type="number" name="kwh_td" class="form-control" value="{{ du_lieu_nhap.get('kwh_td', '') }}" required></div>
                             </div>
-                            
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                 <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
                                 <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
                             </div>
-
                             <div style="margin-top: 10px;">
                                 <label>Chọn ngày nghỉ trong tuần:</label>
                                 <div id="list1" class="dropdown-check-list" tabindex="100">
@@ -203,17 +188,14 @@
                                     </ul>
                                 </div>
                             </div>
-
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                 <div><label>Giờ làm việc (Từ):</label><input type="time" name="gio_lam_tu" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_tu', '08:00') }}"></div>
                                 <div><label>Giờ làm việc (Đến):</label><input type="time" name="gio_lam_den" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_den', '17:00') }}"></div>
                             </div>
-
                             <button type="submit" name="btn_calc_load" class="btn-calc" style="background: #8e44ad; margin-top: 20px;">VẼ BIỂU ĐỒ</button>
                         </form>
 
                         {% if du_lieu_nhap.get('chart_data') %}
-                        
                         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #e9ecef;">
                             <div style="display: flex; justify-content: space-around; text-align: center;">
                                 <div><div class="small-label">Tổng ngày</div><div class="big-num">{{ du_lieu_nhap.chart_data.stats.total }}</div></div>
@@ -223,26 +205,22 @@
                         </div>
 
                         <div style="display: flex; flex-wrap: nowrap; gap: 15px; overflow-x: auto; margin-top: 20px; padding-bottom: 10px;">
-                            
                             <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
                                 <h4 style="text-align:center; margin: 0 0 10px 0; color: #2c3e50;">🏭 Ngày Thường</h4>
                                 <canvas id="chart_weekday"></canvas>
                             </div>
-
                             {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
                             <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
                                 <h4 style="text-align:center; margin: 0 0 10px 0; color: #f39c12;">☀️ Làm việc (CN)</h4>
                                 <canvas id="chart_sunday"></canvas>
                             </div>
                             {% endif %}
-
                             {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
                             <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
                                 <h4 style="text-align:center; margin: 0 0 10px 0; color: #7f8c8d;">☕ Nghỉ (Ngày thường)</h4>
                                 <canvas id="chart_off_wd"></canvas>
                             </div>
                             {% endif %}
-
                             {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
                             <div style="flex: 0 0 45%; min-width: 350px; height: 350px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">
                                 <h4 style="text-align:center; margin: 0 0 10px 0; color: #95a5a6;">☕ Nghỉ (Chủ Nhật)</h4>
@@ -250,189 +228,8 @@
                             </div>
                             {% endif %}
                         </div>
-
-                        <script>
-                            // Hàm đóng mở Dropdown (Giờ nó nằm ngoài nên lúc nào cũng chạy được)
-                            function toggleDropdown() {
-                                var checkList = document.getElementById('list1');
-                                if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
-                                else checkList.classList.add('visible');
-                            }
-                        </script>
-                        {% if du_lieu_nhap.get('chart_data') %}
-                <script>
-                    window.charts = {}; 
-                    
-                    // Lấy dữ liệu từ Server
-                    const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
-                    
-                    // Biến dữ liệu sống (để tính toán lại)
-                    let liveData = JSON.parse(JSON.stringify(chartDataRaw));
-
-                    document.addEventListener("DOMContentLoaded", function() {
-                        // Mở tab biểu đồ (nếu cần)
-                        const tabBtn = document.getElementById('btn_tab_bieu_do');
-                        if(tabBtn) openSubTab('sub_bieu_do', tabBtn);
-                        
-                        // Vẽ biểu đồ
-                        initAllCharts();
-                    });
-
-                    function initAllCharts() {
-                        // 1. Tìm Max Y chung
-                        let maxVal = 0;
-                        const allDatasets = [
-                            liveData.weekday_work, liveData.sunday_work, 
-                            liveData.off_weekday, liveData.off_sunday
-                        ];
-
-                        allDatasets.forEach(data => {
-                            if (data) {
-                                const hourlyTotals = data.td.map((val, i) => {
-                                    return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
-                                });
-                                const currentMax = Math.max(...hourlyTotals);
-                                if (currentMax > maxVal) maxVal = currentMax;
-                            }
-                        });
-                        const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
-
-                        // 2. Vẽ lại các biểu đồ
-                        if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
-                        window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
-                        
-                        if(document.getElementById('chart_sunday')) {
-                            if(window.charts['chart_sunday']) window.charts['chart_sunday'].destroy();
-                            window.charts['chart_sunday'] = createChart('chart_sunday', liveData.sunday_work, COMMON_MAX_Y, true);
-                        }
-                        
-                        if(document.getElementById('chart_off_wd')) {
-                            if(window.charts['chart_off_wd']) window.charts['chart_off_wd'].destroy();
-                            window.charts['chart_off_wd'] = createChart('chart_off_wd', liveData.off_weekday, COMMON_MAX_Y, false);
-                        }
-                        
-                        if(document.getElementById('chart_off_sun')) {
-                            if(window.charts['chart_off_sun']) window.charts['chart_off_sun'].destroy();
-                            window.charts['chart_off_sun'] = createChart('chart_off_sun', liveData.off_sunday, COMMON_MAX_Y, true);
-                        }
-                    }
-
-                    function createChart(canvasId, dataSrc, maxYValue, isSundayMode) {
-                        const ctx = document.getElementById(canvasId).getContext('2d');
-                        const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-
-                        const totalLoad = dataSrc.td.map((val, i) => {
-                            return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
-                        });
-
-                        return new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: liveData.labels,
-                                datasets: [
-                                    {
-                                        type: 'line', label: 'Tổng công suất',
-                                        data: totalLoad,
-                                        borderColor: DARK_YELLOW, borderWidth: 3,
-                                        pointRadius: 6, pointHoverRadius: 10,
-                                        pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
-                                        tension: 0.4, fill: false, order: 0,
-                                        dragData: true
-                                    },
-                                    { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
-                                    { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
-                                    { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false },
-                                    { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
-                                    { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
-                                ]
-                            },
-                            options: {
-                                responsive: true, maintainAspectRatio: false,
-                                animation: false,
-                                scales: {
-                                    y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} },
-                                    x: { stacked: true, grid: { display: false } }
-                                },
-                                plugins: {
-                                    dragData: {
-                                        round: 1, showTooltip: true,
-                                        onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
-                                        onDrag: function(e, datasetIndex, index, value) {
-                                            if (datasetIndex !== 0) return false;
-                                        },
-                                        onDragEnd: function(e, datasetIndex, index, newValue) {
-                                            if (datasetIndex !== 0) return;
-                                            e.target.style.cursor = 'default';
-                                            recalculateSystem(canvasId, index, newValue);
-                                        }
-                                    },
-                                    legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
-                                    tooltip: { mode: 'index', intersect: false }
-                                }
-                            }
-                        });
-                    }
-
-                    // --- LOGIC TÍNH TOÁN LẠI ---
-                    function recalculateSystem(sourceId, targetHour, newTotalValue) {
-                        const wdData = liveData.weekday_work;
-                        const oldTotalValue = wdData.td[targetHour] + wdData.bt_l[targetHour] + wdData.cd_l[targetHour] + wdData.bt_u[targetHour] + wdData.cd_u[targetHour];
-                        const delta = newTotalValue - oldTotalValue;
-
-                        // 1. Cập nhật giờ mục tiêu
-                        distributeValueToComponents(wdData, targetHour, newTotalValue, false);
-
-                        // 2. Chia đều Delta cho các giờ khác
-                        let otherActiveHours = [];
-                        for (let h = 0; h < 24; h++) {
-                            if (h === targetHour) continue;
-                            const val = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h];
-                            if (val > wdData.td[h] + 1) otherActiveHours.push(h);
-                        }
-
-                        if (otherActiveHours.length > 0) {
-                            const compensationPerHour = -delta / otherActiveHours.length;
-                            otherActiveHours.forEach(h => {
-                                const currentVal = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h] + wdData.bt_u[h] + wdData.cd_u[h];
-                                let newVal = currentVal + compensationPerHour;
-                                if (newVal < 0) newVal = 0;
-                                distributeValueToComponents(wdData, h, newVal, false);
-                            });
-                        }
-
-                        // 3. Đồng bộ sang CN
-                        if (liveData.sunday_work) {
-                            for (let h = 0; h < 24; h++) {
-                                const wdTotal = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h] + wdData.bt_u[h] + wdData.cd_u[h];
-                                distributeValueToComponents(liveData.sunday_work, h, wdTotal, true);
-                            }
-                        }
-
-                        // 4. Vẽ lại
-                        initAllCharts();
-                    }
-
-                    function distributeValueToComponents(dataSet, h, totalValue, isSundayMode) {
-                        dataSet.td[h] = 0; dataSet.bt_l[h] = 0; dataSet.cd_l[h] = 0;
-                        dataSet.bt_u[h] = 0; dataSet.cd_u[h] = 0;
-
-                        if ([22, 23, 0, 1, 2, 3].includes(h)) {
-                            dataSet.td[h] = totalValue;
-                        } else if (isSundayMode) {
-                            dataSet.bt_l[h] = totalValue;
-                        } else {
-                            if ([10, 18].includes(h)) dataSet.cd_l[h] = totalValue;
-                            else if ([17, 19].includes(h)) dataSet.cd_l[h] = totalValue;
-                            else if (h === 9) { dataSet.bt_l[h] = totalValue * 0.5; dataSet.cd_u[h] = totalValue * 0.5; }
-                            else if (h === 11) { dataSet.cd_l[h] = totalValue * 0.5; dataSet.bt_u[h] = totalValue * 0.5; }
-                            else dataSet.bt_l[h] = totalValue;
-                        }
-                    }
-                </script>
-                {% endif %}
                         {% endif %}
                     </div>
-
                 </div>
             </div>
         </div>
@@ -448,120 +245,11 @@
                     <button type="submit" name="btn_upload_excel" style="background:#2980b9; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">⬆️ Tải lên</button>
                 </form>
             </div>
-            <div class="config-grid">
-                <div class="config-col config-col-left">
-                    <h3 style="color:#16a085;">📍 Tỉnh Thành & Giờ Nắng</h3>
-                    <form method="POST" style="margin-bottom: 10px; display: flex; gap: 5px;">
-                        <input type="text" name="new_province_name" placeholder="Tên tỉnh..." class="form-control" style="margin:0; flex:2;" required>
-                        <input type="number" step="0.1" name="new_province_hours" placeholder="Giờ" class="form-control" style="margin:0; flex:1;" required>
-                        <button type="submit" name="btn_add_province" class="btn btn-primary" style="width: auto; padding: 0 15px;">+</button>
-                    </form>
-                    <form method="POST" style="flex: 1; display: flex; flex-direction: column;">
-                        <div class="table-scroll-container">
-                            <table>
-                                <thead><tr><th>Tỉnh/Thành</th><th>Giờ nắng</th><th>Xóa</th></tr></thead>
-                                <tbody>{% for ten, gio in settings['tinh_thanh'].items() %}<tr><td>{{ ten }}</td><td><input type="number" step="0.1" name="hours_{{ ten }}" value="{{ gio }}" style="width: 100%; text-align: center;"></td><td><button type="submit" name="btn_delete_province" value="{{ ten }}" class="btn-danger-circle">&times;</button></td></tr>{% endfor %}</tbody>
-                            </table>
-                        </div>
-                        <button type="submit" name="btn_save_list" class="btn btn-primary mt-auto" style="margin-top: 10px;">💾 Lưu Giờ Nắng</button>
-                    </form>
-                </div>
-                <div class="config-col">
-                    <form method="POST" style="flex: 1; display: flex; flex-direction: column;">
-                        <h3 style="color:#16a085;">💰 Đơn Giá & Hệ Số</h3>
-                        <div style="background: #fdfefe; padding: 15px; border: 1px solid #eee; margin-bottom: 20px;">
-                            <h4 style="margin-top: 0; color: #2980b9;">1. Đơn Giá Điện (VNĐ)</h4>
-                            <div style="background: #eafaf1; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #d5f5e3;">
-                                <label style="margin:0; color:#27ae60;">📐 Diện tích mặt sàn cho 1 kWp (m²):</label>
-                                <input type="number" step="0.1" name="dien_tich_kwp" class="form-control" value="{{ settings.get('dien_tich_kwp', 4.5) }}" style="font-weight: bold;">
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div><label>🏢 Kinh Doanh:</label><input type="number" name="gia_kd" class="form-control" value="{{ settings.gia_kinh_doanh }}"></div>
-                                <div><label>🏭 Sản Xuất:</label><input type="number" name="gia_sx" class="form-control" value="{{ settings.gia_san_xuat }}"></div>
-                            </div>
-                            <label style="margin-top:10px;"><b>💡 Bậc thang sinh hoạt:</b></label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">{% for i in range(1, 7) %}<div><small>Bậc {{ i }}:</small><input type="number" name="b{{ i }}" class="form-control" value="{{ settings.evn_bac[i-1] }}"></div>{% endfor %}</div>
-                        </div>
-                        <div style="background: #fff8f0; padding: 15px; border: 1px solid #fce8cc;">
-                            <h4 style="margin-top: 0; color: #d35400;">2. Hệ Số Sử Dụng</h4>
-                            {% set hs = settings.get('he_so_nhom', {'gd_co_nguoi': 0.7, 'gd_di_lam': 0.4, 'gd_ban_dem': 0.3, 'kinh_doanh': 0.8, 'san_xuat': 0.9}) %}
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div><label>🏠 GĐ: Có người già/trẻ em:</label><input type="number" step="0.01" name="hs_gd_co_nguoi" class="form-control" value="{{ hs.gd_co_nguoi }}" oninput="checkHeSo(this)"></div>
-                                <div><label>🏠 GĐ: Đi làm:</label><input type="number" step="0.01" name="hs_gd_di_lam" class="form-control" value="{{ hs.gd_di_lam }}" oninput="checkHeSo(this)"></div>
-                                <div><label>🏠 GĐ: Dùng đêm:</label><input type="number" step="0.01" name="hs_gd_ban_dem" class="form-control" value="{{ hs.gd_ban_dem }}" oninput="checkHeSo(this)"></div>
-                            </div>    
-                            <div style="background: #eaf2f8; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                                <label style="color:#2980b9; margin-top:0;">🏢 Kinh Doanh (Hệ số Min - Max):</label>
-                                <div style="display: flex; gap: 10px;">
-                                    <input type="number" step="0.01" min="0" max="1" name="hs_kd_min" class="form-control" value="{{ hs.kd_min }}" placeholder="Min" oninput="checkHeSo(this)">
-                                    <span style="align-self: center;">➔</span>
-                                    <input type="number" step="0.01" min="0" max="1" name="hs_kd_max" class="form-control" value="{{ hs.kd_max }}" placeholder="Max" oninput="checkHeSo(this)">
-                                </div>
-                            </div>
-                            <div style="background: #f4f6f6; padding: 10px; border-radius: 5px;">
-                                <label style="color:#7f8c8d; margin-top:0;">🏭 Sản Xuất (Hệ số Min - Max):</label>
-                                <div style="display: flex; gap: 10px;">
-                                    <input type="number" step="0.01" min="0" max="1" name="hs_sx_min" class="form-control" value="{{ hs.sx_min }}" placeholder="Min" oninput="checkHeSo(this)">
-                                    <span style="align-self: center;">➔</span>
-                                    <input type="number" step="0.01" min="0" max="1" name="hs_sx_max" class="form-control" value="{{ hs.sx_max }}" placeholder="Max" oninput="checkHeSo(this)">
-                                </div>
-                            </div>
-                            
-                        </div>
-                        <button type="submit" name="btn_update_price" class="btn btn-primary mt-auto" style="margin-top: 20px;">💾 Lưu Cấu Hình </button>
-                    </form>
-                </div>
             </div>
-        </div>
 
         <div id="history" class="tab-content {{ 'active' if active_tab == 'history' else '' }}">
             <h2 style="color: #8e44ad; text-align: center; margin-bottom: 20px;">Lịch Sử Tính Toán Khách Hàng</h2>
-            <div style="text-align: right; margin-bottom: 10px; padding-right: 5px;">
-                <a href="/download_excel" target="_blank" style="text-decoration: none;">
-                    <button class="btn-calc" style="width: auto; padding: 8px 15px; font-size: 14px; background: #27ae60;">
-                        📥 Tải File Excel Gốc
-                    </button>
-                </a>
             </div>
-            <div class="history-container">
-                <div class="history-sidebar">
-                    <button class="v-tab-btn active" onclick="openSubTab('tab_gd', this)">🏡 Hộ Gia Đình</button>
-                    <button class="v-tab-btn" onclick="openSubTab('tab_kd', this)">🏢 Kinh Doanh</button>
-                    <button class="v-tab-btn" onclick="openSubTab('tab_sx', this)">🏭 Sản Xuất</button>
-                    <button class="v-tab-btn" onclick="openSubTab('tab_all', this)" style="margin-top: auto; border-top: 1px solid #ddd;">📋 Tất Cả</button>
-                </div>
-                <div class="history-main-area">
-                    <div id="tab_gd" class="v-tab-content active">
-                        <table class="table" style="border: none;"><thead style="background: #f4f6f7; position: sticky; top: 0; z-index: 10;"><tr><th>Thời Gian</th><th>Khách Hàng</th><th>Khu Vực</th><th>Đầu Vào</th><th>Kết Quả</th><th class="col-center">Xóa</th></tr></thead><tbody>
-                        {% for row in lich_su if row['sheet_source'] == "Hộ Gia Đình" %}
-                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] }}</td><td style="font-weight: bold;">{{ row['Tên Khách Hàng'] }}</td><td>{{ row['Khu Vực'].split(' - ')[0] }}</td><td>{{ row['Đầu Vào'] }}</td><td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] }} kWp</td><td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td></tr>
-                        {% else %}<tr><td colspan="6" style="text-align: center;">Chưa có dữ liệu Hộ Gia Đình.</td></tr>{% endfor %}
-                        </tbody></table>
-                    </div>
-                    <div id="tab_kd" class="v-tab-content">
-                        <table class="table" style="border: none;"><thead style="background: #f4f6f7; position: sticky; top: 0; z-index: 10;"><tr><th>Thời Gian</th><th>Khách Hàng</th><th>Khu Vực</th><th>Đầu Vào</th><th>Kết Quả</th><th class="col-center">Xóa</th></tr></thead><tbody>
-                        {% for row in lich_su if row['sheet_source'] == "Kinh Doanh" %}
-                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] }}</td><td style="font-weight: bold;">{{ row['Tên Khách Hàng'] }}</td><td>{{ row['Khu Vực'].split(' - ')[0] }}</td><td>{{ row['Đầu Vào'] }}</td><td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] }} kWp</td><td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td></tr>
-                        {% else %}<tr><td colspan="6" style="text-align: center;">Chưa có dữ liệu Kinh Doanh.</td></tr>{% endfor %}
-                        </tbody></table>
-                    </div>
-                    <div id="tab_sx" class="v-tab-content">
-                        <table class="table" style="border: none;"><thead style="background: #f4f6f7; position: sticky; top: 0; z-index: 10;"><tr><th>Thời Gian</th><th>Khách Hàng</th><th>Khu Vực</th><th>Đầu Vào</th><th>Kết Quả</th><th class="col-center">Xóa</th></tr></thead><tbody>
-                        {% for row in lich_su if row['sheet_source'] == "Sản Xuất" %}
-                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] }}</td><td style="font-weight: bold;">{{ row['Tên Khách Hàng'] }}</td><td>{{ row['Khu Vực'].split(' - ')[0] }}</td><td>{{ row['Đầu Vào'] }}</td><td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] }} kWp</td><td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td></tr>
-                        {% else %}<tr><td colspan="6" style="text-align: center;">Chưa có dữ liệu Sản Xuất.</td></tr>{% endfor %}
-                        </tbody></table>
-                    </div>
-                    <div id="tab_all" class="v-tab-content">
-                        <table class="table" style="border: none;"><thead style="background: #f4f6f7; position: sticky; top: 0; z-index: 10;"><tr><th>Thời Gian</th><th>Khách Hàng</th><th>Khu Vực</th><th>Đầu Vào</th><th>Kết Quả</th><th class="col-center">Xóa</th></tr></thead><tbody>
-                        {% for row in lich_su %}
-                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] }}</td><td style="font-weight: bold;">{{ row['Tên Khách Hàng'] }}</td><td>{{ row['Khu Vực'] }}</td><td>{{ row['Đầu Vào'] }}</td><td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] }} kWp</td><td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td></tr>
-                        {% else %}<tr><td colspan="6" style="text-align: center;">Chưa có dữ liệu nào.</td></tr>{% endfor %}
-                        </tbody></table>
-                    </div>
-                </div>
-            </div>
-        </div>
         {% endif %}
 
         <div id="account" class="tab-content {{ 'active' if active_tab == 'account' else '' }}">
@@ -577,24 +265,14 @@
         {% if role == 'admin' %}
         <div id="users" class="tab-content {{ 'active' if active_tab == 'users' else '' }}">
             <h2 style="color: #856404; text-align: center;">Quản Lý Người Dùng</h2>
-            {% if msg_update and active_tab == 'users' %}<div class="alert">{{ msg_update }}</div>{% endif %}
-            <div class="management-box">
-                <form method="POST" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px;">
-                    <div style="flex: 2;"><label style="margin:0; font-size:12px">Username:</label><input type="text" name="new_username" placeholder="user1" autocomplete="off"></div>
-                    <div style="flex: 2;"><label style="margin:0; font-size:12px">Password:</label><input type="text" name="new_password" placeholder="123" autocomplete="off"></div>
-                    <div style="flex: 1.5;"><label style="margin:0; font-size:12px">Vai trò:</label><select name="new_role"><option value="user">User (Thường)</option><option value="admin">Admin (QTV)</option></select></div>
-                    <button type="submit" name="btn_add_user" style="background:#27ae60; color:white; border:none; padding:10px; border-radius:5px; height:42px; cursor:pointer">Thêm</button>
-                </form>
-                <div class="table-responsive" style="background:white; border:1px solid #eee;">
-                    <table class="table table-bordered mb-0"><thead class="thead-dark"><tr><th>User</th><th>Vai trò</th><th class="col-center">Xóa</th></tr></thead><tbody>{% for u, info in users.items() %}<tr><td>{{ u }}</td><td>{% if info.role == 'admin' %}<span style="background:#2c3e50; color:white; padding:2px 6px; border-radius:4px; font-size:12px">Admin</span>{% else %}<span style="background:#95a5a6; color:white; padding:2px 6px; border-radius:4px; font-size:12px">User</span>{% endif %}</td><td class="col-center">{% if u != 'admin' and u != session['user'] %}<button onclick="if(confirm('Xóa {{ u }}?')) { var f=document.createElement('form'); f.method='POST'; var i=document.createElement('input'); i.name='btn_delete_user'; i.value='{{ u }}'; f.appendChild(i); document.body.appendChild(f); f.submit(); }" class="btn-danger-circle">✕</button>{% endif %}</td></tr>{% endfor %}</tbody></table>
-                </div>
             </div>
-        </div>
         {% endif %}
     </div>
 
     <script>
         const DATA_HE_SO = {{ settings.get('he_so_nhom', {'gd_co_nguoi': 0.7, 'gd_di_lam': 0.4, 'gd_ban_dem': 0.3, 'kinh_doanh': 0.8, 'san_xuat': 0.9}) | tojson }};
+        
+        // HÀM CHUYỂN TAB
         function openTab(id) {
             document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -607,6 +285,17 @@
             document.getElementById(tabId).classList.add('active');
             btnElement.classList.add('active');
         }
+
+        // HÀM DROPDOWN MENU (Đã đặt ra ngoài để luôn bấm được)
+        function toggleDropdown() {
+            var checkList = document.getElementById('list1');
+            if (checkList) {
+                if (checkList.classList.contains('visible')) checkList.classList.remove('visible');
+                else checkList.classList.add('visible');
+            }
+        }
+
+        // CÁC HÀM FORMAT TIỀN TỆ
         function toggleUnit(radio) {
             document.getElementById("input-label").innerText = radio.value === "theo_tien" ? "Tiền điện trung bình tháng (VNĐ/Month):" : "Sản lượng tiêu thụ (kWh/Month):";
             document.getElementById("gia_tri_input").placeholder = radio.value === "theo_tien" ? "VD: 2.000.000" : "VD: 500";
@@ -648,12 +337,184 @@
                 formatCurrency(input);
             }
         }); 
-        // --- HÀM GIỚI HẠN HỆ SỐ TỪ 0 ĐẾN 1 ---
         function checkHeSo(input) {
             let val = parseFloat(input.value);
             if (val > 1) input.value = 1;
             if (val < 0) input.value = 0;
         }
     </script>
+
+    {% if du_lieu_nhap.get('chart_data') %}
+    <script>
+        window.charts = {}; 
+        
+        // Dữ liệu từ Server
+        const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+        let liveData = JSON.parse(JSON.stringify(chartDataRaw));
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // Mở lại tab biểu đồ nếu đang xem
+            const tabBtn = document.getElementById('btn_tab_bieu_do');
+            if(tabBtn) openSubTab('sub_bieu_do', tabBtn);
+            
+            initAllCharts();
+        });
+
+        // 1. KHỞI TẠO TẤT CẢ BIỂU ĐỒ
+        function initAllCharts() {
+            let maxVal = 0;
+            const allDatasets = [
+                liveData.weekday_work, liveData.sunday_work, 
+                liveData.off_weekday, liveData.off_sunday
+            ];
+
+            allDatasets.forEach(data => {
+                if (data) {
+                    const hourlyTotals = data.td.map((val, i) => {
+                        return val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0);
+                    });
+                    const currentMax = Math.max(...hourlyTotals);
+                    if (currentMax > maxVal) maxVal = currentMax;
+                }
+            });
+            const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
+
+            if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
+            window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
+            
+            if(document.getElementById('chart_sunday')) {
+                if(window.charts['chart_sunday']) window.charts['chart_sunday'].destroy();
+                window.charts['chart_sunday'] = createChart('chart_sunday', liveData.sunday_work, COMMON_MAX_Y, true);
+            }
+            if(document.getElementById('chart_off_wd')) {
+                if(window.charts['chart_off_wd']) window.charts['chart_off_wd'].destroy();
+                window.charts['chart_off_wd'] = createChart('chart_off_wd', liveData.off_weekday, COMMON_MAX_Y, false);
+            }
+            if(document.getElementById('chart_off_sun')) {
+                if(window.charts['chart_off_sun']) window.charts['chart_off_sun'].destroy();
+                window.charts['chart_off_sun'] = createChart('chart_off_sun', liveData.off_sunday, COMMON_MAX_Y, true);
+            }
+        }
+
+        // 2. HÀM TẠO 1 BIỂU ĐỒ
+        function createChart(canvasId, dataSrc, maxYValue, isSundayMode) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+
+            const totalLoad = dataSrc.td.map((val, i) => {
+                return val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0) + (dataSrc.bt_u[i]||0) + (dataSrc.cd_u[i]||0);
+            });
+
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: liveData.labels,
+                    datasets: [
+                        // LINE (KÉO ĐƯỢC)
+                        {
+                            type: 'line', label: 'Tổng công suất',
+                            data: totalLoad,
+                            borderColor: DARK_YELLOW, borderWidth: 3,
+                            pointRadius: 6, pointHoverRadius: 10,
+                            pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2,
+                            tension: 0.4, fill: false, order: 0,
+                            dragData: true
+                        },
+                        // CÁC CỘT MÀU
+                        { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
+                        { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                        { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false },
+                        { label: '', data: [...dataSrc.bt_u], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                        { label: '', data: [...dataSrc.cd_u], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} },
+                        x: { stacked: true, grid: { display: false } }
+                    },
+                    plugins: {
+                        dragData: {
+                            round: 1, showTooltip: true,
+                            onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
+                            onDrag: function(e, datasetIndex, index, value) {
+                                if (datasetIndex !== 0) return false;
+                            },
+                            onDragEnd: function(e, datasetIndex, index, newValue) {
+                                if (datasetIndex !== 0) return;
+                                e.target.style.cursor = 'default';
+                                recalculateSystem(canvasId, index, newValue);
+                            }
+                        },
+                        legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
+                        tooltip: { mode: 'index', intersect: false }
+                    }
+                }
+            });
+        }
+
+        // 3. LOGIC TÍNH TOÁN LẠI (RECALCULATE)
+        function recalculateSystem(sourceId, targetHour, newTotalValue) {
+            // Lấy dữ liệu ngày thường làm gốc
+            const wdData = liveData.weekday_work;
+            
+            // Tính chênh lệch (Delta)
+            const oldTotalValue = wdData.td[targetHour] + wdData.bt_l[targetHour] + wdData.cd_l[targetHour] + wdData.bt_u[targetHour] + wdData.cd_u[targetHour];
+            const delta = newTotalValue - oldTotalValue;
+
+            // Cập nhật giờ mục tiêu
+            distributeValueToComponents(wdData, targetHour, newTotalValue, false);
+
+            // Tìm các giờ làm việc khác để chia sẻ Delta
+            let otherActiveHours = [];
+            for (let h = 0; h < 24; h++) {
+                if (h === targetHour) continue;
+                const val = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h];
+                if (val > wdData.td[h] + 1) otherActiveHours.push(h);
+            }
+
+            if (otherActiveHours.length > 0) {
+                const compensationPerHour = -delta / otherActiveHours.length;
+                otherActiveHours.forEach(h => {
+                    const currentVal = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h] + wdData.bt_u[h] + wdData.cd_u[h];
+                    let newVal = currentVal + compensationPerHour;
+                    if (newVal < 0) newVal = 0;
+                    distributeValueToComponents(wdData, h, newVal, false);
+                });
+            }
+
+            // Đồng bộ sang Chủ Nhật (nếu có)
+            if (liveData.sunday_work) {
+                for (let h = 0; h < 24; h++) {
+                    const wdTotal = wdData.td[h] + wdData.bt_l[h] + wdData.cd_l[h] + wdData.bt_u[h] + wdData.cd_u[h];
+                    distributeValueToComponents(liveData.sunday_work, h, wdTotal, true);
+                }
+            }
+
+            // Vẽ lại toàn bộ
+            initAllCharts();
+        }
+
+        // 4. HÀM PHÂN BỔ MÀU SẮC
+        function distributeValueToComponents(dataSet, h, totalValue, isSundayMode) {
+            dataSet.td[h] = 0; dataSet.bt_l[h] = 0; dataSet.cd_l[h] = 0;
+            dataSet.bt_u[h] = 0; dataSet.cd_u[h] = 0;
+
+            if ([22, 23, 0, 1, 2, 3].includes(h)) {
+                dataSet.td[h] = totalValue;
+            } else if (isSundayMode) {
+                dataSet.bt_l[h] = totalValue;
+            } else {
+                if ([10, 18].includes(h)) dataSet.cd_l[h] = totalValue;
+                else if ([17, 19].includes(h)) dataSet.cd_l[h] = totalValue;
+                else if (h === 9) { dataSet.bt_l[h] = totalValue * 0.5; dataSet.cd_u[h] = totalValue * 0.5; }
+                else if (h === 11) { dataSet.cd_l[h] = totalValue * 0.5; dataSet.bt_u[h] = totalValue * 0.5; }
+                else dataSet.bt_l[h] = totalValue;
+            }
+        }
+    </script>
+    {% endif %}
 </body>
 </html>
