@@ -539,6 +539,8 @@
         function initAllCharts() {
             let maxVal = 0;
             const allDatasets = [liveData.weekday_work, liveData.sunday_work, liveData.off_weekday, liveData.off_sunday];
+            
+            // 1. Tính toán Max dựa trên dữ liệu THỰC TẾ đang có
             allDatasets.forEach(data => {
                 if (data) {
                     const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0) + (data.bt_u[i]||0) + (data.cd_u[i]||0));
@@ -546,8 +548,17 @@
                     if (currentMax > maxVal) maxVal = currentMax;
                 }
             });
+
+            // 2. Tính trục Y hiển thị (Trả về như cũ: Gấp 1.2 lần dữ liệu thực)
+            // Khung này sẽ KHÔNG bị phóng đại vô lý.
             const COMMON_MAX_Y = maxVal > 0 ? Math.ceil(maxVal * 1.2) : 50;
 
+            // 3. Tính riêng cái TRẦN để chặn tay kéo (Ví dụ: Gấp 2 lần đỉnh hiện tại)
+            // Biến này chỉ dùng để chặn chuột, không dùng để vẽ khung.
+            window.HARD_LIMIT = maxVal * 2; 
+            if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
+
+            // 4. Vẽ biểu đồ
             if(window.charts['chart_weekday']) window.charts['chart_weekday'].destroy();
             window.charts['chart_weekday'] = createChart('chart_weekday', liveData.weekday_work, COMMON_MAX_Y, false);
             
@@ -586,7 +597,7 @@
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
                     scales: { 
-                        // THÊM min: 0 ĐỂ TRỤC Y KHÔNG BỊ ÂM
+                        // Giữ nguyên max theo dữ liệu thực, không can thiệp
                         y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
                         x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
                     },
@@ -594,19 +605,27 @@
                         dragData: {
                             round: 1, showTooltip: true,
                             onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
+                            
+                            // --- CHỈ CAN THIỆP KHI KÉO ---
                             onDrag: function(e, datasetIndex, index, value) { 
                                 if (datasetIndex !== 0) return false; 
                                 
-                                // --- CHỐT CHẶN SỐ 0 (REAL-TIME) ---
-                                // Nếu kéo xuống dưới 0, ép về 0 ngay lập tức
+                                // Chặn dưới
                                 if (value < 0) return false; 
+                                
+                                // Chặn trên: Dùng biến HARD_LIMIT đã tính riêng
+                                // Nếu vượt quá -> Trả về false -> Cột đứng im
+                                if (value > window.HARD_LIMIT) {
+                                    return false; 
+                                }
                             },
+                            
                             onDragEnd: function(e, datasetIndex, index, newValue) {
                                 if (datasetIndex !== 0) return;
                                 e.target.style.cursor = 'default';
                                 
-                                // --- CHỐT CHẶN SỐ 0 (KHI THẢ CHUỘT) ---
                                 if (newValue < 0) newValue = 0;
+                                if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
                                 
                                 recalculateSystem(canvasId, index, newValue);
                             }
