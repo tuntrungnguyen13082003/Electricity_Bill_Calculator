@@ -523,7 +523,6 @@
         const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
         let liveData = JSON.parse(JSON.stringify(chartDataRaw));
 
-        // Hàm chuyển Tab
         function switchChartTab(canvasId, btn) {
             document.querySelectorAll('.chart-wrapper').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.chart-tab-btn').forEach(el => el.classList.remove('active'));
@@ -537,7 +536,6 @@
             initAllCharts();
         });
 
-        // --- 1. KHỞI TẠO BIỂU ĐỒ ---
         function initAllCharts() {
             let maxVal = 0;
             const allDatasets = [liveData.weekday_work, liveData.sunday_work, liveData.off_weekday, liveData.off_sunday];
@@ -575,7 +573,7 @@
             return new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: liveData.labels, 
+                    labels: liveData.labels,
                     datasets: [
                         { type: 'line', label: 'Tổng công suất', data: totalLoad, borderColor: DARK_YELLOW, borderWidth: 3, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2, tension: 0.4, fill: false, order: 0, dragData: true },
                         { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
@@ -588,17 +586,28 @@
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
                     scales: { 
-                        y: { beginAtZero: true, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
+                        // THÊM min: 0 ĐỂ TRỤC Y KHÔNG BỊ ÂM
+                        y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
                         x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
                     },
                     plugins: {
                         dragData: {
                             round: 1, showTooltip: true,
                             onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
-                            onDrag: function(e, datasetIndex, index, value) { if (datasetIndex !== 0) return false; },
+                            onDrag: function(e, datasetIndex, index, value) { 
+                                if (datasetIndex !== 0) return false; 
+                                
+                                // --- CHỐT CHẶN SỐ 0 (REAL-TIME) ---
+                                // Nếu kéo xuống dưới 0, ép về 0 ngay lập tức
+                                if (value < 0) return false; 
+                            },
                             onDragEnd: function(e, datasetIndex, index, newValue) {
                                 if (datasetIndex !== 0) return;
                                 e.target.style.cursor = 'default';
+                                
+                                // --- CHỐT CHẶN SỐ 0 (KHI THẢ CHUỘT) ---
+                                if (newValue < 0) newValue = 0;
+                                
                                 recalculateSystem(canvasId, index, newValue);
                             }
                         },
@@ -609,30 +618,15 @@
             });
         }
 
-        // --- 2. HÀM HỖ TRỢ XÁC ĐỊNH LOẠI GIỜ (TD, BT, CD) ---
-        // Trả về: 0=Thấp điểm, 1=Bình thường, 2=Cao điểm
-        function getTariffType(i, isSunday) {
-            // Thấp điểm: 22h-04h (Index 44-47 và 0-7)
-            if (i >= 44 || i < 8) return 0;
-            
-            if (isSunday) return 1; // CN còn lại là Bình thường hết
-
-            // Ngày thường:
-            // Cao điểm sáng: 09:30 - 11:30 (Index 19, 20, 21, 22)
-            // Cao điểm chiều: 17:00 - 20:00 (Index 34 đến 39)
-            if ((i >= 19 && i <= 22) || (i >= 34 && i <= 39)) return 2;
-            
-            return 1; // Còn lại là Bình thường
-        }
-
-        // --- 3. LOGIC TÍNH TOÁN LẠI (PHIÊN BẢN CHẶN SAU 17H) ---
+        // --- 3. LOGIC TÍNH TOÁN LẠI (CÓ CHẶN SỐ ÂM) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
+            // Đảm bảo đầu vào không âm
+            if (newTotalValue < 0) newTotalValue = 0;
+
             const wdData = liveData.weekday_work;
-            // Tính giá trị cũ
             const oldTotalValue = wdData.td[targetIndex] + wdData.bt_l[targetIndex] + wdData.cd_l[targetIndex] + wdData.bt_u[targetIndex] + wdData.cd_u[targetIndex];
             const delta = newTotalValue - oldTotalValue;
 
-            // Xác định Loại giờ của điểm đang bị kéo
             const targetType = getTariffType(targetIndex, false); 
 
             // 1. Cập nhật tại điểm kéo
@@ -641,31 +635,27 @@
             // 2. Chia đều Delta cho các điểm khác
             let otherActiveIndices = [];
             for (let i = 0; i < 48; i++) {
-                // Bỏ qua chính nó
                 if (i === targetIndex) continue;
-                
-                // --- QUAN TRỌNG: CHẶN SAU 17H ---
-                // Index 34 tương ứng với 17:00 (17 * 2)
-                // Nếu giờ > 17h thì bỏ qua, không được nhồi thêm điện vào đây
+                // CHẶN SAU 17H
                 if (i >= 34) continue; 
 
-                // Kiểm tra loại giờ (Cùng màu mới chia)
                 const currentType = getTariffType(i, false);
-                
                 if (currentType === targetType) {
                     const val = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i];
-                    // Chỉ chia cho những giờ đang có tải thực tế (> 0.1)
                     if (val > 0.1) otherActiveIndices.push(i);
                 }
             }
 
-            // Nếu tìm thấy các giờ hợp lệ để chia sẻ
             if (otherActiveIndices.length > 0) {
                 const compensationPerIndex = -delta / otherActiveIndices.length;
                 otherActiveIndices.forEach(i => {
                     const currentVal = wdData.td[i] + wdData.bt_l[i] + wdData.cd_l[i] + wdData.bt_u[i] + wdData.cd_u[i];
                     let newVal = currentVal + compensationPerIndex;
+                    
+                    // --- CHỐT CHẶN SỐ 0 (KHI BÙ TRỪ) ---
+                    // Nếu bù trừ xong mà bị âm -> Ép về 0
                     if (newVal < 0) newVal = 0;
+                    
                     distributeValueToComponents(wdData, i, newVal, false);
                 });
             }
@@ -686,9 +676,18 @@
             dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0; dataSet.bt_u[i] = 0; dataSet.cd_u[i] = 0;
             const type = getTariffType(i, isSundayMode);
 
-            if (type === 0) dataSet.td[i] = totalValue; // Thấp điểm
-            else if (type === 2) dataSet.cd_l[i] = totalValue; // Cao điểm
-            else dataSet.bt_l[i] = totalValue; // Bình thường
+            if (type === 0) dataSet.td[i] = totalValue; 
+            else if (type === 2) dataSet.cd_l[i] = totalValue; 
+            else dataSet.bt_l[i] = totalValue; 
+        }
+
+        // --- 5. HÀM CHECK LOẠI GIỜ ---
+        function getTariffType(i, isSunday) {
+            if (i >= 44 || i < 8) return 0; // Thấp điểm
+            if (isSunday) return 1; 
+            // Cao điểm: 9h30-11h30 (19-22) & 17h-20h (34-39)
+            if ((i >= 19 && i <= 22) || (i >= 34 && i <= 39)) return 2;
+            return 1;
         }
     </script>
     {% endif %}
