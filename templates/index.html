@@ -176,15 +176,18 @@
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Phân tích Phụ tải 3 Giá (Chi tiết 30p)</h3>
                         
                         <form method="POST">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                                <div><label style="color:#c0392b">Cao điểm (kWh):</label><input type="number" name="kwh_cd" class="form-control" value="{{ du_lieu_nhap.get('kwh_cd', '') }}" required></div>
-                                <div><label style="color:#2980b9">Bình thường (kWh):</label><input type="number" name="kwh_bt" class="form-control" value="{{ du_lieu_nhap.get('kwh_bt', '') }}" required></div>
-                                <div><label style="color:#27ae60">Thấp điểm (kWh):</label><input type="number" name="kwh_td" class="form-control" value="{{ du_lieu_nhap.get('kwh_td', '') }}" required></div>
-                            </div>
+
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                 <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
                                 <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
                             </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div><label style="color:#2980b9">Bình thường (kWh):</label><input type="number" name="kwh_bt" class="form-control" value="{{ du_lieu_nhap.get('kwh_bt', '') }}" required></div>
+                                <div><label style="color:#c0392b">Cao điểm (kWh):</label><input type="number" name="kwh_cd" class="form-control" value="{{ du_lieu_nhap.get('kwh_cd', '') }}" required></div>
+                                <div><label style="color:#27ae60">Thấp điểm (kWh):</label><input type="number" name="kwh_td" class="form-control" value="{{ du_lieu_nhap.get('kwh_td', '') }}" required></div>
+                            </div>
+                            
                             <div style="margin-top: 10px;">
                                 <label>Chọn ngày nghỉ trong tuần:</label>
                                 <div id="list1" class="dropdown-check-list" tabindex="100">
