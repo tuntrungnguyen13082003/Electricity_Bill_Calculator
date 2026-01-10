@@ -1,10 +1,12 @@
 import os
 import json
 import google.generativeai as genai
+import re
 import pandas as pd
 from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_file
+
 
 
 os.environ["GOOGLE_API_KEY"] = "AIzaSyAkDousFLZy33pXCo3by3zZ8ar3Pphuy0c"
@@ -21,48 +23,48 @@ template_path = os.path.join(base_dir, 'templates')
 app = Flask(__name__, template_folder=template_path)
 app.secret_key = 'khoa_bi_mat_cua_du_an_solar'
 
+# --- HÀM ĐỌC ẢNH BẰNG AI (PHIÊN BẢN FIX LỖI) ---
 def ai_doc_hoa_don(image_path):
     try:
-        # Dùng model Flash cho nhanh và miễn phí
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         sample_file = genai.upload_file(path=image_path, display_name="Hoa don dien")
 
-        # Ra lệnh cho AI (Prompt)
-        # CẬP NHẬT CÂU LỆNH (PROMPT) THÔNG MINH HƠN
         prompt = """
-        Bạn là một trợ lý nhập liệu chuyên nghiệp. Hãy trích xuất dữ liệu từ hóa đơn tiền điện này và trả về JSON.
+        Bạn là trợ lý điện lực. Hãy trích xuất dữ liệu từ hóa đơn này.
+        Quy tắc:
+        1. Tìm cột "ĐIỆN TIÊU THỤ (kWh)" hoặc các chỉ số mới.
+        2. Loại bỏ dấu chấm phân cách ngàn (Ví dụ: 19.619 -> 19619).
+        3. Ngày tháng chuyển về định dạng YYYY-MM-DD.
         
-        Quy tắc quan trọng:
-        1. Tìm cột "ĐIỆN TIÊU THỤ (kWh)" để lấy số liệu sản lượng.
-        2. Chú ý: Dấu chấm "." trong ảnh là phân cách hàng nghìn, hãy loại bỏ nó. Ví dụ: "19.619" phải trả về số nguyên 19619 (không phải 19.619).
-        3. Định dạng ngày tháng phải chuyển về chuẩn quốc tế: YYYY-MM-DD (Ví dụ: 2025-04-16).
-        
-        Các trường cần lấy:
-        - kwh_bt: Sản lượng ứng với dòng "Khung giờ bình thường".
-        - kwh_cd: Sản lượng ứng với dòng "Khung giờ cao điểm".
-        - kwh_td: Sản lượng ứng với dòng "Khung giờ thấp điểm".
-        - ngay_dau: Tìm trong câu "từ ngày ... đến ngày ...". Lấy ngày bắt đầu.
-        - ngay_cuoi: Tìm trong câu "từ ngày ... đến ngày ...". Lấy ngày kết thúc.
-
-        Chỉ trả về JSON thuần túy, không markdown, không giải thích.
-        Ví dụ cấu trúc mong muốn:
-        {
-            "kwh_bt": 19619,
-            "kwh_cd": 7158,
-            "kwh_td": 4202,
-            "ngay_dau": "2025-04-16",
-            "ngay_cuoi": "2025-04-30"
-        }
+        Trả về JSON thuần túy với các trường:
+        - kwh_bt (Bình thường)
+        - kwh_cd (Cao điểm)
+        - kwh_td (Thấp điểm)
+        - ngay_dau (Ngày bắt đầu)
+        - ngay_cuoi (Ngày kết thúc)
         """
 
         response = model.generate_content([sample_file, prompt])
         
-        # Làm sạch kết quả trả về
-        json_str = response.text.replace('```json', '').replace('```', '').strip()
-        return json.loads(json_str)
+        # --- BƯỚC DEBUG: In ra màn hình đen xem AI trả lời gì ---
+        print("\n--- AI ĐANG TRẢ LỜI ---")
+        print(response.text)
+        print("-----------------------\n")
+        
+        # --- BƯỚC XỬ LÝ MỚI: Dùng Regex săn tìm JSON ---
+        # Tìm đoạn văn bản bắt đầu bằng { và kết thúc bằng }
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        
+        if match:
+            json_str = match.group(0) # Lấy đúng đoạn JSON
+            return json.loads(json_str)
+        else:
+            print("Lỗi: Không tìm thấy JSON trong câu trả lời của AI")
+            return None
+
     except Exception as e:
-        print(f"Lỗi AI: {e}")
+        print(f"LỖI NGHIÊM TRỌNG: {e}")
         return None
     
 # --- 3. TẠO ĐƯỜNG DẪN (ROUTE) ĐỂ WEB GỌI ---
