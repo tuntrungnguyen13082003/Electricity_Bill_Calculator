@@ -1,16 +1,17 @@
 import os
 import json
-import google.generativeai as genai
+import requests
+import base64
 import re
 import pandas as pd
 from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_file
 
-
-
 os.environ["GOOGLE_API_KEY"] = "AIzaSyAkDousFLZy33pXCo3by3zZ8ar3Pphuy0c"
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+
+
 
 # --- CẤU HÌNH ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -23,48 +24,75 @@ template_path = os.path.join(base_dir, 'templates')
 app = Flask(__name__, template_folder=template_path)
 app.secret_key = 'khoa_bi_mat_cua_du_an_solar'
 
-# --- HÀM ĐỌC ẢNH BẰNG AI (PHIÊN BẢN FIX LỖI) ---
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+    
+# --- HÀM ĐỌC HÓA ĐƠN (PHIÊN BẢN SIÊU TƯƠNG THÍCH) ---
 def ai_doc_hoa_don(image_path):
+    print("--- Đang gửi yêu cầu tới Google AI (Qua REST API)... ---")
+    
+    # 1. Chuẩn bị dữ liệu gửi đi
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        base64_image = encode_image(image_path)
         
-        sample_file = genai.upload_file(path=image_path, display_name="Hoa don dien")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": """
+                        Bạn là trợ lý nhập liệu. Hãy trích xuất dữ liệu từ hóa đơn điện này thành JSON.
+                        Quy tắc:
+                        1. Tìm cột 'ĐIỆN TIÊU THỤ (kWh)' để lấy số liệu.
+                        2. Loại bỏ dấu chấm phân cách ngàn (Ví dụ: 19.619 -> 19619).
+                        3. Ngày tháng chuyển về định dạng YYYY-MM-DD.
+                        
+                        Các trường cần lấy:
+                        - kwh_bt (Bình thường)
+                        - kwh_cd (Cao điểm)
+                        - kwh_td (Thấp điểm)
+                        - ngay_dau (Ngày bắt đầu)
+                        - ngay_cuoi (Ngày kết thúc)
+                        
+                        Chỉ trả về đúng chuỗi JSON, không giải thích thêm.
+                    """},
+                    {
+                        "inline_data": {
+                            "mime_type": "image/jpeg",
+                            "data": base64_image
+                        }
+                    }
+                ]
+            }]
+        }
 
-        prompt = """
-        Bạn là trợ lý điện lực. Hãy trích xuất dữ liệu từ hóa đơn này.
-        Quy tắc:
-        1. Tìm cột "ĐIỆN TIÊU THỤ (kWh)" hoặc các chỉ số mới.
-        2. Loại bỏ dấu chấm phân cách ngàn (Ví dụ: 19.619 -> 19619).
-        3. Ngày tháng chuyển về định dạng YYYY-MM-DD.
+        # 2. Gửi yêu cầu (POST)
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
         
-        Trả về JSON thuần túy với các trường:
-        - kwh_bt (Bình thường)
-        - kwh_cd (Cao điểm)
-        - kwh_td (Thấp điểm)
-        - ngay_dau (Ngày bắt đầu)
-        - ngay_cuoi (Ngày kết thúc)
-        """
-
-        response = model.generate_content([sample_file, prompt])
-        
-        # --- BƯỚC DEBUG: In ra màn hình đen xem AI trả lời gì ---
-        print("\n--- AI ĐANG TRẢ LỜI ---")
-        print(response.text)
-        print("-----------------------\n")
-        
-        # --- BƯỚC XỬ LÝ MỚI: Dùng Regex săn tìm JSON ---
-        # Tìm đoạn văn bản bắt đầu bằng { và kết thúc bằng }
-        match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        
-        if match:
-            json_str = match.group(0) # Lấy đúng đoạn JSON
-            return json.loads(json_str)
+        # 3. Xử lý kết quả trả về
+        if response.status_code == 200:
+            result = response.json()
+            # Lấy nội dung văn bản AI trả lời
+            text_response = result['candidates'][0]['content']['parts'][0]['text']
+            
+            print("AI Trả lời:", text_response)
+            
+            # Dùng Regex để bắt lấy đoạn JSON
+            match = re.search(r'\{.*\}', text_response, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            else:
+                print("Lỗi: Không tìm thấy JSON trong phản hồi.")
+                return None
         else:
-            print("Lỗi: Không tìm thấy JSON trong câu trả lời của AI")
+            print(f"Lỗi API: {response.status_code} - {response.text}")
             return None
 
     except Exception as e:
-        print(f"LỖI NGHIÊM TRỌNG: {e}")
+        print(f"Lỗi Code: {e}")
         return None
     
 # --- 3. TẠO ĐƯỜNG DẪN (ROUTE) ĐỂ WEB GỌI ---
