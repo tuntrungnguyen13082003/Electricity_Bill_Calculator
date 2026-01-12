@@ -176,18 +176,6 @@
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Biểu đồ phụ tải</h3>
                         
                         <form method="POST">
-                            <div style="background: #e8f8f5; padding: 10px; border: 1px dashed #16a085; border-radius: 5px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
-                                <div>
-                                    <strong style="color: #16a085;">📸 Nhập nhanh bằng AI</strong>
-                                    <div style="font-size: 12px; color: #666;">Chụp hóa đơn hoặc bảng kê EVN</div>
-                                </div>
-                                <div>
-                                    <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="uploadVaQuetAnh(this)">
-                                    <button type="button" onclick="document.getElementById('inp_scan_img').click()" id="btn_scan_trigger" style="background: #16a085; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                                        Tải file lên
-                                    </button>
-                                </div>
-                            </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                 <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
@@ -536,68 +524,6 @@
             }
         }); 
     </script>
-    <script>
-        function uploadVaQuetAnh(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                const btn = document.getElementById('btn_scan_trigger');
-                
-                // Hiệu ứng loading
-                if(btn) {
-                    btn.innerHTML = "⏳ Đang đọc...";
-                    btn.style.opacity = "0.7";
-                    btn.disabled = true;
-                }
-
-                const formData = new FormData();
-                formData.append('file_anh', file);
-
-                fetch('/scan_invoice', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(res => {
-                    if (res.success && res.data) {
-                        const d = res.data;
-                        
-                        // Code điền dữ liệu
-                        if(d.kwh_bt) document.querySelector('input[name="kwh_bt"]').value = d.kwh_bt.toString().replace(/\./g, '');
-                        if(d.kwh_cd) document.querySelector('input[name="kwh_cd"]').value = d.kwh_cd.toString().replace(/\./g, '');
-                        if(d.kwh_td) document.querySelector('input[name="kwh_td"]').value = d.kwh_td.toString().replace(/\./g, '');
-                        
-                        // Xử lý ngày tháng
-                        const chuanHoaNgay = (strNgay) => {
-                            if (!strNgay) return "";
-                            if (strNgay.includes('/')) {
-                                let parts = strNgay.split('/');
-                                if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                            }
-                            return strNgay;
-                        };
-                        if(d.ngay_dau) document.querySelector('input[name="ngay_dau"]').value = chuanHoaNgay(d.ngay_dau);
-                        if(d.ngay_cuoi) document.querySelector('input[name="ngay_cuoi"]').value = chuanHoaNgay(d.ngay_cuoi);
-                        
-                        alert("✅ Đã trích xuất xong!");
-                    } else {
-                        alert("⚠️ Không tìm thấy dữ liệu.");
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("❌ Lỗi kết nối server.");
-                })
-                .finally(() => {
-                    if(btn) {
-                        btn.innerHTML = "Tải ảnh lên";
-                        btn.style.opacity = "1";
-                        btn.disabled = false;
-                    }
-                    input.value = ''; 
-                });
-            }
-        }
-    </script>
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
         window.charts = {}; 
@@ -792,7 +718,6 @@
             
             return 1; // Còn lại là Bình thường
         }
-        
     </script>
     {% endif %}
 </body>
