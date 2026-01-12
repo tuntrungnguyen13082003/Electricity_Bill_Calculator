@@ -134,13 +134,37 @@
                     <div id="khung_ho_gia_dinh">
                         <label style="margin-top:15px">Nhập liệu theo:</label>
                         <div class="input-mode-group">
-                            <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_tien" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do != 'theo_kwh' else '' }}> Số tiền</label>
-                            <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_kwh" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_kwh' else '' }}> Số điện</label>
+                            <label class="radio-label">
+                                <input type="radio" 
+                                    name="che_do_nhap" 
+                                    value="theo_tien" 
+                                    onchange="toggleUnit(this)" 
+                                    {{ 'checked' if du_lieu_nhap.che_do != 'theo_tien' else '' }}> 
+                                Số tiền
+                            </label>
+                            
+                            <label class="radio-label">
+                                <input type="radio" 
+                                    name="che_do_nhap" 
+                                    value="theo_tien" 
+                                    onchange="toggleUnit(this)" 
+                                    {{ 'checked' if du_lieu_nhap.che_do == 'theo_tien' else '' }}> 
+                                Số điện
+                            </label>
                         </div>
+
                         <label id="input-label">Tiền điện trung bình tháng (VNĐ/Month):</label>
-                        <input type="text" inputmode="numeric" name="gia_tri_dau_vao" id="gia_tri_input" value="{{ du_lieu_nhap.gia_tri }}" oninput="formatCurrency(this)">
                         
-                        <div id="khung_dac_diem">
+                        <input type="text" 
+                            inputmode="numeric" 
+                            name="gia_tri_dau_vao" 
+                            id="gia_tri_input" 
+                            class="form-control"
+                            value="{{ du_lieu_nhap.gia_tri }}" 
+                            oninput="formatCurrency(this)"
+                            required>
+                        
+                        <div id="khung_dac_diem" style="margin-top: 15px;">
                             <label>Đặc điểm sử dụng:</label>
                             <select id="chon_ngu_canh" name="ngu_canh_chon" class="form-control">
                                 <option value="gd_co_nguoi" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_co_nguoi' else '' }}>👴👶 Có người ở nhà</option>
@@ -197,6 +221,20 @@
                     
                     <button type="submit" name="btn_calc" class="btn-calc" style="margin-top: 25px; font-size: 18px;">TÍNH TOÁN CÔNG SUẤT & BÁO GIÁ</button>
                 </div>
+                {% if ket_qua and du_lieu_nhap.loai_hinh == 'can_ho' %}
+                <div style="margin-top: 25px; padding: 20px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 10px; text-align: center;">
+                    <h4 style="color: #1565c0; margin-bottom: 10px;">🏠 KẾT QUẢ ĐỀ XUẤT HỘ GIA ĐÌNH</h4>
+                    
+                    <div style="font-size: 18px; margin-bottom: 5px;">
+                        Công suất lắp đặt: 
+                        <strong style="font-size: 26px; color: #d32f2f;">{{ ket_qua }} kWp</strong>
+                    </div>
+                    
+                    <div style="font-size: 16px; color: #555;">
+                        Diện tích mái cần có: <strong>{{ dien_tich }} m²</strong>
+                    </div>
+                </div>
+                {% endif %}
             </form>
 
             {% if ket_qua %}
@@ -478,12 +516,21 @@
         document.getElementById('chon_ngu_canh').addEventListener('change', capNhatGiaoDien);
         
         document.addEventListener('DOMContentLoaded', function() {
-            // Chạy ngay lập tức để ẩn/hiện đúng khung dựa trên lựa chọn hiện tại
-            capNhatGiaoDien();
+            // 1. Tìm ô nhập liệu của bạn
+            var inputHGD = document.getElementById('gia_tri_input');
             
-            // Vẽ biểu đồ nếu có dữ liệu
-            if(typeof initAllCharts === 'function') {
-                initAllCharts();
+            // 2. Nếu ô này có dữ liệu (do Python trả về), hãy format nó ngay lập tức
+            if (inputHGD && inputHGD.value) {
+                // Giả sử formatCurrency là hàm bạn đã viết để thêm dấu chấm
+                formatCurrency(inputHGD); 
+            }
+            
+            // 3. Cập nhật lại nhãn (VNĐ hay kWh) cho đúng với radio đang chọn
+            var radioTien = document.querySelector('input[name="che_do_nhap"][value="theo_tien"]');
+            if(radioTien && radioTien.checked) {
+                document.getElementById('input-label').innerText = "Tiền điện trung bình tháng (VNĐ/Month):";
+            } else {
+                document.getElementById('input-label').innerText = "Số điện trung bình tháng (kWh/Month):";
             }
         });
     </script>
