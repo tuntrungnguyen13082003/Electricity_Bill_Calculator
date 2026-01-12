@@ -481,21 +481,26 @@
             }
         }
 
-        function toggleUnit(radio) {
-                var label = document.getElementById("input-label");
-                var input = document.getElementById("gia_tri_input");
-                
-                if (radio.value === "tien") {
-                    label.innerText = "Tiền điện trung bình tháng (VNĐ):";
-                    input.placeholder = "Ví dụ: 2.000.000";
-                    input.setAttribute("onkeyup", "formatCurrency(this)");
-                } else {
-                    label.innerText = "Sản lượng tiêu thụ (kWh/tháng):";
-                    input.placeholder = "Ví dụ: 500";
-                    input.removeAttribute("onkeyup"); 
-                }
-                input.value = ""; // Xóa số cũ đi cho đỡ nhầm
+        // Thêm tham số isUserClick (mặc định là true)
+        function toggleUnit(radio, isUserClick = true) {
+            var label = document.getElementById("input-label");
+            var input = document.getElementById("gia_tri_input");
+            
+            if (radio.value === "tien") {
+                label.innerText = "Tiền điện trung bình tháng (VNĐ):";
+                input.placeholder = "Ví dụ: 2.000.000";
+                input.setAttribute("onkeyup", "formatCurrency(this)");
+            } else {
+                label.innerText = "Sản lượng tiêu thụ (kWh/tháng):";
+                input.placeholder = "Ví dụ: 500";
+                input.removeAttribute("onkeyup"); 
             }
+            
+            // Chỉ xóa dữ liệu nếu là người dùng bấm (tránh xóa khi load trang)
+            if (isUserClick) {
+                input.value = ""; 
+            }
+        }
         
         function formatCurrency(input) {
             var modeRadio = document.querySelector('input[name="che_do_nhap"]:checked');
@@ -610,7 +615,6 @@
             const khungDonGian = document.getElementById('khung_nhap_don_gian');
             const khungChiTiet = document.getElementById('khung_nhap_chi_tiet');
             
-            // Lấy các ô nhập liệu
             const inputTien = document.getElementById('gia_tri_input');
             const inputBT = document.querySelector('input[name="kwh_bt"]');
 
@@ -618,27 +622,42 @@
                 khungDonGian.style.display = 'none';
                 khungChiTiet.style.display = 'block';
                 
-                // 🔥 Cấu hình bắt buộc nhập 🔥
                 if(inputTien) {
-                    inputTien.value = ''; 
-                    inputTien.required = false; // Tắt bắt buộc cho ô Hộ gia đình
+                    // inputTien.value = '';  <-- XÓA HOẶC COMMENT DÒNG NÀY (Thủ phạm 1)
+                    inputTien.required = false; 
                 }
-                // Bật bắt buộc cho Kinh doanh (chỉ cần bắt buộc ô Bình thường làm đại diện)
                 if(inputBT) inputBT.required = true; 
 
             } else {
                 khungDonGian.style.display = 'block';
                 khungChiTiet.style.display = 'none';
                 
-                // 🔥 Cấu hình bắt buộc nhập 🔥
-                if(inputTien) inputTien.required = true; // Bật bắt buộc ô Hộ gia đình
-                if(inputBT) inputBT.required = false;    // Tắt bắt buộc ô Kinh doanh
+                if(inputTien) inputTien.required = true; 
+                if(inputBT) inputBT.required = false;    
             }
         }
 
         // Chạy 1 lần lúc đầu để cài đặt
         window.onload = function() {
+            // 1. Thiết lập ẩn/hiện form (Kinh doanh/Gia đình)
             toggleInputMode();
+            
+            // 2. Format lại tiền tệ nếu có dữ liệu sẵn
+            var input = document.getElementById('gia_tri_input');
+            var modeRadio = document.querySelector('input[name="che_do_nhap"]:checked'); // Lấy radio đang được chọn (do Python điền checked)
+
+            // Cập nhật Label/Placeholder cho đúng với Radio đang chọn
+            // Tham số false: Báo cho hàm biết đây là load trang, ĐỪNG XÓA GIÁ TRỊ
+            if (modeRadio) {
+                toggleUnit(modeRadio, false); 
+            }
+
+            // 3. Format lại dấu chấm phân cách nếu đang là mode Tiền
+            if (input && input.value && modeRadio && modeRadio.value === 'tien') {
+                // Xóa .0 nếu có (do float python)
+                if (input.value.endsWith('.0')) input.value = input.value.slice(0, -2);
+                formatCurrency(input);
+            }
         };
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
