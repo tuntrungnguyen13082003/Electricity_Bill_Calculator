@@ -605,35 +605,39 @@
             }
         }
         function toggleInputMode() {
-            // Lấy giá trị dropdown
             const loaiHinh = document.getElementById('loai_hinh_lap_dat').value;
-            
-            // Lấy 2 khung giao diện
             const khungDonGian = document.getElementById('khung_nhap_don_gian');
             const khungChiTiet = document.getElementById('khung_nhap_chi_tiet');
+            
+            // Lấy các ô nhập liệu
+            const inputTien = document.getElementById('gia_tri_input');
+            const inputBT = document.querySelector('input[name="kwh_bt"]');
 
             if (loaiHinh === 'kinh_doanh' || loaiHinh === 'san_xuat') {
-                // Nếu là KD/SX: Ẩn đơn giản, Hiện chi tiết
                 khungDonGian.style.display = 'none';
                 khungChiTiet.style.display = 'block';
                 
-                // Xóa giá trị ở khung đơn giản
-                var simpleInput = document.getElementById('gia_tri_input');
-                if(simpleInput) simpleInput.value = ''; 
+                // 🔥 Cấu hình bắt buộc nhập 🔥
+                if(inputTien) {
+                    inputTien.value = ''; 
+                    inputTien.required = false; // Tắt bắt buộc cho ô Hộ gia đình
+                }
+                // Bật bắt buộc cho Kinh doanh (chỉ cần bắt buộc ô Bình thường làm đại diện)
+                if(inputBT) inputBT.required = true; 
+
             } else {
-                // Nếu là Hộ gia đình: Hiện đơn giản, Ẩn chi tiết
                 khungDonGian.style.display = 'block';
                 khungChiTiet.style.display = 'none';
+                
+                // 🔥 Cấu hình bắt buộc nhập 🔥
+                if(inputTien) inputTien.required = true; // Bật bắt buộc ô Hộ gia đình
+                if(inputBT) inputBT.required = false;    // Tắt bắt buộc ô Kinh doanh
             }
         }
 
-        // Gọi 1 lần khi trang vừa tải xong
+        // Chạy 1 lần lúc đầu để cài đặt
         window.onload = function() {
             toggleInputMode();
-            // Nếu có biểu đồ thì scroll xuống biểu đồ
-            if (document.getElementById('chart_section')) {
-                document.getElementById('chart_section').scrollIntoView({behavior: "smooth"});
-            }
         };
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
