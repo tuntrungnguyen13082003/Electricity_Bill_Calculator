@@ -427,40 +427,36 @@
         function capNhatGiaoDien() {
             var loaiHinh = document.getElementById('loai_hinh').value;
             
-            // --- CHÚ Ý: ID PHẢI KHỚP VỚI HTML ---
+            // --- CÁC ID LẤY CHÍNH XÁC TỪ ẢNH MÀN HÌNH ---
             var khungHGD = document.getElementById('khung_ho_gia_dinh');
-            
-            // Sửa lại ID này cho đúng với HTML của bạn (trước đó là khung_kinh_doanh_san_xuat)
-            var khungKD = document.getElementById('khung_kinh_doanh_san_xuat'); 
-            // Nếu HTML của bạn đặt id="khung_chuyen_nghiep" thì sửa dòng trên, còn không thì giữ nguyên
+            var khungKD  = document.getElementById('khung_chuyen_nghiep'); // Đây là ID đúng!
             
             var khungDacDiem = document.getElementById('khung_dac_diem');
             var dropdown = document.getElementById('chon_ngu_canh');
             var inputAn = document.getElementById('he_so_nhap');
             var thongBao = document.getElementById('thong_bao_he_so');
 
-            // Kiểm tra an toàn (để tránh lỗi nếu thiếu thẻ)
-            if (!khungHGD || !khungKD) return; 
-
+            // Logic ẩn/hiện
             if (loaiHinh === 'can_ho') {
-                // HIỆN Hộ Gia Đình
-                khungHGD.style.display = 'block';
-                khungKD.style.display = 'none';
+                // --- TRƯỜNG HỢP HỘ GIA ĐÌNH ---
+                if(khungHGD) khungHGD.style.display = 'block';
+                if(khungKD)  khungKD.style.display  = 'none';
                 
                 if(khungDacDiem) khungDacDiem.style.display = 'block';
                 if(thongBao) thongBao.style.display = 'none';
-                
-                // Cập nhật hệ số ngầm
+
+                // Cập nhật hệ số ngầm cho Hộ Gia Đình
                 if(dropdown && inputAn && DATA_HE_SO) { 
                     inputAn.value = DATA_HE_SO[dropdown.value] || 0.5; 
                 }
+
             } else {
-                // HIỆN Kinh Doanh / Sản Xuất
-                khungHGD.style.display = 'none';
-                khungKD.style.display = 'block';
+                // --- TRƯỜNG HỢP KINH DOANH / SẢN XUẤT ---
+                if(khungHGD) khungHGD.style.display = 'none';
+                if(khungKD)  khungKD.style.display  = 'block';
                 
                 if(khungDacDiem) khungDacDiem.style.display = 'none';
-                
+
                 // Hiển thị thông báo hệ số
                 if (thongBao && DATA_HE_SO) {
                     thongBao.style.display = 'block';
@@ -481,15 +477,15 @@
         document.getElementById('loai_hinh').addEventListener('change', capNhatGiaoDien);
         document.getElementById('chon_ngu_canh').addEventListener('change', capNhatGiaoDien);
         
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Chạy ngay lập tức để ẩn/hiện đúng khung dựa trên lựa chọn hiện tại
             capNhatGiaoDien();
-            var input = document.getElementById('gia_tri_input');
-            var modeRadio = document.querySelector('input[name="che_do_nhap"]:checked');
-            if (input && input.value && modeRadio && modeRadio.value === 'theo_tien') {
-                if (input.value.endsWith('.0')) input.value = input.value.slice(0, -2);
-                formatCurrency(input);
+            
+            // Vẽ biểu đồ nếu có dữ liệu
+            if(typeof initAllCharts === 'function') {
+                initAllCharts();
             }
-        }); 
+        });
     </script>
     <script>
         function uploadVaQuetAnh(input) {
