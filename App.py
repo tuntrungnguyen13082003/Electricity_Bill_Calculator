@@ -207,17 +207,17 @@ def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_form, gio_nang_tin
     
     return [0, 0]
 
-# --- ROUTE XỬ LÝ TÍNH TOÁN (CÓ KIỂM TRA TÊN KHÁCH HÀNG) ---
+# --- ROUTE XỬ LÝ TÍNH TOÁN (PHIÊN BẢN CÓ CHECK SỐ LIỆU ĐẦU VÀO) ---
 @app.route('/tinh_toan', methods=['POST'])
 def xu_ly_tinh_toan():
-    # 1. LOAD DỮ LIỆU NỀN (Để trang web không bị lỗi hiển thị)
+    # 1. LOAD DỮ LIỆU NỀN (Để giao diện không bị lỗi)
     if 'user' not in session: return redirect(url_for('login'))
     current_role = session.get('role', 'user')
     SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
     SETTINGS['tinh_thanh'] = load_excel_provinces()
     USERS = load_json_file(users_path, DEFAULT_USERS)
     
-    # Load lịch sử hiển thị
+    # Load lịch sử
     lich_su_data = []
     if os.path.exists(history_path):
         try:
@@ -230,18 +230,18 @@ def xu_ly_tinh_toan():
             lich_su_data.sort(key=lambda x: datetime.strptime(x['Thời Gian'], "%d/%m/%Y %H:%M:%S"), reverse=True)
         except: pass
 
-    # 2. LẤY THÔNG TIN CƠ BẢN & KIỂM TRA LỖI
+    # 2. LẤY THÔNG TIN CƠ BẢN
     ten_kh = request.form.get('ten_kh', '').strip()
     loai_hinh_raw = request.form.get('loai_hinh') 
     khu_vuc = request.form.get('khu_vuc')
     
-    # --- [QUAN TRỌNG] CHECK TÊN KHÁCH HÀNG ---
+    # --- CHECK 1: TÊN KHÁCH HÀNG ---
     if not ten_kh:
         return render_template('index.html', 
                                role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
                                active_tab='calc',
-                               msg_update="⚠️ Lỗi: Vui lòng nhập Tên Khách Hàng!", # <--- Báo lỗi đỏ
-                               du_lieu_nhap=request.form) # Giữ lại dữ liệu đã nhập
+                               msg_update="⚠️ Lỗi: Vui lòng nhập Tên Khách Hàng!", 
+                               du_lieu_nhap=request.form)
 
     # Map tên loại hình
     loai_hinh = 'can_ho' if loai_hinh_raw == 'ho_gia_dinh' else loai_hinh_raw
@@ -259,22 +259,25 @@ def xu_ly_tinh_toan():
     chart_data = None
     du_lieu_nhap = {'ten_kh': ten_kh, 'loai_hinh': loai_hinh_raw, 'khu_vuc': khu_vuc} 
 
-    # 3. XỬ LÝ LOGIC SỐ LIỆU
+    # 3. XỬ LÝ LOGIC SỐ LIỆU & CHECK 2: SỐ LIỆU ĐẦU VÀO
     if loai_hinh in ['kinh_doanh', 'san_xuat']:
         k_bt = lay_so_safe('kwh_bt')
         k_cd = lay_so_safe('kwh_cd')
         k_td = lay_so_safe('kwh_td')
         
-        # Kiểm tra nếu chưa nhập số điện
-        if (k_bt + k_cd + k_td) == 0:
-             return render_template('index.html', role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
-                               active_tab='calc', msg_update="⚠️ Lỗi: Vui lòng nhập ít nhất một chỉ số điện (BT/CĐ/TĐ)!", du_lieu_nhap=request.form)
+        # --- [QUAN TRỌNG] NẾU TỔNG ĐIỆN = 0 THÌ BÁO LỖI ---
+        if (k_bt + k_cd + k_td) <= 0:
+             return render_template('index.html', 
+                                    role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
+                                    active_tab='calc', 
+                                    msg_update="⚠️ Lỗi: Vui lòng nhập ít nhất một chỉ số điện (BT/CĐ/TĐ)!", # Báo lỗi
+                                    du_lieu_nhap=request.form)
 
         tong_kwh = k_bt + k_cd + k_td
         gia_tri_final = tong_kwh
         che_do_nhap_final = 'theo_kwh'
         
-        # Lưu lại input để hiển thị lại
+        # Lưu lại input
         du_lieu_nhap.update({
             'kwh_bt': k_bt, 'kwh_cd': k_cd, 'kwh_td': k_td,
             'ngay_dau': request.form.get('ngay_dau'), 'ngay_cuoi': request.form.get('ngay_cuoi'),
@@ -289,16 +292,21 @@ def xu_ly_tinh_toan():
         # Hộ gia đình
         kieu_nhap = request.form.get('kieu_nhap') 
         val_nhap = lay_so_safe('gia_tri_nhap')
-        if val_nhap == 0:
-             return render_template('index.html', role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
-                               active_tab='calc', msg_update="⚠️ Lỗi: Vui lòng nhập Số tiền hoặc Số điện!", du_lieu_nhap=request.form)
+        
+        # --- [QUAN TRỌNG] NẾU NHẬP 0 HOẶC TRỐNG THÌ BÁO LỖI ---
+        if val_nhap <= 0:
+             return render_template('index.html', 
+                                    role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
+                                    active_tab='calc', 
+                                    msg_update="⚠️ Lỗi: Vui lòng nhập Số tiền hoặc Số điện lớn hơn 0!", # Báo lỗi
+                                    du_lieu_nhap=request.form)
 
         gia_tri_final = val_nhap
         che_do_nhap_final = 'theo_kwh' if kieu_nhap == 'dien' else 'theo_tien'
         du_lieu_nhap['gia_tri_nhap'] = request.form.get('gia_tri_nhap')
         du_lieu_nhap['kieu_nhap'] = kieu_nhap
 
-    # 4. TÍNH TOÁN
+    # 4. TÍNH TOÁN (Chỉ chạy xuống đây khi đã có số liệu > 0)
     gio_nang = SETTINGS['tinh_thanh'].get(khu_vuc, 4.0)
     ket_qua_kwp = tinh_toan_kwp(loai_hinh, gia_tri_final, che_do_nhap_final, 0.5, gio_nang, SETTINGS)
 
@@ -334,18 +342,16 @@ def xu_ly_tinh_toan():
         with pd.ExcelWriter(history_path) as writer:
             for s_name, data in all_sheets.items(): data.to_excel(writer, sheet_name=s_name, index=False)
             
-        # Cập nhật lại list lịch sử để hiển thị ngay dòng mới thêm
         lich_su_data.insert(0, new_row.to_dict('records')[0])
     except Exception as e:
         print(f"Lỗi lưu file: {e}")
 
-    # 6. TRẢ VỀ GIAO DIỆN
+    # 6. TRẢ VỀ GIAO DIỆN KẾT QUẢ
     return render_template('index.html', 
                            role=current_role, settings=SETTINGS, users=USERS, 
                            ket_qua=str_ket_qua, dien_tich=str_dien_tich, 
                            du_lieu_nhap=du_lieu_nhap, active_tab='calc', lich_su=lich_su_data,
-                           msg_update="✅ Tính toán và lưu thành công!")
-
+                           msg_update="✅ Tính toán thành công!")
 # --- ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
