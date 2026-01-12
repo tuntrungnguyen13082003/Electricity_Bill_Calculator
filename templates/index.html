@@ -144,17 +144,17 @@
                     <label class="fw-bold text-primary mb-2" style="display: block; margin-bottom: 10px;">Bạn muốn nhập liệu theo:</label>
 
                     <div style="display: flex; align-items: center; gap: 40px; margin-bottom: 20px;">
-                        
                         <label style="display: flex; align-items: center; cursor: pointer; gap: 8px; margin: 0;">
-                            <input type="radio" name="kieu_nhap" value="tien" checked onclick="toggleUnit(this)" style="width: 20px; height: 20px; margin: 0; cursor: pointer;"> 
+                            <input type="radio" name="kieu_nhap" value="tien" id="radio_tien" onclick="toggleUnit(this)" style="width: 20px; height: 20px; margin: 0; cursor: pointer;"
+                            {% if du_lieu_nhap.get('kieu_nhap') == 'tien' or not du_lieu_nhap.get('kieu_nhap') %} checked {% endif %}> 
                             <span style="font-weight: 500;">💰 Số tiền (VNĐ)</span>
                         </label>
                         
                         <label style="display: flex; align-items: center; cursor: pointer; gap: 8px; margin: 0;">
-                            <input type="radio" name="kieu_nhap" value="dien" onclick="toggleUnit(this)" style="width: 20px; height: 20px; margin: 0; cursor: pointer;"> 
+                            <input type="radio" name="kieu_nhap" value="dien" id="radio_dien" onclick="toggleUnit(this)" style="width: 20px; height: 20px; margin: 0; cursor: pointer;"
+                            {% if du_lieu_nhap.get('kieu_nhap') == 'dien' %} checked {% endif %}> 
                             <span style="font-weight: 500;">⚡ Số điện (kWh)</span>
                         </label>
-
                     </div>
 
                     <div class="form-group mb-3">
@@ -162,7 +162,8 @@
                         
                         <input type="text" id="gia_tri_input" class="form-control form-control-lg" name="gia_tri_nhap" 
                             placeholder="Ví dụ: 2.000.000" onkeyup="formatCurrency(this)" 
-                            style="width: 100%; padding: 10px; font-size: 16px;">
+                            style="width: 100%; padding: 10px; font-size: 16px;"
+                            value="{{ du_lieu_nhap.get('gia_tri_nhap', '') }}">
                     </div>
                 </div>
 
