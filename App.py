@@ -207,7 +207,6 @@ def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_form, gio_nang_tin
     
     return [0, 0]
 
-
 # --- ROUTE MỚI: XỬ LÝ TÍNH TOÁN TỪ GIAO DIỆN MỚI ---
 @app.route('/tinh_toan', methods=['POST'])
 def xu_ly_tinh_toan():
@@ -219,7 +218,6 @@ def xu_ly_tinh_toan():
     loai_hinh = 'can_ho' if loai_hinh_raw == 'ho_gia_dinh' else loai_hinh_raw
     
     # Cấu hình giả lập (Hoặc bạn lấy từ Database/Config của bạn)
-    # LƯU Ý: Đảm bảo biến settings này có dữ liệu giống code cũ của bạn
     current_settings = {
         'evn_bac': [1806, 1866, 2167, 2729, 3050, 3151], # Giá điện bậc thang
         'gia_kinh_doanh': 2666,
@@ -227,12 +225,11 @@ def xu_ly_tinh_toan():
         'he_so_nhom': {'kd_min': 0.8, 'kd_max': 0.9, 'sx_min': 0.7, 'sx_max': 0.8}
     }
     
-    # Giả sử số giờ nắng (Bạn có thể thay bằng hàm lấy theo tỉnh nếu có)
     gio_nang = 4.0 
-    he_so_form = 0.5 # Mặc định
+    he_so_form = 0.5 
 
     # ======================================================
-    # 2. XỬ LÝ LOGIC INPUT (PHẦN QUAN TRỌNG NHẤT)
+    # 2. XỬ LÝ LOGIC INPUT (ĐÃ SỬA LỖI DẤU CHẤM)
     # ======================================================
     gia_tri_final = 0
     che_do_nhap_final = ''
@@ -240,16 +237,18 @@ def xu_ly_tinh_toan():
     if loai_hinh in ['kinh_doanh', 'san_xuat']:
         # --- LOGIC MỚI: CỘNG 3 CHỈ SỐ ĐIỆN ---
         try:
-            # Lấy 3 số điện, nếu bỏ trống thì tính là 0
-            k_bt = float(request.form.get('kwh_bt') or 0)
-            k_cd = float(request.form.get('kwh_cd') or 0)
-            k_td = float(request.form.get('kwh_td') or 0)
+            # Lấy 3 số điện, xóa dấu chấm nếu có
+            def lay_so_safe(key):
+                raw = request.form.get(key, '0')
+                return float(str(raw).replace('.', '').replace(',', ''))
+
+            k_bt = lay_so_safe('kwh_bt')
+            k_cd = lay_so_safe('kwh_cd')
+            k_td = lay_so_safe('kwh_td')
             
             # Cộng lại thành tổng kWh
             tong_kwh = k_bt + k_cd + k_td
             
-            # MẸO: Gán tổng này vào giá trị nhập và báo cho hàm tính là "đây là số kWh"
-            # Hàm cũ sẽ lấy số này chia cho tiền nữa mà dùng trực tiếp luôn.
             gia_tri_final = tong_kwh
             che_do_nhap_final = 'theo_kwh' 
             
@@ -257,55 +256,52 @@ def xu_ly_tinh_toan():
             return "Lỗi: Vui lòng nhập số điện đúng định dạng!"
             
     else:
-        # --- LOGIC CŨ: HỘ GIA ĐÌNH (GIỮ NGUYÊN) ---
+        # --- LOGIC HỘ GIA ĐÌNH (ĐÃ SỬA LỖI 500) ---
         kieu_nhap = request.form.get('kieu_nhap') # 'tien' hoặc 'dien'
-        val_nhap = float(request.form.get('gia_tri_nhap') or 0)
+        
+        # [QUAN TRỌNG] Lấy chuỗi thô -> Xóa dấu chấm -> Mới ép kiểu float
+        raw_val = request.form.get('gia_tri_nhap', '0')
+        clean_val = str(raw_val).replace('.', '').replace(',', '')
+        
+        try:
+            val_nhap = float(clean_val)
+        except ValueError:
+            val_nhap = 0
         
         gia_tri_final = val_nhap
-        # Nếu user chọn nhập theo điện -> theo_kwh, nhập tiền -> theo_tien
         che_do_nhap_final = 'theo_kwh' if kieu_nhap == 'dien' else 'theo_tien'
 
     # ======================================================
-    # 3. GỌI HÀM TÍNH TOÁN CŨ CỦA BẠN (Không sửa gì cả)
+    # 3. GỌI HÀM TÍNH TOÁN CŨ
     # ======================================================
-    # Hàm này sẽ trả về [min, max]
     ket_qua_kwp = tinh_toan_kwp(
         loai_hinh=loai_hinh,
         gia_tri_nhap=gia_tri_final,
-        che_do_nhap=che_do_nhap_final, # Đã được xử lý ở bước 2
+        che_do_nhap=che_do_nhap_final,
         he_so_form=he_so_form,
         gio_nang_tinh=gio_nang,
         settings=current_settings
     )
 
     # ======================================================
-    # 4. XỬ LÝ VẼ BIỂU ĐỒ (THEO YÊU CẦU MỚI)
+    # 4. XỬ LÝ VẼ BIỂU ĐỒ
     # ======================================================
     chart_data = None
-    co_ve_bieu_do = request.form.get('co_ve_bieu_do') # Lấy giá trị checkbox
+    co_ve_bieu_do = request.form.get('co_ve_bieu_do') 
     
-    # Chỉ vẽ khi User tick chọn VÀ không phải hộ gia đình
     if co_ve_bieu_do == 'yes' and loai_hinh != 'can_ho':
-        # Lấy lại dữ liệu để vẽ (nếu cần truyền vào hàm vẽ)
-        k_bt = float(request.form.get('kwh_bt') or 0)
-        k_cd = float(request.form.get('kwh_cd') or 0)
-        k_td = float(request.form.get('kwh_td') or 0)
-        
-        # Tạm thời gán biến này để báo cho HTML biết là cần hiện biểu đồ
-        # Bạn có thể gọi hàm vẽ biểu đồ thật của bạn ở đây
+        # Lấy lại dữ liệu để truyền xuống (nếu cần hiển thị lại)
         chart_data = {
-            'kwh_bt': k_bt,
-            'kwh_cd': k_cd,
-            'kwh_td': k_td,
             'message': 'Đã kích hoạt vẽ biểu đồ'
         }
 
-    # 5. TRẢ VỀ KẾT QUẢ RA GIAO DIỆN
+    # 5. TRẢ VỀ KẾT QUẢ
     return render_template('ket_qua.html', 
                            kwp_min=ket_qua_kwp[0], 
                            kwp_max=ket_qua_kwp[1],
-                           chart_data=chart_data, # Truyền biến này để HTML biết có vẽ hay không
+                           chart_data=chart_data,
                            loai_hinh=loai_hinh)
+
 # --- ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
