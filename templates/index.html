@@ -114,245 +114,171 @@
         <div id="calc" class="tab-content {{ 'active' if active_tab == 'calc' else '' }}">
             <h2 style="color: var(--secondary); margin-top: 0; text-align: center; margin-bottom: 20px;">Tính Toán & Phân Tích</h2>
             
-            <div class="history-container" style="height: auto; min-height: 600px;">
-                <div class="history-sidebar" style="width: 220px;">
-                    <button class="v-tab-btn active" onclick="openSubTab('sub_du_toan', this)">⚡ Dự Toán Công Suất</button>
-                    <button id="btn_tab_bieu_do" class="v-tab-btn" onclick="openSubTab('sub_bieu_do', this)">📊 Biểu Đồ Phụ Tải</button>
+            <form action="/tinh_toan" method="POST" enctype="multipart/form-data" id="main_form">
+
+                <div class="card mb-3" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <div class="form-group mb-3">
+                        <label>Tên Khách Hàng:</label>
+                        <input type="text" class="form-control" name="ten_kh" placeholder="Nhập tên khách hàng...">
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label>Khu vực lắp đặt:</label>
+                        <select class="form-select" name="khu_vuc">
+                            <option value="An Giang">An Giang</option>
+                            </select>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label>Mô hình lắp đặt:</label>
+                        <select class="form-select" name="loai_hinh" id="loai_hinh_lap_dat" onchange="toggleInputMode()">
+                            <option value="ho_gia_dinh">🏡 Hộ gia đình</option>
+                            <option value="kinh_doanh">🏢 Kinh doanh</option>
+                            <option value="san_xuat">🏭 Sản xuất</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="history-main-area" style="padding: 20px; overflow-y: auto;">
+                <div id="khung_nhap_don_gian" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <label class="fw-bold text-primary">Nhập liệu đơn giản:</label>
+                    <div class="mb-2">
+                        <input type="radio" name="kieu_nhap" value="tien" checked onclick="toggleUnit(this)"> Số tiền (VNĐ)
+                        <input type="radio" name="kieu_nhap" value="dien" onclick="toggleUnit(this)" style="margin-left: 15px;"> Số điện (kWh)
+                    </div>
+                    <div class="form-group mb-3">
+                        <label id="input-label">Giá trị (VNĐ/Month):</label>
+                        <input type="text" id="gia_tri_input" class="form-control" name="gia_tri_nhap" placeholder="Ví dụ: 2.000.000" onkeyup="formatCurrency(this)">
+                    </div>
+                </div>
+
+                <div id="khung_nhap_chi_tiet" style="display: none; border: 2px dashed #27ae60; padding: 20px; border-radius: 8px; background: #f9fff9; margin-bottom: 20px;">
                     
-                    <div id="sub_du_toan" class="v-tab-content active">
-                        <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Dự toán theo hóa đơn</h3>
-                        <form action="/tinh_toan" method="POST" enctype="multipart/form-data" id="main_form">
-    
-                            <div class="form-group mb-3">
-                                <label>Tên Khách Hàng:</label>
-                                <input type="text" class="form-control" name="ten_kh" placeholder="Nhập tên khách hàng...">
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label>Khu vực lắp đặt:</label>
-                                <select class="form-select" name="khu_vuc">
-                                    <option value="An Giang">An Giang</option>
-                                    </select>
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label>Mô hình lắp đặt:</label>
-                                <select class="form-select" name="loai_hinh" id="loai_hinh_lap_dat" onchange="toggleInputMode()">
-                                    <option value="ho_gia_dinh">🏡 Hộ gia đình</option>
-                                    <option value="kinh_doanh">🏢 Kinh doanh</option>
-                                    <option value="san_xuat">🏭 Sản xuất</option>
-                                </select>
-                            </div>
-
-                            <div id="khung_nhap_don_gian">
-                                <label>Nhập liệu theo:</label>
-                                <div class="mb-2">
-                                    <input type="radio" name="kieu_nhap" value="tien" checked> Số tiền
-                                    <input type="radio" name="kieu_nhap" value="dien"> Số điện
-                                </div>
-                                <div class="form-group mb-3">
-                                    <label>Giá trị (VNĐ hoặc kWh):</label>
-                                    <input type="number" class="form-control" name="gia_tri_nhap" placeholder="Ví dụ: 2000000">
-                                </div>
-                            </div>
-
-                            <div id="khung_nhap_chi_tiet" style="display: none; border: 1px dashed #28a745; padding: 15px; border-radius: 8px; background: #f9fff9;">
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-success m-0"><i class="fas fa-bolt"></i> Chi tiết điện năng 3 khung giờ</h6>
-                                    <label class="btn btn-sm btn-outline-success">
-                                        <i class="fas fa-camera"></i> Nhập nhanh bằng AI
-                                        <input type="file" hidden onchange="uploadVaQuetAnh(this)" accept="image/*">
-                                        <span id="btn_scan_trigger" style="display:none"></span> </label>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label>Bình thường (kWh):</label>
-                                        <input type="number" class="form-control" name="kwh_bt" placeholder="0">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="text-danger">Cao điểm (kWh):</label>
-                                        <input type="number" class="form-control" name="kwh_cd" placeholder="0">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="text-success">Thấp điểm (kWh):</label>
-                                        <input type="number" class="form-control" name="kwh_td" placeholder="0">
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label>Từ ngày:</label>
-                                        <input type="date" class="form-control" name="ngay_dau">
-                                    </div>
-                                    <div class="col-6">
-                                        <label>Đến ngày:</label>
-                                        <input type="date" class="form-control" name="ngay_cuoi">
-                                    </div>
-                                </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label>Giờ làm việc (Từ):</label>
-                                        <input type="time" class="form-control" name="gio_lam_viec_tu" value="08:00">
-                                    </div>
-                                    <div class="col-6">
-                                        <label>Giờ làm việc (Đến):</label>
-                                        <input type="time" class="form-control" name="gio_lam_viec_den" value="17:00">
-                                    </div>
-                                </div>
-
-                                <div class="form-check form-switch mt-3">
-                                    <input class="form-check-input" type="checkbox" id="checkVeBieuDo" name="co_ve_bieu_do" value="yes">
-                                    <label class="form-check-label fw-bold text-primary" for="checkVeBieuDo">
-                                        Có vẽ biểu đồ phụ tải và phân tích chi tiết không?
-                                    </label>
-                                </div>
-                            </div>
-
-                            <hr>
-                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold text-uppercase">
-                                <i class="fas fa-calculator"></i> TÍNH TOÁN CÔNG SUẤT & BÁO GIÁ
-                            </button>
-                        </form>
-                        {% if ket_qua is not none and not du_lieu_nhap.get('chart_data') %}
-                        <div class="result-box">
-                            <div>Công suất đề xuất:</div>
-                            <h1 style="color: var(--secondary); margin: 5px 0; font-size: 36px;">{{ ket_qua }} kWp</h1>
-                            <div style="margin-top: 15px; border-top: 1px solid #ddd; padding-top:10px">Diện tích mái: <strong style="color:#e67e22">{{ dien_tich }} m²</strong></div>
-                        </div>
-                        {% endif %}
+                    <div class="d-flex justify-content-between align-items-center mb-3" style="display: flex; justify-content: space-between;">
+                        <h3 class="text-success m-0" style="color:#27ae60; margin:0"><i class="fas fa-bolt"></i> Chi tiết phụ tải</h3>
+                        <label class="btn btn-sm btn-outline-success" style="cursor: pointer; background: #27ae60; color: white; padding: 5px 10px; border-radius: 4px;">
+                            📸 Quét Hóa Đơn AI
+                            <input type="file" hidden onchange="uploadVaQuetAnh(this)" accept="image/*">
+                            <span id="btn_scan_trigger" style="display:none"></span>
+                        </label>
                     </div>
 
-                    <div id="sub_bieu_do" class="v-tab-content">
-                        <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Biểu đồ phụ tải</h3>
-                        
-                        <form method="POST">
-                            <div style="background: #e8f8f5; padding: 10px; border: 1px dashed #16a085; border-radius: 5px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
-                                <div>
-                                    <strong style="color: #16a085;">📸 Nhập nhanh bằng AI</strong>
-                                    <div style="font-size: 12px; color: #666;">Chụp hóa đơn hoặc bảng kê EVN</div>
-                                </div>
-                                <div>
-                                    <input type="file" id="inp_scan_img" accept="image/*" style="display: none;" onchange="uploadVaQuetAnh(this)">
-                                    <button type="button" onclick="document.getElementById('inp_scan_img').click()" id="btn_scan_trigger" style="background: #16a085; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                                        Tải ảnh lên
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                                <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}" required></div>
-                                <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}" required></div>
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                                <div><label style="color:#2980b9">Bình thường (kWh):</label><input type="number" name="kwh_bt" class="form-control" value="{{ du_lieu_nhap.get('kwh_bt', '') }}" required></div>
-                                <div><label style="color:#c0392b">Cao điểm (kWh):</label><input type="number" name="kwh_cd" class="form-control" value="{{ du_lieu_nhap.get('kwh_cd', '') }}" required></div>
-                                <div><label style="color:#27ae60">Thấp điểm (kWh):</label><input type="number" name="kwh_td" class="form-control" value="{{ du_lieu_nhap.get('kwh_td', '') }}" required></div>
-                            </div>
-                            
-                            <div style="margin-top: 10px;">
-                                <label>Chọn ngày nghỉ trong tuần:</label>
-                                <div id="list1" class="dropdown-check-list" tabindex="100">
-                                    <span class="anchor" onclick="toggleDropdown()">🔻 Bấm để chọn ngày nghỉ...</span>
-                                    <ul class="items">
-                                        {% set selected_days = du_lieu_nhap.get('list_ngay_nghi', [6]) %}
-                                        <li><input type="checkbox" name="ngay_nghi" value="0" {{ 'checked' if 0 in selected_days else '' }}/> Thứ 2 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="1" {{ 'checked' if 1 in selected_days else '' }}/> Thứ 3 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="2" {{ 'checked' if 2 in selected_days else '' }}/> Thứ 4 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="3" {{ 'checked' if 3 in selected_days else '' }}/> Thứ 5 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="4" {{ 'checked' if 4 in selected_days else '' }}/> Thứ 6 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="5" {{ 'checked' if 5 in selected_days else '' }}/> Thứ 7 </li>
-                                        <li><input type="checkbox" name="ngay_nghi" value="6" {{ 'checked' if 6 in selected_days else '' }}/> Chủ Nhật </li>
-                                    </ul>
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                                <div><label>Giờ làm việc (Từ):</label><input type="time" name="gio_lam_tu" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_tu', '08:00') }}"></div>
-                                <div><label>Giờ làm việc (Đến):</label><input type="time" name="gio_lam_den" class="form-control" value="{{ du_lieu_nhap.get('gio_lam_den', '17:00') }}"></div>
-                            </div>
-                            <button type="submit" name="btn_calc_load" class="btn-calc" style="background: #8e44ad; margin-top: 20px;">VẼ BIỂU ĐỒ</button>
-                        </form>
-
-                        {% if du_lieu_nhap.get('chart_data') %}
-                        
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #e9ecef;">
-                            <div style="display: flex; justify-content: space-around; text-align: center;">
-                                <div>
-                                    <div class="small-label">Tổng ngày</div>
-                                    <div class="big-num">{{ du_lieu_nhap.chart_data.stats.total }}</div>
-                                </div>
-                                <div>
-                                    <div class="small-label" style="color:#27ae60">Ngày làm việc</div>
-                                    <div class="big-num" style="color:#27ae60">{{ du_lieu_nhap.chart_data.stats.work }}</div>
-                                </div>
-                                <div>
-                                    <div class="small-label" style="color:#e74c3c">Ngày nghỉ</div>
-                                    <div class="big-num" style="color:#e74c3c">{{ du_lieu_nhap.chart_data.stats.off }}</div>
-                                </div>
-                            </div>
+                    <div class="row mb-3" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="color:#2980b9">Bình thường (kWh):</label>
+                            <input type="number" class="form-control" name="kwh_bt" placeholder="0">
                         </div>
-
-                        <div style="display: flex; gap: 10px; margin-top: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; overflow-x: auto;">
-                            <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">🏭 Ngày Làm Việc</button>
-                            <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">☕ Ngày Nghỉ</button>
+                        <div>
+                            <label class="text-danger" style="color:#c0392b">Cao điểm (kWh):</label>
+                            <input type="number" class="form-control" name="kwh_cd" placeholder="0">
                         </div>
-
-                        <div style="margin-top: 20px;">
-                            <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
-                                <canvas id="chart_work"></canvas>
-                            </div>
-
-                            <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
-                                <canvas id="chart_off"></canvas>
-                            </div>
+                        <div>
+                            <label class="text-success" style="color:#27ae60">Thấp điểm (kWh):</label>
+                            <input type="number" class="form-control" name="kwh_td" placeholder="0">
                         </div>
-
-                        <style>
-                            .chart-tab-btn { padding: 10px 20px; border: none; background: #ecf0f1; cursor: pointer; border-radius: 5px; font-weight: bold; color: #555; white-space: nowrap; }
-                            .chart-tab-btn.active { background: #3498db; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-                            .chart-tab-btn:hover:not(.active) { background: #bdc3c7; }
-                        </style>
-
-                        <div style="margin-top: 20px;">
-                            <div id="wrapper_chart_weekday" class="chart-wrapper active" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
-                                <canvas id="chart_weekday"></canvas>
-                            </div>
-
-                            {% if du_lieu_nhap.chart_data.stats.sun_work_count > 0 %}
-                            <div id="wrapper_chart_sunday" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
-                                <canvas id="chart_sunday"></canvas>
-                            </div>
-                            {% endif %}
-
-                            {% if du_lieu_nhap.chart_data.stats.off_weekday_count > 0 %}
-                            <div id="wrapper_chart_off_wd" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
-                                <canvas id="chart_off_wd"></canvas>
-                            </div>
-                            {% endif %}
-
-                            {% if du_lieu_nhap.chart_data.stats.off_sunday_count > 0 %}
-                            <div id="wrapper_chart_off_sun" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
-                                <canvas id="chart_off_sun"></canvas>
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <style>
-                            .chart-tab-btn { padding: 10px 20px; border: none; background: #ecf0f1; cursor: pointer; border-radius: 5px; font-weight: bold; color: #555; white-space: nowrap; }
-                            .chart-tab-btn.active { background: #3498db; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-                            .chart-tab-btn:hover:not(.active) { background: #bdc3c7; }
-                        </style>
-                        {% endif %}
                     </div>
 
+                    <div class="row mb-3" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                        <div>
+                            <label>Từ ngày:</label>
+                            <input type="date" class="form-control" name="ngay_dau" value="{{ du_lieu_nhap.get('ngay_dau', '') }}">
+                        </div>
+                        <div>
+                            <label>Đến ngày:</label>
+                            <input type="date" class="form-control" name="ngay_cuoi" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}">
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 10px;">
+                        <label>Chọn ngày nghỉ trong tuần:</label>
+                        <div id="list1" class="dropdown-check-list" tabindex="100">
+                            <span class="anchor" onclick="toggleDropdown()">🔻 Bấm để chọn ngày nghỉ...</span>
+                            <ul class="items">
+                                {% set selected_days = du_lieu_nhap.get('list_ngay_nghi', [6]) %}
+                                <li><input type="checkbox" name="ngay_nghi" value="0" {{ 'checked' if 0 in selected_days else '' }}/> Thứ 2 </li>
+                                <li><input type="checkbox" name="ngay_nghi" value="1" {{ 'checked' if 1 in selected_days else '' }}/> Thứ 3 </li>
+                                <li><input type="checkbox" name="ngay_nghi" value="2" {{ 'checked' if 2 in selected_days else '' }}/> Thứ 4 </li>
+                                <li><input type="checkbox" name="ngay_nghi" value="3" {{ 'checked' if 3 in selected_days else '' }}/> Thứ 5 </li>
+                                <li><input type="checkbox" name="ngay_nghi" value="4" {{ 'checked' if 4 in selected_days else '' }}/> Thứ 6 </li>
+                                <li><input type="checkbox" name="ngay_nghi" value="5" {{ 'checked' if 5 in selected_days else '' }}/> Thứ 7 </li>
+                                <li><input type="checkbox" name="ngay_nghi" value="6" {{ 'checked' if 6 in selected_days else '' }}/> Chủ Nhật </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                        <div>
+                            <label>Giờ làm việc (Từ):</label>
+                            <input type="time" class="form-control" name="gio_lam_viec_tu" value="08:00">
+                        </div>
+                        <div>
+                            <label>Giờ làm việc (Đến):</label>
+                            <input type="time" class="form-control" name="gio_lam_viec_den" value="17:00">
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mt-3" style="margin-top: 20px; background: #e8f8f5; padding: 10px; border-radius: 5px;">
+                        <input class="form-check-input" type="checkbox" id="checkVeBieuDo" name="co_ve_bieu_do" value="yes" style="margin-right: 10px;">
+                        <label class="form-check-label fw-bold text-primary" for="checkVeBieuDo" style="font-weight: bold; color: #16a085; display: inline;">
+                            Có phân tích và vẽ biểu đồ phụ tải không?
+                        </label>
+                    </div>
+                </div>
+
+                <hr>
+                <button type="submit" class="btn btn-success w-100 py-2 fw-bold text-uppercase" style="width: 100%; padding: 15px; background: #27ae60; color: white; font-weight: bold; font-size: 18px; border: none; border-radius: 5px; cursor: pointer;">
+                    TÍNH TOÁN CÔNG SUẤT & BÁO GIÁ
+                </button>
+            </form>
+
+            {% if ket_qua is not none %}
+            <div class="result-box">
+                <div>Công suất đề xuất:</div>
+                <h1 style="color: var(--secondary); margin: 5px 0; font-size: 36px;">{{ ket_qua }} kWp</h1>
+                {% if dien_tich %}<div style="margin-top: 15px; border-top: 1px solid #ddd; padding-top:10px">Diện tích mái: <strong style="color:#e67e22">{{ dien_tich }} m²</strong></div>{% endif %}
+            </div>
+            {% endif %}
+
+            {% if du_lieu_nhap.get('chart_data') %}
+            <div id="chart_section" style="margin-top: 30px; border-top: 3px solid #27ae60; padding-top: 20px;">
+                <h3 style="text-align: center; color: #2c3e50;">📊 Phân Tích Biểu Đồ Phụ Tải</h3>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #e9ecef;">
+                    <div style="display: flex; justify-content: space-around; text-align: center;">
+                        <div>
+                            <div class="small-label">Tổng ngày</div>
+                            <div class="big-num">{{ du_lieu_nhap.chart_data.stats.total }}</div>
+                        </div>
+                        <div>
+                            <div class="small-label" style="color:#27ae60">Ngày làm việc</div>
+                            <div class="big-num" style="color:#27ae60">{{ du_lieu_nhap.chart_data.stats.work }}</div>
+                        </div>
+                        <div>
+                            <div class="small-label" style="color:#e74c3c">Ngày nghỉ</div>
+                            <div class="big-num" style="color:#e74c3c">{{ du_lieu_nhap.chart_data.stats.off }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; overflow-x: auto;">
+                    <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">🏭 Ngày Làm Việc</button>
+                    <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">☕ Ngày Nghỉ</button>
+                    <button class="chart-tab-btn" onclick="switchChartTab('chart_weekday', this)">📅 Tuần Điển Hình</button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
+                        <canvas id="chart_work"></canvas>
+                    </div>
+                    <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
+                        <canvas id="chart_off"></canvas>
+                    </div>
+                    <div id="wrapper_chart_weekday" class="chart-wrapper" style="height: 400px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; display: none;">
+                        <canvas id="chart_weekday"></canvas>
+                    </div>
                 </div>
             </div>
+            {% endif %}
+
         </div>
 
         {% if role == 'admin' %}
@@ -662,12 +588,13 @@
             const khungChiTiet = document.getElementById('khung_nhap_chi_tiet');
 
             if (loaiHinh === 'kinh_doanh' || loaiHinh === 'san_xuat') {
-                // Nếu là KD/SX: Ẩn cái đơn giản, Hiện cái chi tiết
+                // Nếu là KD/SX: Ẩn đơn giản, Hiện chi tiết
                 khungDonGian.style.display = 'none';
                 khungChiTiet.style.display = 'block';
                 
-                // Xóa giá trị ở khung đơn giản để tránh Backend hiểu lầm (Optional)
-                document.querySelector('input[name="gia_tri_nhap"]').value = ''; 
+                // Xóa giá trị ở khung đơn giản
+                var simpleInput = document.getElementById('gia_tri_input');
+                if(simpleInput) simpleInput.value = ''; 
             } else {
                 // Nếu là Hộ gia đình: Hiện đơn giản, Ẩn chi tiết
                 khungDonGian.style.display = 'block';
@@ -675,9 +602,13 @@
             }
         }
 
-        // Gọi 1 lần khi trang vừa tải xong để set đúng trạng thái ban đầu
+        // Gọi 1 lần khi trang vừa tải xong
         window.onload = function() {
             toggleInputMode();
+            // Nếu có biểu đồ thì scroll xuống biểu đồ
+            if (document.getElementById('chart_section')) {
+                document.getElementById('chart_section').scrollIntoView({behavior: "smooth"});
+            }
         };
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
