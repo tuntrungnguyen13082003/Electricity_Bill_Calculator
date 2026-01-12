@@ -531,6 +531,20 @@
                 });
             }
         }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            capNhatGiaoDien();
+            
+            // Nếu đang ở tab Hộ Gia Đình, cập nhật luôn cả phần nhập Tiền/Số điện
+            if(document.getElementById('loai_hinh').value === 'can_ho') {
+                capNhatGiaoDien(); // Gọi lại lần nữa cho chắc chắn
+            }
+            
+            // Khởi tạo biểu đồ (nếu có dữ liệu)
+            if(typeof initAllCharts === 'function') {
+                initAllCharts();
+            }
+        });
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
