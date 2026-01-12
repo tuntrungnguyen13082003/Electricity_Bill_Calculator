@@ -32,7 +32,9 @@ def ai_doc_hoa_don(image_path):
     # 1. Chuẩn bị dữ liệu gửi đi
     try:
         base64_image = encode_image(image_path)
-        
+        mime_type = "image/jpeg"
+        if image_path.lower().endswith('.pdf'):
+            mime_type = "application/pdf"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
         
         headers = {'Content-Type': 'application/json'}
@@ -58,8 +60,8 @@ def ai_doc_hoa_don(image_path):
                     """},
                     {
                         "inline_data": {
-                            "mime_type": "image/jpeg",
-                            "data": base64_image
+                            "mime_type": mime_type,
+                            "data": base64_data
                         }
                     }
                 ]
