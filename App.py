@@ -81,8 +81,10 @@ def ai_doc_hoa_don(image_path):
             # Lấy nội dung văn bản AI trả lời
             text_response = result['candidates'][0]['content']['parts'][0]['text']
             
-            print("AI Trả lời:", text_response)
-            
+            print("--- KẾT QUẢ THÔ TỪ AI ---")
+            print(text_response)
+            print("-------------------------")
+
             # Dùng Regex để bắt lấy đoạn JSON
             match = re.search(r'\{.*\}', text_response, re.DOTALL)
             if match:
