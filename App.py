@@ -211,69 +211,56 @@ def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_form, gio_nang_tin
 @app.route('/tinh_toan', methods=['POST'])
 def xu_ly_tinh_toan():
     # 1. LẤY CÁC THÔNG SỐ CƠ BẢN TỪ FORM
-    loai_hinh_raw = request.form.get('loai_hinh') # ho_gia_dinh, kinh_doanh, san_xuat
+    loai_hinh_raw = request.form.get('loai_hinh') 
     khu_vuc = request.form.get('khu_vuc')
     
-    # Map lại tên 'ho_gia_dinh' thành 'can_ho' để khớp với hàm tính cũ của bạn
+    # Map lại tên
     loai_hinh = 'can_ho' if loai_hinh_raw == 'ho_gia_dinh' else loai_hinh_raw
     
-    # Cấu hình giả lập (Hoặc bạn lấy từ Database/Config của bạn)
+    # Settings (giả lập)
     current_settings = {
-        'evn_bac': [1806, 1866, 2167, 2729, 3050, 3151], # Giá điện bậc thang
+        'evn_bac': [1806, 1866, 2167, 2729, 3050, 3151],
         'gia_kinh_doanh': 2666,
         'gia_san_xuat': 1600,
         'he_so_nhom': {'kd_min': 0.8, 'kd_max': 0.9, 'sx_min': 0.7, 'sx_max': 0.8}
     }
-    
     gio_nang = 4.0 
     he_so_form = 0.5 
 
-    # ======================================================
-    # 2. XỬ LÝ LOGIC INPUT (ĐÃ SỬA LỖI DẤU CHẤM)
-    # ======================================================
+    # --- HÀM HỖ TRỢ: LẤY SỐ AN TOÀN (Xóa dấu chấm, phẩy) ---
+    def lay_so_safe(key_name):
+        raw = request.form.get(key_name, '0')
+        if not raw: return 0.0
+        # Xóa dấu chấm (ngàn) và thay dấu phẩy thành chấm (thập phân - nếu có)
+        clean = str(raw).replace('.', '').replace(',', '')
+        try:
+            return float(clean)
+        except ValueError:
+            return 0.0
+
+    # 2. XỬ LÝ LOGIC INPUT
     gia_tri_final = 0
     che_do_nhap_final = ''
 
     if loai_hinh in ['kinh_doanh', 'san_xuat']:
-        # --- LOGIC MỚI: CỘNG 3 CHỈ SỐ ĐIỆN ---
-        try:
-            # Lấy 3 số điện, xóa dấu chấm nếu có
-            def lay_so_safe(key):
-                raw = request.form.get(key, '0')
-                return float(str(raw).replace('.', '').replace(',', ''))
-
-            k_bt = lay_so_safe('kwh_bt')
-            k_cd = lay_so_safe('kwh_cd')
-            k_td = lay_so_safe('kwh_td')
-            
-            # Cộng lại thành tổng kWh
-            tong_kwh = k_bt + k_cd + k_td
-            
-            gia_tri_final = tong_kwh
-            che_do_nhap_final = 'theo_kwh' 
-            
-        except ValueError:
-            return "Lỗi: Vui lòng nhập số điện đúng định dạng!"
+        # --- TRƯỜNG HỢP KD/SX: CỘNG 3 CHỈ SỐ ---
+        k_bt = lay_so_safe('kwh_bt')
+        k_cd = lay_so_safe('kwh_cd')
+        k_td = lay_so_safe('kwh_td')
+        
+        tong_kwh = k_bt + k_cd + k_td
+        gia_tri_final = tong_kwh
+        che_do_nhap_final = 'theo_kwh'
             
     else:
-        # --- LOGIC HỘ GIA ĐÌNH (ĐÃ SỬA LỖI 500) ---
+        # --- TRƯỜNG HỢP HỘ GIA ĐÌNH ---
         kieu_nhap = request.form.get('kieu_nhap') # 'tien' hoặc 'dien'
-        
-        # [QUAN TRỌNG] Lấy chuỗi thô -> Xóa dấu chấm -> Mới ép kiểu float
-        raw_val = request.form.get('gia_tri_nhap', '0')
-        clean_val = str(raw_val).replace('.', '').replace(',', '')
-        
-        try:
-            val_nhap = float(clean_val)
-        except ValueError:
-            val_nhap = 0
+        val_nhap = lay_so_safe('gia_tri_nhap') # <--- Dùng hàm an toàn ở đây
         
         gia_tri_final = val_nhap
         che_do_nhap_final = 'theo_kwh' if kieu_nhap == 'dien' else 'theo_tien'
 
-    # ======================================================
-    # 3. GỌI HÀM TÍNH TOÁN CŨ
-    # ======================================================
+    # 3. GỌI HÀM TÍNH TOÁN
     ket_qua_kwp = tinh_toan_kwp(
         loai_hinh=loai_hinh,
         gia_tri_nhap=gia_tri_final,
@@ -283,14 +270,11 @@ def xu_ly_tinh_toan():
         settings=current_settings
     )
 
-    # ======================================================
     # 4. XỬ LÝ VẼ BIỂU ĐỒ
-    # ======================================================
     chart_data = None
     co_ve_bieu_do = request.form.get('co_ve_bieu_do') 
     
     if co_ve_bieu_do == 'yes' and loai_hinh != 'can_ho':
-        # Lấy lại dữ liệu để truyền xuống (nếu cần hiển thị lại)
         chart_data = {
             'message': 'Đã kích hoạt vẽ biểu đồ'
         }
