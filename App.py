@@ -297,12 +297,26 @@ def home():
         # 5. XỬ LÝ TÍNH TOÁN HỢP NHẤT (GỘP BIỂU ĐỒ VÀ DỰ TOÁN) 
         elif 'btn_calc' in request.form:
             try:
-                # A. THÔNG TIN CHUNG 
+                # A. THÔNG TIN CHUNG
                 ten_kh = request.form.get('ten_khach_hang', 'Khách vãng lai')
                 lh = request.form.get('loai_hinh')
                 tc = request.form.get('tinh_thanh_chon')
-                gn = SETTINGS['tinh_thanh'].get(tc, 4.0); gio_nang_da_dung = gn
+                gn = SETTINGS['tinh_thanh'].get(tc, 4.0)
+                gio_nang_da_dung = gn
                 he_so_dt = SETTINGS.get('dien_tich_kwp', 4.5)
+
+                # --- QUAN TRỌNG: Cập nhật ngay du_lieu_nhap để giữ dữ liệu trên form không bị reset ---
+                du_lieu_nhap.update({
+                    'ten_kh': ten_kh, 'loai_hinh': lh, 'tinh_chon': tc,
+                    'ngay_dau': request.form.get('ngay_dau'),
+                    'ngay_cuoi': request.form.get('ngay_cuoi'),
+                    'kwh_bt': request.form.get('kwh_bt'),
+                    'kwh_cd': request.form.get('kwh_cd'),
+                    'kwh_td': request.form.get('kwh_td'),
+                    'gio_lam_tu': request.form.get('gio_lam_tu'),
+                    'gio_lam_den': request.form.get('gio_lam_den'),
+                    'list_ngay_nghi': [int(x) for x in request.form.getlist('ngay_nghi')]
+                })
 
                 if lh == 'can_ho':
                     # --- NHÁNH HỘ GIA ĐÌNH --- 
@@ -312,24 +326,16 @@ def home():
                     hs = float(request.form.get('he_so_nhap') or 0.5)
                     ngu_canh = request.form.get('ngu_canh_chon')
                     
-                    du_lieu_nhap.update({'loai_hinh': lh, 'gia_tri': raw_gt, 'che_do': cd, 'he_so': hs, 'tinh_chon': tc, 'ten_kh': ten_kh, 'ngu_canh': ngu_canh})
+                    du_lieu_nhap.update({'gia_tri': raw_gt, 'che_do': cd, 'he_so': hs, 'ngu_canh': ngu_canh})
                     
                     kwp_list = tinh_toan_kwp(lh, gt, cd, hs, gn, SETTINGS)
                     kwp_min, kwp_max = kwp_list[0], kwp_list[1]
                 else:
                     # --- NHÁNH KINH DOANH / SẢN XUẤT --- 
-                    kwh_bt = float(request.form.get('kwh_bt') or 0)
-                    kwh_cd = float(request.form.get('kwh_cd') or 0)
-                    kwh_td = float(request.form.get('kwh_td') or 0)
+                    kwh_bt = float(du_lieu_nhap['kwh_bt'] or 0)
+                    kwh_cd = float(du_lieu_nhap['kwh_cd'] or 0)
+                    kwh_td = float(du_lieu_nhap['kwh_td'] or 0)
                     tong_kwh = kwh_bt + kwh_cd + kwh_td
-
-                    du_lieu_nhap.update({
-                        'loai_hinh': lh, 'tinh_chon': tc, 'ten_kh': ten_kh,
-                        'kwh_bt': kwh_bt, 'kwh_cd': kwh_cd, 'kwh_td': kwh_td,
-                        'ngay_dau': request.form.get('ngay_dau'), 'ngay_cuoi': request.form.get('ngay_cuoi'),
-                        'gio_lam_tu': request.form.get('gio_lam_tu'), 'gio_lam_den': request.form.get('gio_lam_den'),
-                        'list_ngay_nghi': [int(x) for x in request.form.getlist('ngay_nghi')]
-                    })
 
                     # Tính kWp theo dải hệ số trong cấu hình 
                     prefix = 'kd' if lh == 'kinh_doanh' else 'sx'
@@ -350,6 +356,7 @@ def home():
                             total_days = (end_date - start_date).days + 1
                             
                             if total_days > 0:
+                                # Logic tính toán các ngày nghỉ/làm việc
                                 count_days = {'total': total_days, 'week_work': 0, 'sun_work': 0, 'off_weekday': 0, 'off_sunday': 0}
                                 for i in range(total_days):
                                     curr = start_date + timedelta(days=i)
@@ -362,22 +369,20 @@ def home():
                                         else: count_days['week_work'] += 1
                                 
                                 p_base = (kwh_td / total_days) / 6 if kwh_td > 0 else 0
-                                # ... (Các biến phụ tải khác tính toán tương tự đoạn code #6 cũ của bạn) ...
                                 
-                                # Hàm tạo dataset cho biểu đồ
+                                # Hàm tạo dataset cho biểu đồ (Bạn hãy giữ logic phân bổ P_ADD của bạn tại đây)
                                 def create_profile(mode):
                                     res = {'td': [], 'bt_l': [], 'cd_l': [], 'bt_u': [], 'cd_u': []}
                                     for i in range(48):
-                                        # Giả lập công suất bar dựa trên p_base và phân bổ
-                                        res['td'].append(round(p_base, 2)); res['bt_l'].append(0); res['cd_l'].append(0)
+                                        res['td'].append(round(p_base, 2))
+                                        res['bt_l'].append(0); res['cd_l'].append(0)
                                         res['bt_u'].append(0); res['cd_u'].append(0)
                                     return res
 
                                 labels_48 = [f"{i//2}:{'30' if i%2!=0 else '00'}" for i in range(48)]
                                 du_lieu_nhap['chart_data'] = {
                                     'labels': labels_48,
-                                    'stats': {'total': total_days, 'work': count_days['week_work'] + count_days['sun_work'], 'off': count_days['off_weekday'] + count_days['off_sunday'],
-                                              'off_weekday_count': count_days['off_weekday'], 'off_sunday_count': count_days['off_sunday'], 'sun_work_count': count_days['sun_work']},
+                                    'stats': {'total': total_days, 'work': count_days['week_work'] + count_days['sun_work'], 'off': count_days['off_weekday'] + count_days['off_sunday']},
                                     'weekday_work': create_profile('week_work'), 'off_weekday': create_profile('off_weekday')
                                 }
 
@@ -389,11 +394,12 @@ def home():
                     ket_qua, dien_tich = f"{kwp_min} ➔ {kwp_max}", f"{round(kwp_min * he_so_dt, 1)} ➔ {round(kwp_max * he_so_dt, 1)}"
                     excel_res = f"{kwp_min}-{kwp_max} kWp (≈{round(kwp_min * he_so_dt, 1)}-{round(kwp_max * he_so_dt, 1)} m²)"
 
+                # C. LƯU LỊCH SỬ (GIỮ NGUYÊN)
                 try:
                     map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
                     ten_sheet = map_sheet.get(lh, 'Khác')
                     thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    new_row = pd.DataFrame([{"Tên Khách Hàng": ten_kh, "Thời Gian": thoi_gian, "Khu Vực": f"{tc} - {ten_sheet}", "Đầu Vào": "Dữ liệu gộp", "Kết Quả (kWp)": excel_res}])
+                    new_row = pd.DataFrame([{"Tên Khách Hàng": ten_kh, "Thời Gian": thoi_gian, "Khu Vực": f"{tc}", "Đầu Vào": "Dữ liệu chi tiết", "Kết Quả (kWp)": excel_res}])
                     all_sheets = pd.read_excel(history_path, sheet_name=None) if os.path.exists(history_path) else {}
                     if ten_sheet in all_sheets: all_sheets[ten_sheet] = pd.concat([all_sheets[ten_sheet], new_row], ignore_index=True)
                     else: all_sheets[ten_sheet] = new_row
@@ -403,7 +409,8 @@ def home():
 
                 active_tab = 'calc'
             except Exception as e:
-                msg_update = f"❌ Lỗi hệ thống: {str(e)}"
+                print(f"Lỗi hệ thống: {str(e)}")
+                msg_update = f"❌ Lỗi: {str(e)}"
 
     # --- 6. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
     lich_su_data = []
