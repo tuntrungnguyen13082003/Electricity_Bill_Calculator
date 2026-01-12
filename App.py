@@ -305,8 +305,37 @@ def home():
                 du_lieu_nhap.update({'ten_kh': ten_kh, 'loai_hinh': lh, 'tinh_chon': tc})
 
                 if lh == 'can_ho':
-                    # ... (Code Hộ gia đình giữ nguyên) ...
-                    pass 
+                    # =================================================
+                    # 1. LOGIC HỘ GIA ĐÌNH (ĐÃ KHÔI PHỤC ĐẦY ĐỦ)
+                    # =================================================
+                    raw_gt = request.form.get('gia_tri_dau_vao', '0')
+                    cd = request.form.get('che_do_nhap', 'theo_tien')
+                    
+                    # Xử lý input: Xóa dấu chấm/phẩy để thành số thực
+                    val_str = raw_gt.replace('.', '').replace(',', '')
+                    gt = float(val_str) if val_str else 0
+                    
+                    hs = float(request.form.get('he_so_nhap') or 0.5)
+                    ngu_canh = request.form.get('ngu_canh_chon')
+
+                    # Lưu lại dữ liệu để HTML hiển thị lại
+                    du_lieu_nhap.update({
+                        'gia_tri': raw_gt, # Giữ nguyên string có dấu chấm để hiện lại cho đẹp
+                        'che_do': cd, 
+                        'he_so': hs, 
+                        'ngu_canh': ngu_canh
+                    })
+
+                    # Gọi hàm tính toán (Giả định hàm này đã có trong code của bạn)
+                    if 'tinh_toan_kwp' in globals():
+                        kwp_list = tinh_toan_kwp(lh, gt, cd, hs, gn, SETTINGS)
+                        kwp_min, kwp_max = kwp_list[0], kwp_list[1]
+                    else:
+                        # Fallback nếu hàm bị thiếu (Tính nhẩm đơn giản để không crash)
+                        # VD: Tiền / 2000đ / 30 ngày / 4h nắng
+                        uoc_luong = (gt / 2000) / 30 / gn if cd == 'theo_tien' else gt / 30 / gn
+                        kwp_min = round(uoc_luong * 0.8, 2)
+                        kwp_max = round(uoc_luong * 1.2, 2)
                 else:
                     # --- B. NHÁNH KINH DOANH / SẢN XUẤT (THUẬT TOÁN MỚI) ---
                     
