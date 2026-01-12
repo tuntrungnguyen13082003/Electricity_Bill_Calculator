@@ -214,9 +214,13 @@
                     <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">Ngày Làm Việc</button>
                     <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">Ngày Nghỉ</button>
                 </div>
-                <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px;"><canvas id="chart_work"></canvas></div>
-                <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; display: none;"><canvas id="chart_off"></canvas></div>
-            </div>
+
+                <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px;">
+                    <canvas id="chart_work"></canvas>
+                </div>
+                <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; display: none;">
+                    <canvas id="chart_off"></canvas>
+                </div>
             {% endif %}
         </div>
 
