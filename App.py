@@ -207,17 +207,17 @@ def tinh_toan_kwp(loai_hinh, gia_tri_nhap, che_do_nhap, he_so_form, gio_nang_tin
     
     return [0, 0]
 
-# --- ROUTE MỚI: XỬ LÝ TÍNH TOÁN & QUAY VỀ TRANG CHỦ ---
+# --- ROUTE XỬ LÝ TÍNH TOÁN (CÓ KIỂM TRA TÊN KHÁCH HÀNG) ---
 @app.route('/tinh_toan', methods=['POST'])
 def xu_ly_tinh_toan():
-    # 1. LOAD CÁC DỮ LIỆU NỀN (Để index.html không bị lỗi thiếu biến)
+    # 1. LOAD DỮ LIỆU NỀN (Để trang web không bị lỗi hiển thị)
     if 'user' not in session: return redirect(url_for('login'))
     current_role = session.get('role', 'user')
     SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
     SETTINGS['tinh_thanh'] = load_excel_provinces()
     USERS = load_json_file(users_path, DEFAULT_USERS)
     
-    # Load lịch sử (để tab lịch sử không bị trắng)
+    # Load lịch sử hiển thị
     lich_su_data = []
     if os.path.exists(history_path):
         try:
@@ -230,12 +230,23 @@ def xu_ly_tinh_toan():
             lich_su_data.sort(key=lambda x: datetime.strptime(x['Thời Gian'], "%d/%m/%Y %H:%M:%S"), reverse=True)
         except: pass
 
-    # 2. XỬ LÝ INPUT (CODE AN TOÀN)
+    # 2. LẤY THÔNG TIN CƠ BẢN & KIỂM TRA LỖI
+    ten_kh = request.form.get('ten_kh', '').strip()
     loai_hinh_raw = request.form.get('loai_hinh') 
-    loai_hinh = 'can_ho' if loai_hinh_raw == 'ho_gia_dinh' else loai_hinh_raw
     khu_vuc = request.form.get('khu_vuc')
     
-    # Hàm hỗ trợ lấy số
+    # --- [QUAN TRỌNG] CHECK TÊN KHÁCH HÀNG ---
+    if not ten_kh:
+        return render_template('index.html', 
+                               role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
+                               active_tab='calc',
+                               msg_update="⚠️ Lỗi: Vui lòng nhập Tên Khách Hàng!", # <--- Báo lỗi đỏ
+                               du_lieu_nhap=request.form) # Giữ lại dữ liệu đã nhập
+
+    # Map tên loại hình
+    loai_hinh = 'can_ho' if loai_hinh_raw == 'ho_gia_dinh' else loai_hinh_raw
+    
+    # Hàm lấy số an toàn
     def lay_so_safe(key_name):
         raw = request.form.get(key_name, '0')
         if not raw: return 0.0
@@ -246,83 +257,94 @@ def xu_ly_tinh_toan():
     gia_tri_final = 0
     che_do_nhap_final = ''
     chart_data = None
-    du_lieu_nhap = {} # Lưu lại để điền lại vào form
+    du_lieu_nhap = {'ten_kh': ten_kh, 'loai_hinh': loai_hinh_raw, 'khu_vuc': khu_vuc} 
 
-    # --- LOGIC XỬ LÝ ---
+    # 3. XỬ LÝ LOGIC SỐ LIỆU
     if loai_hinh in ['kinh_doanh', 'san_xuat']:
         k_bt = lay_so_safe('kwh_bt')
         k_cd = lay_so_safe('kwh_cd')
         k_td = lay_so_safe('kwh_td')
-        tong_kwh = k_bt + k_cd + k_td
         
+        # Kiểm tra nếu chưa nhập số điện
+        if (k_bt + k_cd + k_td) == 0:
+             return render_template('index.html', role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
+                               active_tab='calc', msg_update="⚠️ Lỗi: Vui lòng nhập ít nhất một chỉ số điện (BT/CĐ/TĐ)!", du_lieu_nhap=request.form)
+
+        tong_kwh = k_bt + k_cd + k_td
         gia_tri_final = tong_kwh
         che_do_nhap_final = 'theo_kwh'
         
-        # Lưu lại input để form không bị reset trắng trơn
+        # Lưu lại input để hiển thị lại
         du_lieu_nhap.update({
             'kwh_bt': k_bt, 'kwh_cd': k_cd, 'kwh_td': k_td,
-            'ngay_dau': request.form.get('ngay_dau'),
-            'ngay_cuoi': request.form.get('ngay_cuoi'),
-            'gio_lam_tu': request.form.get('gio_lam_tu'),
-            'gio_lam_den': request.form.get('gio_lam_den'),
+            'ngay_dau': request.form.get('ngay_dau'), 'ngay_cuoi': request.form.get('ngay_cuoi'),
+            'gio_lam_tu': request.form.get('gio_lam_tu'), 'gio_lam_den': request.form.get('gio_lam_den'),
             'list_ngay_nghi': [int(x) for x in request.form.getlist('ngay_nghi')]
         })
-
-        # Logic vẽ biểu đồ (nếu tích chọn)
+        
         if request.form.get('co_ve_bieu_do') == 'yes':
-            # Ở đây tạm thời gửi thông báo, bạn có thể gắn hàm tính biểu đồ thật vào sau
-            chart_data = {'message': 'Đã kích hoạt chế độ phân tích biểu đồ (Đang cập nhật logic vẽ...)'}
+            chart_data = {'message': 'Đã kích hoạt chế độ phân tích biểu đồ.'}
 
     else:
         # Hộ gia đình
         kieu_nhap = request.form.get('kieu_nhap') 
         val_nhap = lay_so_safe('gia_tri_nhap')
+        if val_nhap == 0:
+             return render_template('index.html', role=current_role, settings=SETTINGS, users=USERS, lich_su=lich_su_data,
+                               active_tab='calc', msg_update="⚠️ Lỗi: Vui lòng nhập Số tiền hoặc Số điện!", du_lieu_nhap=request.form)
+
         gia_tri_final = val_nhap
         che_do_nhap_final = 'theo_kwh' if kieu_nhap == 'dien' else 'theo_tien'
-        du_lieu_nhap['gia_tri_nhap'] = request.form.get('gia_tri_nhap') # Giữ nguyên format có dấu chấm
+        du_lieu_nhap['gia_tri_nhap'] = request.form.get('gia_tri_nhap')
+        du_lieu_nhap['kieu_nhap'] = kieu_nhap
 
-    # 3. TÍNH TOÁN
+    # 4. TÍNH TOÁN
     gio_nang = SETTINGS['tinh_thanh'].get(khu_vuc, 4.0)
-    
-    ket_qua_kwp = tinh_toan_kwp(
-        loai_hinh=loai_hinh,
-        gia_tri_nhap=gia_tri_final,
-        che_do_nhap=che_do_nhap_final,
-        he_so_form=0.5,
-        gio_nang_tinh=gio_nang,
-        settings=SETTINGS
-    )
+    ket_qua_kwp = tinh_toan_kwp(loai_hinh, gia_tri_final, che_do_nhap_final, 0.5, gio_nang, SETTINGS)
 
-    # 4. CHUẨN BỊ KẾT QUẢ HIỂN THỊ (Format chuỗi đẹp)
+    # Chuẩn bị kết quả hiển thị
     kwp_min, kwp_max = ket_qua_kwp[0], ket_qua_kwp[1]
     he_so_dt = SETTINGS.get('dien_tich_kwp', 4.5)
     
-    str_ket_qua = ""
-    str_dien_tich = ""
+    str_ket_qua = f"{kwp_min}" if kwp_min == kwp_max else f"{kwp_min} - {kwp_max}"
+    str_dien_tich = f"≈ {round(kwp_min * he_so_dt, 1)}" if kwp_min == kwp_max else f"{round(kwp_min * he_so_dt, 1)} - {round(kwp_max * he_so_dt, 1)}"
     
-    if kwp_min == kwp_max:
-        str_ket_qua = f"{kwp_min}"
-        str_dien_tich = f"≈ {round(kwp_min * he_so_dt, 1)}"
-    else:
-        str_ket_qua = f"{kwp_min} - {kwp_max}"
-        dt_min = round(kwp_min * he_so_dt, 1)
-        dt_max = round(kwp_max * he_so_dt, 1)
-        str_dien_tich = f"{dt_min} - {dt_max}"
+    excel_res = f"{str_ket_qua} kWp (≈{str_dien_tich} m²)"
 
-    # Gán chart_data vào du_lieu_nhap để HTML hiển thị được
-    if chart_data:
-        du_lieu_nhap['chart_data'] = chart_data
+    if chart_data: du_lieu_nhap['chart_data'] = chart_data
 
-    # 5. QUAY VỀ INDEX.HTML (Thay vì ket_qua.html)
+    # 5. LƯU VÀO LỊCH SỬ (EXCEL)
+    try:
+        map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
+        ten_sheet = map_sheet.get(loai_hinh, 'Khác')
+        thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        don_vi = 'VNĐ' if che_do_nhap_final == 'theo_tien' else 'kWh'
+        str_dau_vao = f"{gia_tri_final:,.0f} {don_vi}".replace(',', '.')
+        
+        new_row = pd.DataFrame([{
+            "Tên Khách Hàng": ten_kh, "Thời Gian": thoi_gian, 
+            "Khu Vực": f"{khu_vuc}", "Đầu Vào": str_dau_vao, 
+            "Kết Quả (kWp)": excel_res
+        }])
+        
+        all_sheets = pd.read_excel(history_path, sheet_name=None) if os.path.exists(history_path) else {}
+        if ten_sheet in all_sheets: all_sheets[ten_sheet] = pd.concat([all_sheets[ten_sheet], new_row], ignore_index=True)
+        else: all_sheets[ten_sheet] = new_row
+        
+        with pd.ExcelWriter(history_path) as writer:
+            for s_name, data in all_sheets.items(): data.to_excel(writer, sheet_name=s_name, index=False)
+            
+        # Cập nhật lại list lịch sử để hiển thị ngay dòng mới thêm
+        lich_su_data.insert(0, new_row.to_dict('records')[0])
+    except Exception as e:
+        print(f"Lỗi lưu file: {e}")
+
+    # 6. TRẢ VỀ GIAO DIỆN
     return render_template('index.html', 
-                           role=current_role, 
-                           settings=SETTINGS, 
-                           users=USERS, 
-                           ket_qua=str_ket_qua, 
-                           dien_tich=str_dien_tich, 
-                           du_lieu_nhap=du_lieu_nhap, 
-                           active_tab='calc',
-                           lich_su=lich_su_data)
+                           role=current_role, settings=SETTINGS, users=USERS, 
+                           ket_qua=str_ket_qua, dien_tich=str_dien_tich, 
+                           du_lieu_nhap=du_lieu_nhap, active_tab='calc', lich_su=lich_su_data,
+                           msg_update="✅ Tính toán và lưu thành công!")
 
 # --- ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
