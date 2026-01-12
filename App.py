@@ -57,45 +57,100 @@ def save_excel_provinces(dict_data):
 
 # --- AI ĐỌC HÓA ĐƠN (GIỮ NGUYÊN) ---
 def ai_doc_hoa_don(image_path):
-    print("--- Đang gửi yêu cầu tới Google AI... ---")
+    print("--- Đang gửi yêu cầu tới Google AI (Qua REST API)... ---")
+    
+    # 1. Chuẩn bị dữ liệu gửi đi
     try:
         base64_image = encode_image(image_path)
+        
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
+        
         headers = {'Content-Type': 'application/json'}
+        
         payload = {
             "contents": [{
                 "parts": [
-                    {"text": """Bạn là trợ lý nhập liệu. Hãy trích xuất dữ liệu từ hóa đơn điện thành JSON:
-                                kwh_bt, kwh_cd, kwh_td, ngay_dau (YYYY-MM-DD), ngay_cuoi (YYYY-MM-DD).
-                                Loại bỏ dấu chấm phân cách ngàn. Chỉ trả về JSON."""},
-                    {"inline_data": {"mime_type": "image/jpeg", "data": base64_image}}
+                    {"text": """
+                        Bạn là trợ lý nhập liệu. Hãy trích xuất dữ liệu từ hóa đơn điện này thành JSON.
+                        Quy tắc:
+                        1. Tìm cột 'ĐIỆN TIÊU THỤ (kWh)' để lấy số liệu.
+                        2. Loại bỏ dấu chấm phân cách ngàn (Ví dụ: 19.619 -> 19619).
+                        3. Ngày tháng chuyển về định dạng YYYY-MM-DD.
+                        
+                        Các trường cần lấy:
+                        - kwh_bt (Bình thường)
+                        - kwh_cd (Cao điểm)
+                        - kwh_td (Thấp điểm)
+                        - ngay_dau (Ngày bắt đầu)
+                        - ngay_cuoi (Ngày kết thúc)
+                        
+                        Chỉ trả về đúng chuỗi JSON, không giải thích thêm.
+                    """},
+                    {
+                        "inline_data": {
+                            "mime_type": "image/jpeg",
+                            "data": base64_image
+                        }
+                    }
                 ]
             }]
         }
+
+        # 2. Gửi yêu cầu (POST)
         response = requests.post(url, headers=headers, data=json.dumps(payload))
+        print(f"--- TRẠNG THÁI GỬI: {response.status_code} ---")
+        if response.status_code != 200:
+            print("--- NỘI DUNG LỖI TỪ GOOGLE: ---")
+            print(response.text)
+
+        # 3. Xử lý kết quả trả về
         if response.status_code == 200:
             result = response.json()
+            # Lấy nội dung văn bản AI trả lời
             text_response = result['candidates'][0]['content']['parts'][0]['text']
+            
+            print("AI Trả lời:", text_response)
+            
+            # Dùng Regex để bắt lấy đoạn JSON
             match = re.search(r'\{.*\}', text_response, re.DOTALL)
-            if match: return json.loads(match.group(0))
-        return None
+            if match:
+                return json.loads(match.group(0))
+            else:
+                print("Lỗi: Không tìm thấy JSON trong phản hồi.")
+                return None
+        else:
+            print(f"Lỗi API: {response.status_code} - {response.text}")
+            return None
+
     except Exception as e:
-        print(f"Lỗi AI: {e}")
+        print(f"--- LỖI CODE PYTHON: {e}")
         return None
 
 @app.route('/scan_invoice', methods=['POST'])
 def scan_invoice():
-    if 'file_anh' not in request.files: return jsonify({'success': False, 'error': 'Không có file'}), 400
+    if 'file_anh' not in request.files:
+        return jsonify({'success': False, 'error': 'Không có file'}), 400
+    
     file = request.files['file_anh']
-    if file.filename == '': return jsonify({'success': False, 'error': 'Chưa chọn file'}), 400
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'Chưa chọn file'}), 400
+
     if file:
+        # Lưu tạm ảnh
         if not os.path.exists("uploads"): os.makedirs("uploads")
         temp_path = os.path.join("uploads", file.filename)
         file.save(temp_path)
+        
+        # Gọi AI xử lý
         data = ai_doc_hoa_don(temp_path)
+        
+        # Xóa ảnh sau khi xong
         if os.path.exists(temp_path): os.remove(temp_path)
-        if data: return jsonify({'success': True, 'data': data})
-        else: return jsonify({'success': False, 'error': 'AI không đọc được'}), 500
+        
+        if data:
+            return jsonify({'success': True, 'data': data})
+        else:
+            return jsonify({'success': False, 'error': 'AI không đọc được dữ liệu'}), 500
 
 # --- DATA MẶC ĐỊNH ---
 DEFAULT_SETTINGS = { 
