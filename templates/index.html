@@ -212,7 +212,9 @@
                 <h3 style="text-align: center;">📊 Phân Tích Biểu Đồ</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                     <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">Ngày Làm Việc</button>
+                    {% if du_lieu_nhap.chart_data.stats.off > 0 %}
                     <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">Ngày Nghỉ</button>
+                    {% endif %}
                 </div>
 
                 <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px;">
