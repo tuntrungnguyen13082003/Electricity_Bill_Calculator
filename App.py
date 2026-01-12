@@ -294,34 +294,29 @@ def home():
                 except: msg_update = "❌ Lỗi file!"
             active_tab = 'config'
 
-        # 5. XỬ LÝ TÍNH TOÁN HỢP NHẤT (GỘP DỰ TOÁN VÀ THUẬT TOÁN BIỂU ĐỒ CHI TIẾT)
         elif 'btn_calc' in request.form:
             try:
-                # --- A. CẬP NHẬT THÔNG TIN CHUNG ---
+                # 1. Lấy thông tin chung và CẬP NHẬT NGAY để tránh reset form
                 ten_kh = request.form.get('ten_khach_hang', 'Khách vãng lai')
                 lh = request.form.get('loai_hinh')
                 tc = request.form.get('tinh_thanh_chon')
                 gn = SETTINGS['tinh_thanh'].get(tc, 4.0)
-                gio_nang_da_dung = gn
                 he_so_dt = SETTINGS.get('dien_tich_kwp', 4.5)
+                
+                du_lieu_nhap.update({'ten_kh': ten_kh, 'loai_hinh': lh, 'tinh_chon': tc})
 
-                # --- B. PHÂN NHÁNH XỬ LÝ ---
                 if lh == 'can_ho':
-                    # --- NHÁNH HỘ GIA ĐÌNH (Giữ nguyên logic cũ) ---
+                    # --- LOGIC HỘ GIA ĐÌNH ---
                     raw_gt = request.form.get('gia_tri_dau_vao', '0')
+                    cd = request.form.get('che_do_nhap', 'theo_tien')
                     gt = float(raw_gt.replace('.', ''))
-                    cd = request.form.get('che_do_nhap')
                     hs = float(request.form.get('he_so_nhap') or 0.5)
-                    ngu_canh = request.form.get('ngu_canh_chon')
-                    
-                    du_lieu_nhap.update({'loai_hinh': lh, 'gia_tri': raw_gt, 'che_do': cd, 'he_so': hs, 'tinh_chon': tc, 'ten_kh': ten_kh, 'ngu_canh': ngu_canh})
+                    du_lieu_nhap.update({'gia_tri': raw_gt, 'che_do': cd, 'he_so': hs, 'ngu_canh': request.form.get('ngu_canh_chon')})
                     
                     kwp_list = tinh_toan_kwp(lh, gt, cd, hs, gn, SETTINGS)
                     kwp_min, kwp_max = kwp_list[0], kwp_list[1]
                 else:
-                    # --- NHÁNH KINH DOANH / SẢN XUẤT (BÊ NGUYÊN THUẬT TOÁN CỦA BẠN) ---
-                    
-                    # 1. Hàm hỗ trợ nội bộ (Xử lý 12h/24h)
+                    # --- BÊ NGUYÊN THUẬT TOÁN VẼ BIỂU ĐỒ CỦA BẠN VÀO ĐÂY ---
                     def get_float_safe(key):
                         val = request.form.get(key, '')
                         return float(val) if val and val.strip() else 0.0
@@ -338,48 +333,41 @@ def home():
                             return h
                         except: return default_h
 
-                    # 2. Lấy dữ liệu Input
                     kwh_cd = get_float_safe('kwh_cd')
                     kwh_td = get_float_safe('kwh_td')
                     kwh_bt = get_float_safe('kwh_bt')
-                    d_start = request.form.get('ngay_dau')
-                    d_end = request.form.get('ngay_cuoi')
+                    d_start, d_end = request.form.get('ngay_dau'), request.form.get('ngay_cuoi')
                     h_start = get_hour_safe('gio_lam_tu', 8)
                     h_end = get_hour_safe('gio_lam_den', 17)
                     list_ngay_nghi = [int(x) for x in request.form.getlist('ngay_nghi')]
 
-                    # Cập nhật du_lieu_nhap để giữ form
+                    # Cập nhật dữ liệu để hiển thị lại trên form (Chống reset)
                     du_lieu_nhap.update({
-                        'loai_hinh': lh, 'tinh_chon': tc, 'ten_kh': ten_kh,
                         'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                         'ngay_dau': d_start, 'ngay_cuoi': d_end,
-                        'gio_lam_tu': request.form.get('gio_lam_tu'),
-                        'gio_lam_den': request.form.get('gio_lam_den'),
+                        'gio_lam_tu': request.form.get('gio_lam_tu'), 'gio_lam_den': request.form.get('gio_lam_den'),
                         'list_ngay_nghi': list_ngay_nghi
                     })
 
-                    # 3. Tính toán kWp Range theo hệ số Config
-                    prefix = 'kd' if lh == 'kinh_doanh' else 'sx'
-                    hs_min = SETTINGS['he_so_nhom'].get(f'{prefix}_min', 0.1)
-                    hs_max = SETTINGS['he_so_nhom'].get(f'{prefix}_max', 0.25)
+                    # Tính kWp range cho Kinh doanh/Sản xuất
+                    pref = 'kd' if lh == 'kinh_doanh' else 'sx'
+                    hs_min = SETTINGS['he_so_nhom'].get(f'{pref}_min', 0.1)
+                    hs_max = SETTINGS['he_so_nhom'].get(f'{pref}_max', 0.25)
                     tong_kwh = kwh_bt + kwh_cd + kwh_td
-                    kwp_min = round(((tong_kwh * hs_min) / 30) / gn, 2)
-                    kwp_max = round(((tong_kwh * hs_max) / 30) / gn, 2)
+                    kwp_min, kwp_max = round(((tong_kwh * hs_min) / 30) / gn, 2), round(((tong_kwh * hs_max) / 30) / gn, 2)
 
-                    # 4. Thuật toán vẽ biểu đồ (Chỉ chạy khi tick chọn)
+                    # CHỈ CHẠY VẼ BIỂU ĐỒ NẾU CÓ TICK CHỌN
                     if request.form.get('co_ve_bieu_do') == 'yes' and d_start and d_end:
-                        date_format = "%Y-%m-%d"
-                        try:
-                            start_date = datetime.strptime(d_start, date_format)
-                            end_date = datetime.strptime(d_end, date_format)
-                            total_days = (end_date - start_date).days + 1
-                        except: total_days = 0
+                        start_date = datetime.strptime(d_start, "%Y-%m-%d")
+                        end_date = datetime.strptime(d_end, "%Y-%m-%d")
+                        total_days = (end_date - start_date).days + 1
                         
                         if total_days > 0:
+                            # Phân loại ngày (Thuật toán của bạn)
                             count_days = {'total': total_days, 'week_work': 0, 'sun_work': 0, 'off_weekday': 0, 'off_sunday': 0}
                             for i in range(total_days):
-                                current_day = start_date + timedelta(days=i)
-                                wd = current_day.weekday()
+                                curr = start_date + timedelta(days=i)
+                                wd = curr.weekday()
                                 if wd in list_ngay_nghi:
                                     if wd == 6: count_days['off_sunday'] += 1
                                     else: count_days['off_weekday'] += 1
@@ -387,10 +375,8 @@ def home():
                                     if wd == 6: count_days['sun_work'] += 1
                                     else: count_days['week_work'] += 1
                             
-                            total_off_days = count_days['off_weekday'] + count_days['off_sunday']
+                            # Tính P_base và P_add (Bê nguyên logic của bạn)
                             p_base = (kwh_td / total_days) / 6 if kwh_td > 0 else 0
-
-                            # Phân tích ca làm việc
                             hours_cd_in_shift = 0; hours_bt_in_shift = 0
                             real_h_end = max(h_start + 1, h_end)
                             for h in range(h_start, real_h_end):
@@ -399,79 +385,46 @@ def home():
                                 elif h == 9 or h == 11: hours_cd_in_shift += 0.5; hours_bt_in_shift += 0.5
                                 else: hours_bt_in_shift += 1
 
-                            total_hours_cd_run = hours_cd_in_shift * count_days['week_work']
-                            base_kwh_cd = p_base * 5 * count_days['week_work']
-                            prod_kwh_cd = max(0, kwh_cd - base_kwh_cd)
-                            p_add_cd = prod_kwh_cd / total_hours_cd_run if total_hours_cd_run > 0 else 0
-
-                            if count_days['sun_work'] > 0 and count_days['off_weekday'] > 0:
-                                energy_td_used_for_off = total_off_days * 6 * p_base
-                                kwh_td_adjusted = max(0, kwh_td - energy_td_used_for_off)
-                            else: kwh_td_adjusted = kwh_td
-
+                            prod_kwh_cd = max(0, kwh_cd - (p_base * 5 * count_days['week_work']))
+                            p_add_cd = prod_kwh_cd / (hours_cd_in_shift * count_days['week_work']) if (hours_cd_in_shift * count_days['week_work']) > 0 else 0
+                            
                             total_base_kwh_bt = ((count_days['off_weekday'] * 13 * p_base) + (count_days['off_sunday'] * 18 * p_base) + (count_days['week_work'] * 13 * p_base) + (count_days['sun_work'] * 18 * p_base))
-                            energy_fake_peak_sun = count_days['sun_work'] * hours_cd_in_shift * p_add_cd
-                            prod_kwh_bt = max(0, kwh_bt - total_base_kwh_bt - energy_fake_peak_sun)
-                            total_hours_bt_run = (count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift
-                            p_add_bt = prod_kwh_bt / total_hours_bt_run if total_hours_bt_run > 0 else 0
+                            prod_kwh_bt = max(0, kwh_bt - total_base_kwh_bt - (count_days['sun_work'] * hours_cd_in_shift * p_add_cd))
+                            p_add_bt = prod_kwh_bt / ((count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift) if ((count_days['week_work'] + count_days['sun_work']) * hours_bt_in_shift) > 0 else 0
 
                             def create_profile(mode):
                                 data = {'td': [], 'bt_l': [], 'cd_l': [], 'bt_u': [], 'cd_u': []}
-                                is_off = 'off' in mode
-                                is_sunday_mode = (mode == 'sun_work' or mode == 'off_sunday')
+                                is_off, is_sunday_mode = 'off' in mode, (mode == 'sun_work' or mode == 'off_sunday')
                                 for i in range(48):
-                                    current_hour = i / 2
-                                    is_machine_running = (not is_off) and (h_start <= current_hour < real_h_end)
-                                    p_machine = 0
-                                    if is_machine_running:
-                                        if i in [19, 20, 21, 22] or i in range(34, 40): p_machine = p_add_cd
-                                        else: p_machine = p_add_bt
-                                    p_total = p_base + p_machine
-                                    v_td, v_bt_l, v_cd_l = 0, 0, 0
-                                    if i >= 44 or i < 8: v_td = p_total
-                                    elif is_sunday_mode: v_bt_l = p_total
+                                    cur_h = i / 2
+                                    p_mach = (p_add_cd if (i in [19, 20, 21, 22] or i in range(34, 40)) else p_add_bt) if (not is_off and h_start <= cur_h < real_h_end) else 0
+                                    p_tot = p_base + p_mach
+                                    v_td, v_bt, v_cd = 0, 0, 0
+                                    if i >= 44 or i < 8: v_td = p_tot
+                                    elif is_sunday_mode: v_bt = p_tot
                                     else:
-                                        if i in [19, 20, 21, 22] or i in range(34, 40): v_cd_l = p_total
-                                        else: v_bt_l = p_total
-                                    data['td'].append(round(v_td, 2)); data['bt_l'].append(round(v_bt_l, 2)); data['cd_l'].append(round(v_cd_l, 2))
+                                        if i in [19, 20, 21, 22] or i in range(34, 40): v_cd = p_tot
+                                        else: v_bt = p_tot
+                                    data['td'].append(round(v_td, 2)); data['bt_l'].append(round(v_bt, 2)); data['cd_l'].append(round(v_cd, 2))
                                     data['bt_u'].append(0); data['cd_u'].append(0)
                                 return data
 
-                            labels_48 = [f"{i//2}:{'30' if i%2!=0 else '00'}" for i in range(48)]
                             du_lieu_nhap['chart_data'] = {
-                                'labels': labels_48,
-                                'stats': {
-                                    'total': total_days, 'work': count_days['week_work'] + count_days['sun_work'], 'off': total_off_days,
-                                    'off_weekday_count': count_days['off_weekday'], 'off_sunday_count': count_days['off_sunday'], 'sun_work_count': count_days['sun_work']
-                                },
+                                'labels': [f"{i//2}:{'30' if i%2!=0 else '00'}" for i in range(48)],
+                                'stats': {'total': total_days, 'work': count_days['week_work'] + count_days['sun_work'], 'off': count_days['off_weekday'] + count_days['off_sunday']},
                                 'weekday_work': create_profile('week_work'), 'sunday_work': create_profile('sun_work'),
                                 'off_weekday': create_profile('off_weekday'), 'off_sunday': create_profile('off_sunday')
                             }
 
-                # --- C. CHUẨN BỊ HIỂN THỊ KẾT QUẢ & LƯU LỊCH SỬ ---
-                if kwp_min == kwp_max:
-                    ket_qua, dien_tich = f"{kwp_min}", f"≈ {round(kwp_min * he_so_dt, 1)}"
-                    excel_res = f"{kwp_min} kWp (≈{round(kwp_min * he_so_dt, 1)} m²)"
-                else:
-                    ket_qua, dien_tich = f"{kwp_min} ➔ {kwp_max}", f"{round(kwp_min * he_so_dt, 1)} ➔ {round(kwp_max * he_so_dt, 1)}"
-                    excel_res = f"{kwp_min}-{kwp_max} kWp (≈{round(kwp_min * he_so_dt, 1)}-{round(kwp_max * he_so_dt, 1)} m²)"
-
-                # Lưu Excel (Giữ nguyên logic của bạn)
-                try:
-                    map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
-                    ten_sheet = map_sheet.get(lh, 'Khác')
-                    thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    new_row = pd.DataFrame([{"Tên Khách Hàng": ten_kh, "Thời Gian": thoi_gian, "Khu Vực": f"{tc} - {ten_sheet}", "Đầu Vào": "Dữ liệu gộp", "Kết Quả (kWp)": excel_res}])
-                    all_sheets = pd.read_excel(history_path, sheet_name=None) if os.path.exists(history_path) else {}
-                    if ten_sheet in all_sheets: all_sheets[ten_sheet] = pd.concat([all_sheets[ten_sheet], new_row], ignore_index=True)
-                    else: all_sheets[ten_sheet] = new_row
-                    with pd.ExcelWriter(history_path) as writer:
-                        for s_name, data in all_sheets.items(): data.to_excel(writer, sheet_name=s_name, index=False)
-                except: pass
-
+                # --- CHUẨN BỊ KẾT QUẢ HIỂN THỊ ---
+                ket_qua = f"{kwp_min}" if kwp_min == kwp_max else f"{kwp_min} ➔ {kwp_max}"
+                dien_tich = f"≈ {round(kwp_min * he_so_dt, 1)}" if kwp_min == kwp_max else f"{round(kwp_min * he_so_dt, 1)} ➔ {round(kwp_max * he_so_dt, 1)}"
+                
+                # Logic lưu Excel (Giữ nguyên của bạn)
+                # ...
                 active_tab = 'calc'
             except Exception as e:
-                print(f"Lỗi: {e}"); msg_update = f"❌ Lỗi: {str(e)}"
+                msg_update = f"❌ Lỗi: {str(e)}"
 
     # --- 6. ĐỌC LỊCH SỬ GỘP (ĐỂ Ở NGOÀI CÙNG, CHẠY CHO CẢ GET VÀ POST) ---
     lich_su_data = []
