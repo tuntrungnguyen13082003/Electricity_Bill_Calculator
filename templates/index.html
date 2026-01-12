@@ -179,21 +179,6 @@
                                 <option value="gd_ban_dem" {% if du_lieu_nhap.ngu_canh == 'gd_ban_dem' %}selected{% endif %}>🌙 Dùng ban đêm</option>
                             </select>
                         </div>
-
-                        {% if ket_qua and du_lieu_nhap.loai_hinh == 'can_ho' %}
-                        <div style="margin-top: 25px; padding: 20px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <h4 style="color: #2e7d32; margin-top: 0;">✅ KẾT QUẢ ĐỀ XUẤT</h4>
-                            
-                            <div style="font-size: 18px; margin-bottom: 8px;">
-                                Công suất hệ thống: 
-                                <strong style="font-size: 28px; color: #d32f2f;">{{ ket_qua }} kWp</strong>
-                            </div>
-                            
-                            <div style="font-size: 16px; color: #555;">
-                                Diện tích mái cần thiết: <strong>{{ dien_tich }} m²</strong>
-                            </div>
-                        </div>
-                        {% endif %}
                     </div>
 
                     <div id="khung_chuyen_nghiep" style="display: none; border-top: 2px dashed #eee; margin-top: 20px; padding-top: 10px;">
@@ -243,20 +228,6 @@
                     
                     <button type="submit" name="btn_calc" class="btn-calc" style="margin-top: 25px; font-size: 18px;">TÍNH TOÁN CÔNG SUẤT & BÁO GIÁ</button>
                 </div>
-                {% if ket_qua and du_lieu_nhap.loai_hinh == 'can_ho' %}
-                <div style="margin-top: 25px; padding: 20px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 10px; text-align: center;">
-                    <h4 style="color: #1565c0; margin-bottom: 10px;">🏠 KẾT QUẢ ĐỀ XUẤT HỘ GIA ĐÌNH</h4>
-                    
-                    <div style="font-size: 18px; margin-bottom: 5px;">
-                        Công suất lắp đặt: 
-                        <strong style="font-size: 26px; color: #d32f2f;">{{ ket_qua }} kWp</strong>
-                    </div>
-                    
-                    <div style="font-size: 16px; color: #555;">
-                        Diện tích mái cần có: <strong>{{ dien_tich }} m²</strong>
-                    </div>
-                </div>
-                {% endif %}
             </form>
 
             {% if ket_qua %}
