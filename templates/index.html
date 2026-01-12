@@ -139,15 +139,31 @@
                     </div>
                 </div>
 
-                <div id="khung_nhap_don_gian" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <label class="fw-bold text-primary">Nhập liệu đơn giản:</label>
-                    <div class="mb-2">
-                        <input type="radio" name="kieu_nhap" value="tien" checked onclick="toggleUnit(this)"> Số tiền (VNĐ)
-                        <input type="radio" name="kieu_nhap" value="dien" onclick="toggleUnit(this)" style="margin-left: 15px;"> Số điện (kWh)
+                <div id="khung_nhap_don_gian" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+    
+                    <label class="fw-bold text-primary mb-2">Bạn muốn nhập liệu theo:</label>
+
+                    <div class="d-flex align-items-center mb-3" style="gap: 30px;">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="kieu_nhap" id="radio_tien" value="tien" checked onclick="toggleUnit(this)">
+                            <label class="form-check-label" for="radio_tien" style="cursor: pointer; margin-top: 0;">
+                                💰 Số tiền (VNĐ)
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="kieu_nhap" id="radio_dien" value="dien" onclick="toggleUnit(this)">
+                            <label class="form-check-label" for="radio_dien" style="cursor: pointer; margin-top: 0;">
+                                ⚡ Số điện (kWh)
+                            </label>
+                        </div>
                     </div>
+
                     <div class="form-group mb-3">
-                        <label id="input-label">Giá trị (VNĐ/Month):</label>
-                        <input type="text" id="gia_tri_input" class="form-control" name="gia_tri_nhap" placeholder="Ví dụ: 2.000.000" onkeyup="formatCurrency(this)">
+                        <label id="input-label" class="fw-bold">Tiền điện trung bình tháng (VNĐ):</label>
+                        
+                        <input type="text" id="gia_tri_input" class="form-control form-control-lg" name="gia_tri_nhap" 
+                            placeholder="Ví dụ: 2.000.000" onkeyup="formatCurrency(this)">
                     </div>
                 </div>
 
@@ -466,9 +482,25 @@
         }
 
         function toggleUnit(radio) {
-            document.getElementById("input-label").innerText = radio.value === "theo_tien" ? "Tiền điện trung bình tháng (VNĐ/Month):" : "Sản lượng tiêu thụ (kWh/Month):";
-            document.getElementById("gia_tri_input").placeholder = radio.value === "theo_tien" ? "VD: 2.000.000" : "VD: 500";
-            document.getElementById("gia_tri_input").value = "";
+            var label = document.getElementById("input-label");
+            var input = document.getElementById("gia_tri_input");
+            
+            if (radio.value === "tien") {
+                // Nếu chọn Tiền
+                label.innerText = "Tiền điện trung bình tháng (VNĐ):";
+                input.placeholder = "Ví dụ: 2.000.000";
+                // Bật lại tính năng format tiền tệ
+                input.setAttribute("onkeyup", "formatCurrency(this)");
+            } else {
+                // Nếu chọn Số điện
+                label.innerText = "Sản lượng tiêu thụ (kWh/tháng):";
+                input.placeholder = "Ví dụ: 500";
+                // Tắt format tiền tệ (để nhập số thường)
+                input.removeAttribute("onkeyup"); 
+            }
+            
+            // Xóa giá trị cũ để người dùng nhập lại cho đỡ nhầm
+            input.value = "";
         }
         
         function formatCurrency(input) {
