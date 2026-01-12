@@ -124,44 +124,100 @@
                     
                     <div id="sub_du_toan" class="v-tab-content active">
                         <h3 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">Dự toán theo hóa đơn</h3>
-                        <form method="POST">
-                            <label>Tên Khách Hàng:</label>
-                            <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_kh', '') }}" required>
-                            
-                            <label>Khu vực lắp đặt:</label>
-                            <select name="tinh_thanh_chon">
-                                {% for t in settings.tinh_thanh %}<option value="{{ t }}" {{ 'selected' if du_lieu_nhap.tinh_chon == t else '' }}>{{ t }}</option>{% endfor %}
-                            </select>
-                    
-                            <label>Mô hình lắp đặt:</label>
-                            <select name="loai_hinh" id="loai_hinh" class="form-control">
-                                <option value="can_ho" {{ 'selected' if du_lieu_nhap.loai_hinh == 'can_ho' else '' }}>🏡 Hộ gia đình</option>
-                                <option value="kinh_doanh" {{ 'selected' if du_lieu_nhap.loai_hinh == 'kinh_doanh' else '' }}>🏢 Kinh doanh</option>
-                                <option value="san_xuat" {{ 'selected' if du_lieu_nhap.loai_hinh == 'san_xuat' else '' }}>🏭 Sản xuất</option>
-                            </select>
-                    
-                            <label>Nhập liệu theo:</label>
-                            <div class="input-mode-group">
-                                <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_tien" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_tien' else '' }}> Số tiền</label>
-                                <label class="radio-label"><input type="radio" name="che_do_nhap" value="theo_kwh" onchange="toggleUnit(this)" {{ 'checked' if du_lieu_nhap.che_do == 'theo_kwh' else '' }}> Số điện</label>
+                        <form action="/tinh_toan" method="POST" enctype="multipart/form-data" id="main_form">
+    
+                            <div class="form-group mb-3">
+                                <label>Tên Khách Hàng:</label>
+                                <input type="text" class="form-control" name="ten_kh" placeholder="Nhập tên khách hàng...">
                             </div>
-                    
-                            <label id="input-label">{% if du_lieu_nhap.che_do == 'theo_kwh' %}Sản lượng (kWh/Month):{% else %}Tiền điện (VNĐ/Month):{% endif %}</label>
-                            <input type="text" inputmode="numeric" name="gia_tri_dau_vao" id="gia_tri_input" required value="{{ du_lieu_nhap.gia_tri }}" oninput="formatCurrency(this)">
-                            
-                            <div style="margin-bottom: 20px;">
-                                <input type="hidden" name="he_so_nhap" id="he_so_nhap" value="{{ du_lieu_nhap.he_so }}">
-                                <div id="khung_dac_diem">
-                                    <label>Đặc điểm sử dụng:</label>
-                                    <select id="chon_ngu_canh" name="ngu_canh_chon" class="form-control">
-                                        <option value="gd_co_nguoi" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_co_nguoi' else '' }}>👴👶 Có người ở nhà</option>
-                                        <option value="gd_di_lam" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_di_lam' else '' }}>💼 Đi làm hành chính</option>
-                                        <option value="gd_ban_dem" {{ 'selected' if du_lieu_nhap.ngu_canh == 'gd_ban_dem' else '' }}>🌙 Dùng ban đêm</option>
+
+                            <div class="form-group mb-3">
+                                <label>Khu vực lắp đặt:</label>
+                                <select class="form-select" name="khu_vuc">
+                                    <option value="An Giang">An Giang</option>
                                     </select>
-                                </div>
-                                <div id="thong_bao_he_so" style="margin-top: 10px; padding: 10px; background: #e8f6f3; color: #16a085; border-radius: 5px; display: none; font-size: 13px;"></div>
                             </div>
-                            <button type="submit" name="btn_calc" class="btn-calc">TÍNH TOÁN CÔNG SUẤT</button>
+
+                            <div class="form-group mb-3">
+                                <label>Mô hình lắp đặt:</label>
+                                <select class="form-select" name="loai_hinh" id="loai_hinh_lap_dat" onchange="toggleInputMode()">
+                                    <option value="ho_gia_dinh">🏡 Hộ gia đình</option>
+                                    <option value="kinh_doanh">🏢 Kinh doanh</option>
+                                    <option value="san_xuat">🏭 Sản xuất</option>
+                                </select>
+                            </div>
+
+                            <div id="khung_nhap_don_gian">
+                                <label>Nhập liệu theo:</label>
+                                <div class="mb-2">
+                                    <input type="radio" name="kieu_nhap" value="tien" checked> Số tiền
+                                    <input type="radio" name="kieu_nhap" value="dien"> Số điện
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label>Giá trị (VNĐ hoặc kWh):</label>
+                                    <input type="number" class="form-control" name="gia_tri_nhap" placeholder="Ví dụ: 2000000">
+                                </div>
+                            </div>
+
+                            <div id="khung_nhap_chi_tiet" style="display: none; border: 1px dashed #28a745; padding: 15px; border-radius: 8px; background: #f9fff9;">
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="text-success m-0"><i class="fas fa-bolt"></i> Chi tiết điện năng 3 khung giờ</h6>
+                                    <label class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-camera"></i> Nhập nhanh bằng AI
+                                        <input type="file" hidden onchange="uploadVaQuetAnh(this)" accept="image/*">
+                                        <span id="btn_scan_trigger" style="display:none"></span> </label>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label>Bình thường (kWh):</label>
+                                        <input type="number" class="form-control" name="kwh_bt" placeholder="0">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="text-danger">Cao điểm (kWh):</label>
+                                        <input type="number" class="form-control" name="kwh_cd" placeholder="0">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="text-success">Thấp điểm (kWh):</label>
+                                        <input type="number" class="form-control" name="kwh_td" placeholder="0">
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label>Từ ngày:</label>
+                                        <input type="date" class="form-control" name="ngay_dau">
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Đến ngày:</label>
+                                        <input type="date" class="form-control" name="ngay_cuoi">
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label>Giờ làm việc (Từ):</label>
+                                        <input type="time" class="form-control" name="gio_lam_viec_tu" value="08:00">
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Giờ làm việc (Đến):</label>
+                                        <input type="time" class="form-control" name="gio_lam_viec_den" value="17:00">
+                                    </div>
+                                </div>
+
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="checkVeBieuDo" name="co_ve_bieu_do" value="yes">
+                                    <label class="form-check-label fw-bold text-primary" for="checkVeBieuDo">
+                                        Có vẽ biểu đồ phụ tải và phân tích chi tiết không?
+                                    </label>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold text-uppercase">
+                                <i class="fas fa-calculator"></i> TÍNH TOÁN CÔNG SUẤT & BÁO GIÁ
+                            </button>
                         </form>
                         {% if ket_qua is not none and not du_lieu_nhap.get('chart_data') %}
                         <div class="result-box">
@@ -597,6 +653,32 @@
                 });
             }
         }
+        function toggleInputMode() {
+            // Lấy giá trị dropdown
+            const loaiHinh = document.getElementById('loai_hinh_lap_dat').value;
+            
+            // Lấy 2 khung giao diện
+            const khungDonGian = document.getElementById('khung_nhap_don_gian');
+            const khungChiTiet = document.getElementById('khung_nhap_chi_tiet');
+
+            if (loaiHinh === 'kinh_doanh' || loaiHinh === 'san_xuat') {
+                // Nếu là KD/SX: Ẩn cái đơn giản, Hiện cái chi tiết
+                khungDonGian.style.display = 'none';
+                khungChiTiet.style.display = 'block';
+                
+                // Xóa giá trị ở khung đơn giản để tránh Backend hiểu lầm (Optional)
+                document.querySelector('input[name="gia_tri_nhap"]').value = ''; 
+            } else {
+                // Nếu là Hộ gia đình: Hiện đơn giản, Ẩn chi tiết
+                khungDonGian.style.display = 'block';
+                khungChiTiet.style.display = 'none';
+            }
+        }
+
+        // Gọi 1 lần khi trang vừa tải xong để set đúng trạng thái ban đầu
+        window.onload = function() {
+            toggleInputMode();
+        };
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
