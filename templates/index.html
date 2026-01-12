@@ -553,7 +553,14 @@
         // --- 1. KHỞI TẠO ---
         function initAllCharts() {
             let maxVal = 0;
-            const allDatasets = [liveData.weekday_work, liveData.off_weekday];
+            // Bước 1: Duyệt qua tất cả các kịch bản để tìm giá trị đỉnh (Max) đồng bộ trục Y
+            // Bao gồm cả sunday_work và off_sunday để tính toán chính xác
+            const allDatasets = [
+                liveData.weekday_work, 
+                liveData.sunday_work, 
+                liveData.off_weekday, 
+                liveData.off_sunday
+            ];
             
             allDatasets.forEach(data => {
                 if (data) {
@@ -571,14 +578,24 @@
 
             const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
 
-            // 1. Biểu đồ Ngày Làm Việc
+            // 1. Vẽ Biểu đồ Ngày Làm Việc
             if(window.charts['chart_work']) window.charts['chart_work'].destroy();
             window.charts['chart_work'] = createChart('chart_work', liveData.weekday_work, COMMON_MAX_Y);
             
-            // 2. Biểu đồ Ngày Nghỉ
+            // 2. Vẽ Biểu đồ Ngày Nghỉ (LOGIC THÔNG MINH MỚI)
             if(document.getElementById('chart_off')) {
                 if(window.charts['chart_off']) window.charts['chart_off'].destroy();
-                window.charts['chart_off'] = createChart('chart_off', liveData.off_weekday, COMMON_MAX_Y);
+                
+                // KIỂM TRA: Nếu có số ngày nghỉ Chủ Nhật > 0, ưu tiên lấy profile off_sunday 
+                // (Tập dữ liệu này đã được Python xử lý bỏ màu đỏ/giờ cao điểm)
+                let dataHienThi;
+                if (liveData.stats.off_sunday_count > 0) {
+                    dataHienThi = liveData.off_sunday;
+                } else {
+                    dataHienThi = liveData.off_weekday;
+                }
+                
+                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
             }
         }
 
