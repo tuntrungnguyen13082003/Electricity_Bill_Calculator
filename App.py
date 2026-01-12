@@ -301,6 +301,7 @@ def home():
                 ten_kh = request.form.get('ten_khach_hang', 'Khách vãng lai')
                 lh, tc = request.form.get('loai_hinh'), request.form.get('tinh_thanh_chon')
                 gn = SETTINGS['tinh_thanh'].get(tc, 4.0)
+                he_so_dt = SETTINGS.get('dien_tich_kwp', 4.5)
                 du_lieu_nhap.update({'ten_kh': ten_kh, 'loai_hinh': lh, 'tinh_chon': tc})
 
                 if lh == 'can_ho':
