@@ -126,9 +126,9 @@
 
                     <label>Mô hình lắp đặt:</label>
                     <select name="loai_hinh" id="loai_hinh" class="form-control" onchange="capNhatGiaoDien()">
-                        <option value="can_ho" {{ 'selected' if du_lieu_nhap.loai_hinh == 'can_ho' else '' }}>🏡 Hộ gia đình</option>
-                        <option value="kinh_doanh" {{ 'selected' if du_lieu_nhap.loai_hinh == 'kinh_doanh' else '' }}>🏢 Kinh doanh</option>
-                        <option value="san_xuat" {{ 'selected' if du_lieu_nhap.loai_hinh == 'san_xuat' else '' }}>🏭 Sản xuất</option>
+                        <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏠 Hộ Gia Đình</option>
+                        <option value="kinh_doanh" {% if du_lieu_nhap.loai_hinh == 'kinh_doanh' %}selected{% endif %}>🏢 Kinh Doanh</option>
+                        <option value="san_xuat" {% if du_lieu_nhap.loai_hinh == 'san_xuat' %}selected{% endif %}>🏭 Sản Xuất</option>
                     </select>
 
                     <div id="khung_ho_gia_dinh">
