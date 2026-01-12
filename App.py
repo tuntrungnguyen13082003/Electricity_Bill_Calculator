@@ -3,6 +3,7 @@ import json
 import requests
 import base64
 import re
+import pdfplumber
 import pandas as pd
 from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
@@ -26,78 +27,61 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode('utf-8')
     
 # --- HÀM ĐỌC HÓA ĐƠN (PHIÊN BẢN SIÊU TƯƠNG THÍCH) ---
-def ai_doc_hoa_don(image_path):
-    print("--- Đang gửi yêu cầu tới Google AI (Qua REST API)... ---")
-    
-    # 1. Chuẩn bị dữ liệu gửi đi
+def ai_doc_hoa_don(file_path):
+    # Chỉ xử lý nếu là file PDF
+    if not file_path.lower().endswith('.pdf'):
+        print("Lỗi: Thư viện này chỉ hỗ trợ file PDF gốc.")
+        return None
+
+    data = {
+        "kwh_bt": 0,
+        "kwh_cd": 0,
+        "kwh_td": 0,
+        "ngay_dau": "",
+        "ngay_cuoi": ""
+    }
+
     try:
-        base64_image = encode_image(image_path)
-        mime_type = "image/jpeg"
-        if image_path.lower().endswith('.pdf'):
-            mime_type = "application/pdf"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
-        
-        headers = {'Content-Type': 'application/json'}
-        
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": """
-                        Bạn là trợ lý nhập liệu. Hãy trích xuất dữ liệu từ hóa đơn điện này thành JSON.
-                        Quy tắc:
-                        1. Tìm cột 'ĐIỆN TIÊU THỤ (kWh)' để lấy số liệu.
-                        2. Loại bỏ dấu chấm phân cách ngàn (Ví dụ: 19.619 -> 19619).
-                        3. Ngày tháng chuyển về định dạng YYYY-MM-DD.
-                        
-                        Các trường cần lấy:
-                        - kwh_bt (Bình thường)
-                        - kwh_cd (Cao điểm)
-                        - kwh_td (Thấp điểm)
-                        - ngay_dau (Ngày bắt đầu)
-                        - ngay_cuoi (Ngày kết thúc)
-                        
-                        Chỉ trả về đúng chuỗi JSON, không giải thích thêm.
-                    """},
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": base64_data
-                        }
-                    }
-                ]
-            }]
-        }
+        with pdfplumber.open(file_path) as pdf:
+            full_text = ""
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    full_text += text + "\n"
 
-        # 2. Gửi yêu cầu (POST)
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        print(f"--- TRẠNG THÁI GỬI: {response.status_code} ---")
-        if response.status_code != 200:
-            print("--- NỘI DUNG LỖI TỪ GOOGLE: ---")
-            print(response.text)
+            # 1. Trích xuất Ngày (Kỳ hóa đơn)
+            # Tìm mẫu: từ 01/01/2025 đến 10/01/2025
+            date_match = re.search(r"từ\s+(\d{2}/\d{2}/\d{4})\s+đến\s+(\d{2}/\d{2}/\d{4})", full_text)
+            if date_match:
+                # Chuyển định dạng DD/MM/YYYY sang YYYY-MM-DD cho HTML input date
+                d1 = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
+                d2 = datetime.strptime(date_match.group(2), "%d/%m/%Y").strftime("%Y-%m-%d")
+                data["ngay_dau"] = d1
+                data["ngay_cuoi"] = d2
 
-        # 3. Xử lý kết quả trả về
-        if response.status_code == 200:
-            result = response.json()
-            # Lấy nội dung văn bản AI trả lời
-            text_response = result['candidates'][0]['content']['parts'][0]['text']
+            # 2. Trích xuất Sản lượng (kWh)
+            # Dựa trên bảng kê EVN bạn gửi, chúng ta tìm số ở cột cuối cùng của các dòng Khung giờ
+            # Bình thường: 251.256, Cao điểm: 78.492, Thấp điểm: 109.584
             
-            print("--- KẾT QUẢ THÔ TỪ AI ---")
-            print(text_response)
-            print("-------------------------")
+            # Tìm dòng "Khung giờ bình thường" và lấy số cuối cùng của dòng đó
+            bt_match = re.search(r"Khung giờ bình thường.*?([\d\.,]+)$", full_text, re.MULTILINE)
+            if bt_match:
+                data["kwh_bt"] = float(bt_match.group(1).replace('.', '').replace(',', ''))
 
-            # Dùng Regex để bắt lấy đoạn JSON
-            match = re.search(r'\{.*\}', text_response, re.DOTALL)
-            if match:
-                return json.loads(match.group(0))
-            else:
-                print("Lỗi: Không tìm thấy JSON trong phản hồi.")
-                return None
-        else:
-            print(f"Lỗi API: {response.status_code} - {response.text}")
-            return None
+            # Tìm dòng "Khung giờ cao điểm"
+            cd_match = re.search(r"Khung giờ cao điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
+            if cd_match:
+                data["kwh_cd"] = float(cd_match.group(1).replace('.', '').replace(',', ''))
+
+            # Tìm dòng "Khung giờ thấp điểm"
+            td_match = re.search(r"Khung giờ thấp điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
+            if td_match:
+                data["kwh_td"] = float(td_match.group(1).replace('.', '').replace(',', ''))
+
+        return data
 
     except Exception as e:
-        print(f"--- LỖI CODE PYTHON: {e}")
+        print(f"Lỗi trích xuất PDF trực tiếp: {e}")
         return None
     
 # --- 3. TẠO ĐƯỜNG DẪN (ROUTE) ĐỂ WEB GỌI ---
