@@ -454,11 +454,14 @@ def home():
                                     data['bt_u'].append(0); data['cd_u'].append(0)
                                 return data
 
-                            # 6. Đóng gói dữ liệu gửi xuống Frontend
+                            # 6. Đóng gói dữ liệu gửi xuống Frontend (BẢN FIX LỖI "NO ATTRIBUTE OFF")
                             du_lieu_nhap['chart_data'] = {
                                 'labels': [f"{i//2}:{'30' if i%2!=0 else '00'}" for i in range(48)],
                                 'stats': {
                                     'total': total_days, 
+                                    # --- THÊM DÒNG NÀY ĐỂ SỬA LỖI ---
+                                    'off': count_days['off_weekday'] + count_days['off_sunday'], 
+                                    # --------------------------------
                                     'off_weekday_count': count_days['off_weekday'],
                                     'off_sunday_count': count_days['off_sunday']
                                 },
