@@ -746,56 +746,60 @@
             });
         }
 
+        // --- 1. HÀM TÍNH TOÁN CHÍNH ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
             const master = liveData.weekday_work;
             const slave = liveData.sunday_work;
             const hasSunday = (DAYS_SUN > 0);
 
-            // 1. Tính độ lệch (Delta)
+            // 1. Tính độ lệch công suất (Delta kW)
             const oldVal = master.td[targetIndex] + master.bt_l[targetIndex] + master.cd_l[targetIndex];
             const deltaKW = newTotalValue - oldVal;
 
-            // 2. Cập nhật giá trị mới cho vị trí đang kéo (Cả Master và Slave)
+            // 2. Cập nhật giá trị tại điểm kéo (Target)
+            // Cập nhật Master (Ngày thường)
             setLoadValue(master, targetIndex, newTotalValue, false);
+            
+            // Cập nhật Slave (Chủ nhật) - Ép buộc đồng bộ giá trị
             if (hasSunday) {
                 setLoadValue(slave, targetIndex, newTotalValue, true);
             }
 
-            // --- BẮT ĐẦU LOGIC BÙ TRỪ ---
+            // --- 3. XỬ LÝ BÙ TRỪ (LOGIC QUAN TRỌNG) ---
             const type = getTariffType(targetIndex);
-            let globalNormalDebt = 0; // Biến tích lũy nợ cho phe Xanh (Normal)
+            let globalNormalDebt = 0; // Biến chứa tổng "Nợ" của phe Bình thường (kWh)
 
-            // A. XỬ LÝ NGÀY THƯỜNG (Weekday)
-            if (type === 2) { 
-                // Nếu là Cao điểm: Bù trừ nội bộ Đỏ vs Đỏ
+            // TRƯỜNG HỢP A: Kéo giờ CAO ĐIỂM (Màu Đỏ - Type 2)
+            // Ví dụ: Kéo lúc 9h30
+            if (type === 2) {
+                // A1. Tại Ngày thường: Đỏ tự xử với Đỏ (Nội bộ)
+                // (Không ảnh hưởng đến phe Xanh của ngày thường)
                 balanceInternal(master, targetIndex, deltaKW, 2);
-            } else if (type === 1) { 
-                // Nếu là Bình thường: Ghi nợ vào quỹ Xanh
-                globalNormalDebt += deltaKW * DAYS_WEEK;
-            } else {
-                // Nếu là Thấp điểm: Bù trừ nội bộ Vàng vs Vàng
-                balanceInternal(master, targetIndex, deltaKW, 0);
-            }
 
-            // B. XỬ LÝ CHỦ NHẬT (Sunday)
-            if (hasSunday) {
-                // Xác định loại giờ thực tế vào Chủ Nhật
-                // (Ở CN: Giờ Cao điểm (2) chuyển thành Bình thường (1))
-                let sunType = type;
-                if (type === 2) sunType = 1; 
-
-                if (sunType === 1) {
-                    // Nếu CN là giờ Bình thường (bao gồm cả khúc 9h30):
-                    // Việc tăng công suất tạo ra nợ cho quỹ Xanh
+                // A2. Tại Chủ Nhật: Giờ này biến thành BÌNH THƯỜNG
+                // Nên sự thay đổi này tạo ra nợ cho quỹ Bình thường
+                if (hasSunday) {
+                    // Nợ = Delta * 4 ngày CN
                     globalNormalDebt += deltaKW * DAYS_SUN;
-                } else if (sunType === 0) {
-                    // Thấp điểm bù nội bộ
-                    balanceInternal(slave, targetIndex, deltaKW, 0);
                 }
             }
+            // TRƯỜNG HỢP B: Kéo giờ BÌNH THƯỜNG (Màu Xanh - Type 1)
+            else if (type === 1) {
+                // Ảnh hưởng cả 26 ngày thường + 4 ngày CN
+                let totalDays = DAYS_WEEK;
+                if (hasSunday) totalDays += DAYS_SUN;
+                
+                // Nợ = Delta * 30 ngày
+                globalNormalDebt += deltaKW * totalDays;
+            }
+            // TRƯỜNG HỢP C: Kéo giờ THẤP ĐIỂM (Type 0)
+            else {
+                balanceInternal(master, targetIndex, deltaKW, 0);
+                if (hasSunday) balanceInternal(slave, targetIndex, deltaKW, 0);
+            }
 
-            // C. THANH TOÁN NỢ XANH (Bước quan trọng nhất bạn đang tìm)
-            // Nếu biến này khác 0, nghĩa là có sự thay đổi ở phe Xanh (do kéo giờ Xanh ngày thường HOẶC kéo giờ 9h30 CN)
+            // --- 4. PHÂN BỔ NỢ CHO TOÀN BỘ CÁC NGÀY (THƯỜNG + CN) ---
+            // Nếu có nợ Xanh phát sinh (từ case A2 hoặc B), ta chia đều cho cả tháng
             if (globalNormalDebt !== 0) {
                 distributeGlobalNormalDebt(globalNormalDebt, targetIndex);
             }
@@ -803,48 +807,78 @@
             initAllCharts();
         }
 
-        // --- CÁC HÀM HELPER (ĐÃ SỬA TÊN) ---
-
+        // --- 2. HÀM PHÂN BỔ NỢ TOÀN CỤC (GLOBAL) ---
         function distributeGlobalNormalDebt(kwhDebt, skipIndex) {
             let candidates = [];
-            let totalWeight = 0;
+            let totalWeight = 0; // Tổng dung lượng (đơn vị: slot-ngày)
 
-            // Helper chọn ứng viên để code gọn hơn
-            const scanCandidates = (dataSet, daysWeight) => {
+            // Helper: Quét tìm các giờ Bình thường trong 1 dataset
+            // weightPerSlot: 26 (nếu là ngày thường) hoặc 4 (nếu là CN)
+            const scanAndCollect = (dataSet, weightPerSlot, isSundayMode) => {
                 if (!dataSet) return;
+
                 for (let i = 0; i < 48; i++) {
+                    // Bỏ qua ô đang kéo
                     if (i === skipIndex) continue;
-                    if (i >= 34 || (i >= 8 && i < 16)) continue; // Skip giờ nghỉ/cấm
+                    // Bỏ qua vùng cấm (nếu có logic vùng cấm)
+                    if (i >= 34 || (i >= 8 && i < 16 && !isSundayMode)) {
+                        // Lưu ý: Nếu là CN thì 8h-16h không bị cấm vì nó là giờ BT/TD
+                        // Tùy logic cấm tải của bạn, ở đây mình check đơn giản
+                        if (!isSundayMode && (i >= 8 && i < 16)) continue; 
+                    }
+                    if (i >= 34) continue; // Giả sử sau 17h không bù trừ (tuỳ bạn)
 
                     const t = getTariffType(i);
-                    // Logic chọn: Type 1 luôn chọn. Type 2 chỉ chọn nếu là dataset của CN.
-                    // (Mẹo: Check dataSet === liveData.sunday_work hơi rủi ro, nên dựa vào Tariff thực tế tại ô đó)
                     
-                    let isValid = (t === 1); 
-                    if (daysWeight === DAYS_SUN && t === 2) isValid = true; // CN chấp nhận cả giờ Cao điểm (vì là giá BT)
+                    // Logic xác định "Đây có phải giờ Bình thường không?"
+                    let isNormalSlot = false;
+                    
+                    if (isSundayMode) {
+                        // Ở CN: Type 1 (BT) và Type 2 (CĐ) đều tính là Bình thường
+                        if (t === 1 || t === 2) isNormalSlot = true;
+                    } else {
+                        // Ở Ngày thường: Chỉ Type 1 là Bình thường
+                        if (t === 1) isNormalSlot = true;
+                    }
 
-                    if (isValid) {
-                        const val = dataSet.bt_l[i] + dataSet.cd_l[i] + dataSet.td[i]; // Lấy tổng cho chắc
-                        if (val > 0.1) {
-                            candidates.push({ data: dataSet, idx: i, isSun: daysWeight === DAYS_SUN });
-                            totalWeight += daysWeight;
+                    // Nếu đúng là giờ Bình thường -> Đưa vào danh sách chịu phạt
+                    if (isNormalSlot) {
+                        const currentVal = dataSet.bt_l[i] + dataSet.cd_l[i] + dataSet.td[i];
+                        // Chỉ chọn những ô đang có điện (để trừ)
+                        if (currentVal > 0.01) {
+                            candidates.push({ 
+                                data: dataSet, 
+                                idx: i, 
+                                isSun: isSundayMode 
+                            });
+                            // CỘNG DỒN TRỌNG SỐ: Quan trọng nhất đoạn này
+                            // Tìm thấy 1 ô ở ngày thường -> cộng 26
+                            // Tìm thấy 1 ô ở CN -> cộng 4
+                            totalWeight += weightPerSlot; 
                         }
                     }
                 }
             };
 
-            scanCandidates(liveData.weekday_work, DAYS_WEEK);
-            if (DAYS_SUN > 0) scanCandidates(liveData.sunday_work, DAYS_SUN);
+            // 1. Quét Ngày thường (Weight = 26 ngày)
+            scanAndCollect(liveData.weekday_work, DAYS_WEEK, false);
 
+            // 2. Quét Chủ Nhật (Weight = 4 ngày)
+            if (DAYS_SUN > 0) {
+                scanAndCollect(liveData.sunday_work, DAYS_SUN, true);
+            }
+
+            // 3. Thực hiện chia đều và trừ
             if (totalWeight > 0) {
-                const kwReduction = -(kwhDebt / totalWeight); // kW cần giảm
-                
+                // Tính số kW cần trừ cho mỗi slot
+                // Ví dụ: Nợ 40kWh / 316 trọng số = 0.126 kW
+                const kwReduction = -(kwhDebt / totalWeight);
+
                 candidates.forEach(item => {
                     const cur = item.data.bt_l[item.idx] + item.data.cd_l[item.idx] + item.data.td[item.idx];
                     let neu = cur + kwReduction;
-                    if (neu < 0) neu = 0; // Chấp nhận mất sai số nhỏ để an toàn
+                    if (neu < 0) neu = 0; // Không cho âm
                     
-                    // Gọi hàm setLoadValue thay vì distributeValue
                     setLoadValue(item.data, item.idx, neu, item.isSun);
                 });
             }
@@ -881,7 +915,6 @@
          * isSunday: boolean (Truyền vào tường minh để tránh so sánh object)
          */
         function setLoadValue(dataSet, i, val, isSunday) {
-            // Reset dòng này về 0
             dataSet.td[i] = 0; 
             dataSet.bt_l[i] = 0; 
             dataSet.cd_l[i] = 0;
@@ -889,11 +922,11 @@
             const type = getTariffType(i);
 
             if (type === 0) {
-                dataSet.td[i] = val; // Thấp điểm
-            } else if (type === 2 && !isSunday) {
-                dataSet.cd_l[i] = val; // Cao điểm (Chỉ ngày thường)
-            } else {
-                dataSet.bt_l[i] = val; // Bình thường (hoặc Cao điểm của ngày CN)
+                dataSet.td[i] = val; 
+            } else if (type === 2 && !isSunday) { // Cao điểm ngày thường
+                dataSet.cd_l[i] = val; 
+            } else { // Bình thường (hoặc Cao điểm CN)
+                dataSet.bt_l[i] = val; 
             }
         }
 
