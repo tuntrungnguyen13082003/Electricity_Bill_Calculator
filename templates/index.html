@@ -732,65 +732,99 @@
             });
         }
 
-        // --- 3. TÍNH TOÁN LẠI (ĐÃ SỬA CHẶN 4h-8h) ---
+        // --- 3. TÍNH TOÁN LẠI (PHIÊN BẢN ĐỒNG BỘ CHÉO) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
+            // A. XỬ LÝ BIỂU ĐỒ GỐC (Cái bạn đang kéo)
             let sourceData;
-            
-            if (sourceId === 'chart_work') { sourceData = liveData.weekday_work; } 
-            else if (sourceId === 'chart_off') { sourceData = liveData.off_weekday; }
+            if (sourceId === 'chart_work') sourceData = liveData.weekday_work; 
+            else if (sourceId === 'chart_off') sourceData = liveData.off_weekday;
             
             if (!sourceData) return;
 
+            // 1. Tính độ lệch pha (Bạn kéo lên hay kéo xuống bao nhiêu?)
             const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
             const delta = newTotalValue - oldTotal;
 
-            // 1. Cập nhật chính điểm đang kéo
-            distributeValueToComponents(sourceData, targetIndex, newTotalValue);
+            // 2. Cập nhật chính nó và cân bằng lại các giờ khác trong ngày đó
+            performBalancing(sourceData, targetIndex, newTotalValue, delta);
 
-            // 2. Tìm đồng đội để chia sẻ
+            // ============================================================
+            // B. LOGIC ĐỒNG BỘ: KÉO NGÀY THƯỜNG -> ẢNH HƯỞNG CHỦ NHẬT
+            // ============================================================
             const targetType = getTariffType(targetIndex);
             
-            // Nếu đang kéo Thấp điểm (Xanh lá) -> Cho phép chỉnh sửa full 24h
-            // Nếu đang kéo Bình thường/Cao điểm -> Bị chặn tải nền
-            const isEditingLowPeak = (targetType === 0); 
-            
-            let candidates = []; 
+            // Chỉ đồng bộ khi:
+            // 1. Bạn đang kéo biểu đồ "Ngày làm việc" (chart_work)
+            // 2. Giờ bạn kéo là giờ CAO ĐIỂM (Type = 2)
+            // 3. Có ngày làm việc Chủ Nhật (stats.sun_work > 0)
+            if (sourceId === 'chart_work' && targetType === 2 && liveData.stats.sun_work > 0) {
+                
+                const sundayData = liveData.sunday_work; // Lấy dữ liệu Chủ Nhật
+                if (sundayData) {
+                    // Lấy giá trị hiện tại của giờ đó bên Chủ Nhật
+                    const sunOldVal = sundayData.td[targetIndex] + sundayData.bt_l[targetIndex] + sundayData.cd_l[targetIndex];
+                    
+                    // Tính độ lệch cần áp dụng cho Chủ Nhật (Để nó nhảy lên bằng giá trị mới)
+                    // Lưu ý: Giá trị đích là newTotalValue (để cao bằng ngày thường)
+                    const sunDelta = newTotalValue - sunOldVal;
 
+                    // Thực hiện cân bằng cho biểu đồ Chủ Nhật
+                    performBalancing(sundayData, targetIndex, newTotalValue, sunDelta);
+                }
+            }
+
+            // Vẽ lại toàn bộ
+            initAllCharts();
+        }
+
+        // --- HÀM CÂN BẰNG NỘI BỘ (Tách ra để tái sử dụng cho cả 2 biểu đồ) ---
+        function performBalancing(dataSet, targetIndex, newValue, delta) {
+            // 1. Cập nhật điểm đang kéo
+            distributeValueToComponents(dataSet, targetIndex, newValue);
+
+            // 2. Tìm đồng đội để chia sẻ (Logic cũ)
+            const targetType = getTariffType(targetIndex);
+            // Giờ cao điểm (Type 2) của ngày thường -> Sang chủ nhật nó thành Type 1 (Bình thường)
+            // Nên ta cần check lỏng hơn: Nếu đang sửa Cao điểm thì được phép bù trừ vào Bình thường
+            
+            const isEditingLowPeak = (targetType === 0); 
+
+            let candidates = [];
             for (let i = 0; i < 48; i++) {
-                // Bỏ qua chính nó
                 if (i === targetIndex) continue;
 
-                // --- QUAN TRỌNG: VÙNG CẤM BAY ---
+                // Vùng cấm bay (Sáng sớm & Chiều muộn)
                 if (!isEditingLowPeak) {
-                    // 1. Chặn sau 17h (Tan ca) -> Index >= 34
-                    if (i >= 34) continue;
-
-                    // 2. Chặn từ 4h đến 8h (Tải nền sáng sớm)
-                    // 4h = Index 8. 8h = Index 16.
-                    // Nếu i nằm trong khoảng [8, 16) -> Bỏ qua
-                    if (i >= 8 && i < 16) continue;
+                    if (i >= 34) continue; // Sau 17h
+                    if (i >= 8 && i < 16) continue; // 4h-8h
                 }
                 
-                // Chỉ chia sẻ với giờ cùng màu
-                if (getTariffType(i) === targetType) {
-                    const val = sourceData.td[i] + sourceData.bt_l[i] + sourceData.cd_l[i];
-                    if (val > 0.1) candidates.push(i);
+                // LOGIC QUAN TRỌNG: 
+                // Nếu đang kéo Cao điểm -> Chỉ tìm Bình thường hoặc Cao điểm để trừ
+                // Không được đụng vào Thấp điểm
+                const currentType = getTariffType(i);
+                if (isEditingLowPeak) {
+                    // Kéo thấp điểm -> Chỉ bù vào thấp điểm
+                    if (currentType === 0) candidates.push(i);
+                } else {
+                    // Kéo Cao điểm/Bình thường -> Bù vào Cao điểm/Bình thường (Tránh Thấp điểm)
+                    if (currentType !== 0) {
+                         const val = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
+                         if (val > 0.1) candidates.push(i);
+                    }
                 }
             }
 
+            // 3. Thực hiện chia đều phần chênh lệch
             if (candidates.length > 0) {
                 const compensation = -delta / candidates.length;
-
                 candidates.forEach(i => {
-                    const d = sourceData;
-                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
+                    const cur = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
                     let neu = cur + compensation;
                     if (neu < 0) neu = 0;
-                    distributeValueToComponents(d, i, neu);
+                    distributeValueToComponents(dataSet, i, neu);
                 });
             }
-
-            initAllCharts();
         }
 
         // --- 4. PHÂN MÀU ---
