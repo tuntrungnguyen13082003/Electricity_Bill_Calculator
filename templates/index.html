@@ -395,7 +395,7 @@
                                     <td style="font-weight: bold;">{{ row['Tên Khách Hàng'] if row['Tên Khách Hàng']|string != 'nan' else 'Chưa có tên' }}</td>
                                     <td>{{ row['Khu Vực'].split(' - ')[0] if row['Khu Vực']|string != 'nan' else '-' }}</td>
                                     <td>{{ row['Đầu Vào'] if row['Đầu Vào']|string != 'nan' else '-' }}</td>
-                                    <td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] if row['Kết Quả (kWp)']|string != 'nan' else '0' }} kWp</td>
+                                    <td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] if row['Kết Quả (kWp)']|string != 'nan' else '0' }}</td>
                                     <td class="col-center">
                                         <form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');">
                                             <input type="hidden" name="row_index" value="{{ row['id_row'] }}">
@@ -423,7 +423,7 @@
                                     <td style="font-weight: bold;">{{ row['Tên Khách Hàng'] if row['Tên Khách Hàng']|string != 'nan' else 'Chưa có tên' }}</td>
                                     <td>{{ row['Khu Vực'].split(' - ')[0] if row['Khu Vực']|string != 'nan' else '-' }}</td>
                                     <td>{{ row['Đầu Vào'] if row['Đầu Vào']|string != 'nan' else '-' }}</td>
-                                    <td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] if row['Kết Quả (kWp)']|string != 'nan' else '0' }} kWp</td>
+                                    <td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] if row['Kết Quả (kWp)']|string != 'nan' else '0' }}</td>
                                     <td class="col-center">
                                         <form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');">
                                             <input type="hidden" name="row_index" value="{{ row['id_row'] }}">
