@@ -55,24 +55,32 @@ def ai_doc_hoa_don(file_path):
                 if text:
                     full_text += text + "\n"
 
+            if not full_text.strip():
+                print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
+                return None
+            
             # --- 1. MỚI: TRÍCH XUẤT TÊN KHÁCH HÀNG ---
             # Tìm dòng "Khách hàng" và lấy nội dung phía sau 
             name_match = re.search(r"Khách hàng\s*[\n\r]\s*(.*)", full_text, re.IGNORECASE)
             if name_match:
                 data["ten_kh"] = name_match.group(1).strip().replace('"', '').replace(',', '')
+                print(f"✅ Tìm thấy tên: {data['ten_kh']}") # [cite: 2, 61, 118]
+            else:
+                print("⚠️ Không tìm thấy tên khách hàng.")
             
             # --- 2. MỚI: TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) ---
             # Tìm trong "Địa chỉ sử dụng điện" và so khớp với danh sách SETTINGS 
-            address_match = re.search(r"Địa chỉ sử dụng điện\s*(.*)", full_text, re.IGNORECASE)
-            if address_match:
-                address_str = address_match.group(1).lower()
-                # Duyệt qua danh sách tỉnh thành bạn có trong SETTINGS để chọn đúng Option
-                if 'tinh_thanh' in SETTINGS:
-                    for tinh in SETTINGS['tinh_thanh'].keys():
-                        if tinh.lower() in address_str:
-                            data["tinh_thanh"] = tinh
-                            break
-                        
+            if 'tinh_thanh' in SETTINGS:
+                # Sắp xếp danh sách tỉnh theo độ dài giảm dần để tránh nhận diện nhầm
+                tinh_keys = sorted(SETTINGS['tinh_thanh'].keys(), key=len, reverse=True)
+                for tinh in tinh_keys:
+                    if tinh.lower() in full_text.lower():
+                        data["tinh_thanh"] = tinh
+                        print(f"✅ Tìm thấy khu vực: {tinh}")
+                        break
+            if not data["tinh_thanh"]:
+                print("⚠️ Không tìm thấy khu vực trong danh sách cài đặt.")
+
             # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
             # Tìm đoạn văn bản sau cụm "Mục đích sử dụng điện"
             purpose_match = re.search(r"Mục đích sử dụng điện\s*(.*)", full_text, re.IGNORECASE)
