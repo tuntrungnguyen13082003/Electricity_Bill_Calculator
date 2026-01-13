@@ -527,44 +527,38 @@
             }
         });
         function resetAllResults() {
-            console.log("--- ĐANG RESET TOÀN BỘ KẾT QUẢ ---");
-
-            // 1. XÓA BIỂU ĐỒ (Phần cũ)
-            if (window.charts) {
-                Object.keys(window.charts).forEach(key => {
-                    if (window.charts[key]) {
-                        window.charts[key].destroy(); 
-                    }
-                });
-                window.charts = {}; 
-            }
-
-            // 2. ẨN KHUNG CHỨA BIỂU ĐỒ (Cái khung Grid 4 cái)
-            const chartGrid = document.querySelector('.row.chart-wrapper-grid'); // Hoặc ID cụ thể nếu bạn đã đặt
-            if (chartGrid) {
-                chartGrid.style.display = 'none';
-                // Hoặc xóa trắng luôn HTML nội dung bên trong nếu muốn:
-                chartGrid.innerHTML = ''; 
-            }
-
-            // 3. XÓA/ẨN KẾT QUẢ CÔNG SUẤT ĐỀ XUẤT (Phần bạn vừa yêu cầu)
-            // Giả sử toàn bộ phần hiển thị kết quả nằm trong 1 div lớn có id="ket_qua_tinh_toan"
-            const resultSection = document.getElementById('ket_qua_tinh_toan'); 
-            if (resultSection) {
-                resultSection.style.display = 'none'; // Ẩn nguyên khối kết quả đi
-            }
-
-            // [TÙY CHỌN] Nếu bạn muốn xóa trắng các ô input cụ thể thay vì ẩn cả khối:
-            
-            document.getElementById('txt_cong_suat_de_xuat').value = '';
-            document.getElementById('txt_so_tam_pin').innerText = '0';
-            document.getElementById('txt_san_luong_du_kien').innerText = '0 kWh';
-
-            // 4. RESET BIẾN DỮ LIỆU GỐC
-            if (typeof liveData !== 'undefined') {
-                liveData = null;
-            }
+        // 1. XÓA BIỂU ĐỒ (Giữ nguyên logic cũ)
+        if (window.charts) {
+            Object.keys(window.charts).forEach(key => {
+                if (window.charts[key]) window.charts[key].destroy();
+            });
+            window.charts = {}; 
         }
+
+        // 2. ẨN BIỂU ĐỒ (Chỉ ẩn phần vẽ thôi, không ẩn phần số)
+        const chartGrid = document.querySelector('.row.chart-wrapper-grid'); 
+        if (chartGrid) chartGrid.style.display = 'none';
+
+        // 3. [QUAN TRỌNG] KHÔNG ẨN DIV KẾT QUẢ, MÀ CHỈ RESET SỐ LIỆU
+        // Đừng dùng style.display = 'none' nữa
+        
+        // Tìm các thẻ đang hiển thị số và đưa về '---'
+        // Bạn thay ID bên dưới bằng ID thật của mấy cái số to đùng màu xanh đó nhé
+        const elCongSuat = document.getElementById('hien_thi_cong_suat'); // Ví dụ ID
+        if (elCongSuat) elCongSuat.innerHTML = '--- kWp';
+
+        const elDienTich = document.getElementById('hien_thi_dien_tich'); // Ví dụ ID
+        if (elDienTich) elDienTich.innerHTML = '--- m²';
+        
+        // Nếu bạn muốn reset cả ô nhập tiền (Để người dùng nhập lại từ đầu cho đúng mô hình mới)
+        const inputTien = document.querySelector('input[name="so_tien_dien"]');
+        if (inputTien) inputTien.value = ''; 
+
+        // 4. Reset biến dữ liệu
+        if (typeof liveData !== 'undefined') liveData = null;
+        
+        console.log("Đã Soft-Reset giao diện!");
+    }
     </script>
     <script>
         function uploadVaQuetAnh(input) {
