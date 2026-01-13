@@ -70,14 +70,13 @@ def ai_doc_hoa_don(file_path):
             
             # --- 2. MỚI: TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) ---
             # Tìm trong "Địa chỉ sử dụng điện" và so khớp với danh sách SETTINGS 
-            if 'tinh_thanh' in SETTINGS:
-                # Sắp xếp danh sách tỉnh theo độ dài giảm dần để tránh nhận diện nhầm
-                tinh_keys = sorted(SETTINGS['tinh_thanh'].keys(), key=len, reverse=True)
-                for tinh in tinh_keys:
-                    if tinh.lower() in full_text.lower():
-                        data["tinh_thanh"] = tinh
-                        print(f"✅ Tìm thấy khu vực: {tinh}")
-                        break
+            address_block = re.findall(r"Địa chỉ.*", full_text, re.IGNORECASE)
+            combined_address_text = " ".join(address_block).lower()
+            tinh_list = sorted(SETTINGS.get('tinh_thanh', {}).keys(), key=len, reverse=True)
+            for tinh in tinh_list:
+                if tinh.lower() in combined_address_text or tinh.lower() in full_text.lower():
+                    data["tinh_thanh"] = tinh
+                    break
             if not data["tinh_thanh"]:
                 print("⚠️ Không tìm thấy khu vực trong danh sách cài đặt.")
 
