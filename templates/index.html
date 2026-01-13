@@ -608,9 +608,6 @@
         window.charts = {}; 
         const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
         let liveData = JSON.parse(JSON.stringify(chartDataRaw));
-        const IS_WORKING_SUNDAY = (liveData.stats.sun_work > 0);
-        const DAYS_WEEK = liveData.stats.week_work || 26; 
-        const DAYS_SUN  = liveData.stats.sun_work || 0;
 
         // --- HÀM CHUYỂN TAB ---
         function switchChartTab(canvasId, btn) {
@@ -670,17 +667,6 @@
                 } else {
                     dataHienThi = liveData.off_weekday;
                 }
-                
-                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
-            }
-
-            if(document.getElementById('chart_off')) {
-                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
-                
-                // LOGIC MỚI:
-                // Nếu có đi làm CN -> Hiển thị biểu đồ CN (Đã được đồng bộ ở trên)
-                // Nếu nghỉ CN -> Hiển thị biểu đồ Ngày nghỉ (Tải nền thấp)
-                let dataHienThi = IS_WORKING_SUNDAY ? liveData.sunday_work : liveData.off_weekday;
                 
                 window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
             }
@@ -746,179 +732,75 @@
             });
         }
 
-        // --- 1. HÀM TÍNH TOÁN CHÍNH ---
+        // --- 3. TÍNH TOÁN LẠI (ĐÃ SỬA CHẶN 4h-8h) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
-            const master = liveData.weekday_work;
-            const slave = liveData.sunday_work;
-            const hasSunday = (DAYS_SUN > 0);
-
-            // 1. Tính độ lệch công suất (Delta kW)
-            const oldVal = master.td[targetIndex] + master.bt_l[targetIndex] + master.cd_l[targetIndex];
-            const deltaKW = newTotalValue - oldVal;
-
-            // 2. Cập nhật giá trị tại điểm kéo (Target)
-            // Cập nhật Master (Ngày thường)
-            setLoadValue(master, targetIndex, newTotalValue, false);
+            let sourceData;
             
-            // Cập nhật Slave (Chủ nhật) - Ép buộc đồng bộ giá trị
-            if (hasSunday) {
-                setLoadValue(slave, targetIndex, newTotalValue, true);
-            }
+            if (sourceId === 'chart_work') { sourceData = liveData.weekday_work; } 
+            else if (sourceId === 'chart_off') { sourceData = liveData.off_weekday; }
+            
+            if (!sourceData) return;
 
-            // --- 3. XỬ LÝ BÙ TRỪ (LOGIC QUAN TRỌNG) ---
-            const type = getTariffType(targetIndex);
-            let globalNormalDebt = 0; // Biến chứa tổng "Nợ" của phe Bình thường (kWh)
+            const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
+            const delta = newTotalValue - oldTotal;
 
-            // TRƯỜNG HỢP A: Kéo giờ CAO ĐIỂM (Màu Đỏ - Type 2)
-            // Ví dụ: Kéo lúc 9h30
-            if (type === 2) {
-                // A1. Tại Ngày thường: Đỏ tự xử với Đỏ (Nội bộ)
-                // (Không ảnh hưởng đến phe Xanh của ngày thường)
-                balanceInternal(master, targetIndex, deltaKW, 2);
+            // 1. Cập nhật chính điểm đang kéo
+            distributeValueToComponents(sourceData, targetIndex, newTotalValue);
 
-                // A2. Tại Chủ Nhật: Giờ này biến thành BÌNH THƯỜNG
-                // Nên sự thay đổi này tạo ra nợ cho quỹ Bình thường
-                if (hasSunday) {
-                    // Nợ = Delta * 4 ngày CN
-                    globalNormalDebt += deltaKW * DAYS_SUN;
+            // 2. Tìm đồng đội để chia sẻ
+            const targetType = getTariffType(targetIndex);
+            
+            // Nếu đang kéo Thấp điểm (Xanh lá) -> Cho phép chỉnh sửa full 24h
+            // Nếu đang kéo Bình thường/Cao điểm -> Bị chặn tải nền
+            const isEditingLowPeak = (targetType === 0); 
+            
+            let candidates = []; 
+
+            for (let i = 0; i < 48; i++) {
+                // Bỏ qua chính nó
+                if (i === targetIndex) continue;
+
+                // --- QUAN TRỌNG: VÙNG CẤM BAY ---
+                if (!isEditingLowPeak) {
+                    // 1. Chặn sau 17h (Tan ca) -> Index >= 34
+                    if (i >= 34) continue;
+
+                    // 2. Chặn từ 4h đến 8h (Tải nền sáng sớm)
+                    // 4h = Index 8. 8h = Index 16.
+                    // Nếu i nằm trong khoảng [8, 16) -> Bỏ qua
+                    if (i >= 8 && i < 16) continue;
+                }
+                
+                // Chỉ chia sẻ với giờ cùng màu
+                if (getTariffType(i) === targetType) {
+                    const val = sourceData.td[i] + sourceData.bt_l[i] + sourceData.cd_l[i];
+                    if (val > 0.1) candidates.push(i);
                 }
             }
-            // TRƯỜNG HỢP B: Kéo giờ BÌNH THƯỜNG (Màu Xanh - Type 1)
-            else if (type === 1) {
-                // Ảnh hưởng cả 26 ngày thường + 4 ngày CN
-                let totalDays = DAYS_WEEK;
-                if (hasSunday) totalDays += DAYS_SUN;
-                
-                // Nợ = Delta * 30 ngày
-                globalNormalDebt += deltaKW * totalDays;
-            }
-            // TRƯỜNG HỢP C: Kéo giờ THẤP ĐIỂM (Type 0)
-            else {
-                balanceInternal(master, targetIndex, deltaKW, 0);
-                if (hasSunday) balanceInternal(slave, targetIndex, deltaKW, 0);
-            }
 
-            // --- 4. PHÂN BỔ NỢ CHO TOÀN BỘ CÁC NGÀY (THƯỜNG + CN) ---
-            // Nếu có nợ Xanh phát sinh (từ case A2 hoặc B), ta chia đều cho cả tháng
-            if (globalNormalDebt !== 0) {
-                distributeGlobalNormalDebt(globalNormalDebt, targetIndex);
+            if (candidates.length > 0) {
+                const compensation = -delta / candidates.length;
+
+                candidates.forEach(i => {
+                    const d = sourceData;
+                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
+                    let neu = cur + compensation;
+                    if (neu < 0) neu = 0;
+                    distributeValueToComponents(d, i, neu);
+                });
             }
 
             initAllCharts();
         }
 
-        // --- 2. HÀM PHÂN BỔ NỢ TOÀN CỤC (GLOBAL) ---
-        function distributeGlobalNormalDebt(kwhDebt, skipIndex) {
-            let candidates = [];
-            let totalWeight = 0; 
+        // --- 4. PHÂN MÀU ---
+        function distributeValueToComponents(dataSet, i, totalValue) {
+            dataSet.td[i] = 0; dataSet.bt_l[i] = 0; dataSet.cd_l[i] = 0; 
+            const type = getTariffType(i); 
 
-            // Helper quét tìm giờ
-            const scanAndCollect = (dataSet, weightPerSlot, isSundayMode) => {
-                if (!dataSet) return;
-
-                for (let i = 0; i < 48; i++) {
-                    // 1. Bỏ qua ô đang kéo
-                    if (i === skipIndex) continue;
-                    
-                    // 2. CHỈ GIỮ LẠI ĐIỀU KIỆN NÀY: Bỏ qua giờ sau 17h nếu muốn (tuỳ bạn chọn)
-                    // Nếu hệ thống chạy 24/7 thì bỏ luôn dòng này cũng được
-                    if (i >= 34) continue; 
-
-                    // --- ĐÃ XÓA ĐOẠN (i >= 8 && i < 16) GÂY LỖI ---
-
-                    const t = getTariffType(i);
-                    
-                    // 3. Xác định giờ có được phép gánh nợ không? (Là giờ Bình thường)
-                    let isNormalSlot = false;
-                    if (isSundayMode) {
-                        // CN: Bình thường (1) hoặc Cao điểm (2 - quy về bình thường)
-                        if (t === 1 || t === 2) isNormalSlot = true;
-                    } else {
-                        // Ngày thường: Chỉ giờ Bình thường (1)
-                        if (t === 1) isNormalSlot = true;
-                    }
-
-                    // 4. Nếu đúng là giờ xanh và đang có điện -> Đưa vào danh sách
-                    if (isNormalSlot) {
-                        const currentVal = dataSet.bt_l[i] + dataSet.cd_l[i] + dataSet.td[i];
-                        if (currentVal > 0.01) {
-                            candidates.push({ data: dataSet, idx: i, isSun: isSundayMode });
-                            totalWeight += weightPerSlot; 
-                        }
-                    }
-                }
-            };
-
-            // Quét cả 2 hệ thống
-            scanAndCollect(liveData.weekday_work, DAYS_WEEK, false);
-            if (DAYS_SUN > 0) scanAndCollect(liveData.sunday_work, DAYS_SUN, true);
-
-            // LOGIC CHIA VÀ TRỪ
-            if (totalWeight > 0) {
-                // In ra Console để kiểm chứng
-                const kwReduction = -(kwhDebt / totalWeight);
-                console.log(`=== PHÂN BỔ NỢ ===`);
-                console.log(`Tổng nợ phát sinh: ${kwhDebt.toFixed(2)} kWh`);
-                console.log(`Tổng trọng số (số ngày * số giờ xanh): ${totalWeight}`);
-                console.log(`=> Mỗi giờ xanh sẽ bị GIẢM: ${Math.abs(kwReduction).toFixed(4)} kW`);
-
-                candidates.forEach(item => {
-                    const cur = item.data.bt_l[item.idx] + item.data.cd_l[item.idx] + item.data.td[item.idx];
-                    let neu = cur + kwReduction;
-                    if (neu < 0) neu = 0;
-                    
-                    // Cập nhật lại
-                    setLoadValue(item.data, item.idx, neu, item.isSun);
-                });
-            } else {
-                console.warn("Không tìm thấy giờ Bình thường nào để trừ nợ!");
-            }
-        }
-
-        function balanceInternal(dataSet, skipIndex, delta, targetType) {
-            let candidates = [];
-            // ... (Code tìm candidate của bạn giữ nguyên, chỉ sửa đoạn dưới) ...
-            for(let i=0; i<48; i++) {
-                if(i === skipIndex) continue;
-                if(targetType !== 0 && (i >= 34 || (i >= 8 && i < 16))) continue;
-                
-                if(getTariffType(i) === targetType) {
-                    const val = dataSet.bt_l[i] + dataSet.cd_l[i] + dataSet.td[i];
-                    if(val > 0.1) candidates.push(i);
-                }
-            }
-
-            if (candidates.length > 0) {
-                const adjustment = -(delta / candidates.length);
-                const isSun = (dataSet === liveData.sunday_work);
-
-                candidates.forEach(i => {
-                    const cur = dataSet.bt_l[i] + dataSet.cd_l[i] + dataSet.td[i];
-                    let neu = cur + adjustment;
-                    if (neu < 0) neu = 0;
-                    setLoadValue(dataSet, i, neu, isSun);
-                });
-            }
-        }
-
-        /**
-         * ĐỔI TÊN: setLoadValue (Tránh trùng với hàm chia mảng)
-         * isSunday: boolean (Truyền vào tường minh để tránh so sánh object)
-         */
-        function setLoadValue(dataSet, i, val, isSunday) {
-            dataSet.td[i] = 0; 
-            dataSet.bt_l[i] = 0; 
-            dataSet.cd_l[i] = 0;
-            
-            const type = getTariffType(i);
-
-            if (type === 0) {
-                dataSet.td[i] = val; 
-            } else if (type === 2 && !isSunday) { // Cao điểm ngày thường
-                dataSet.cd_l[i] = val; 
-            } else { // Bình thường (hoặc Cao điểm CN)
-                dataSet.bt_l[i] = val; 
-            }
+            if (type === 0) dataSet.td[i] = totalValue; 
+            else if (type === 2) dataSet.cd_l[i] = totalValue; 
+            else dataSet.bt_l[i] = totalValue; 
         }
 
         // --- 5. CHECK LOẠI GIỜ ---
