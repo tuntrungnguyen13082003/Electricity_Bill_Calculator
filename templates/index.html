@@ -668,125 +668,142 @@
             initAllCharts();
         });
 
-        // --- 1. KHỞI TẠO ---
-        function initAllCharts() {
-            let maxVal = 0;
-            
-            // Bước 1: Tìm Max Y chung cho tất cả dataset để đồng bộ tỷ lệ
-            const allDatasets = [
-                liveData.weekday_work, 
-                liveData.sunday_work, 
-                liveData.off_weekday, 
-                liveData.off_sunday
-            ];
-            
-            allDatasets.forEach(data => {
-                if (data) {
-                    // Tính tổng load tại mỗi giờ
-                    const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
-                    const currentMax = Math.max(...hourlyTotals);
-                    if (currentMax > maxVal) maxVal = currentMax;
-                }
-            });
-
-            // Thiết lập trần hiển thị
-            if (!window.HARD_LIMIT) {
-                window.HARD_LIMIT = maxVal * 2; 
-                if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
-            }
-            const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
-
-            // Bước 2: Hủy biểu đồ cũ (nếu có) để vẽ mới
-            ['chart_work_weekday', 'chart_work_sunday', 'chart_off_weekday', 'chart_off_sunday'].forEach(id => {
-                if (window.charts[id]) window.charts[id].destroy();
-            });
-
-            // Bước 3: Vẽ 4 biểu đồ tường minh
-            // Chỉ cho phép KÉO (Drag) ở biểu đồ số 1 (Master)
-            window.charts['chart_work_weekday'] = createChart('chart_work_weekday', liveData.weekday_work, COMMON_MAX_Y, true); 
-            window.charts['chart_work_sunday']  = createChart('chart_work_sunday', liveData.sunday_work, COMMON_MAX_Y, false);
-            window.charts['chart_off_weekday']  = createChart('chart_off_weekday', liveData.off_weekday, COMMON_MAX_Y, false);
-            window.charts['chart_off_sunday']   = createChart('chart_off_sunday', liveData.off_sunday, COMMON_MAX_Y, false);
+        function getEffectiveData(originalData, isActive) {
+            if (isActive && originalData) return originalData;
+            // Nếu không kích hoạt, trả về mảng toàn số 0
+            return {
+                td: Array(48).fill(0),
+                bt_l: Array(48).fill(0),
+                cd_l: Array(48).fill(0)
+            };
         }
 
-        // --- 2. HÀM TẠO BIỂU ĐỒ ---
-        function createChart(canvasId, dataSrc, maxYValue, allowDrag) {
-            const ctx = document.getElementById(canvasId);
-            if (!ctx || !dataSrc) return; // Nếu dữ liệu null thì bỏ qua
+        // --- 1. KHỞI TẠO ---
+        // --- 1. KHỞI TẠO 4 BIỂU ĐỒ ---
+    function initAllCharts() {
+        // Lấy dữ liệu thực tế dựa trên cấu hình (Có làm CN hay không?)
+        // 1. Ngày làm việc thường: Luôn có
+        const dataWorkWeek = liveData.weekday_work;
+        
+        // 2. Ngày làm việc CN: Chỉ hiện số liệu nếu IS_WORKING_SUNDAY = true
+        const dataWorkSun  = getEffectiveData(liveData.sunday_work, IS_WORKING_SUNDAY);
+        
+        // 3. Ngày nghỉ thường: Dùng cho ngày Lễ. 
+        // (Tùy ý bạn, ở đây mình vẫn để hiện để chỉnh Lễ, nếu muốn ẩn luôn thì sửa true thành false)
+        const dataOffWeek  = getEffectiveData(liveData.off_weekday, true); 
+        
+        // 4. Ngày nghỉ CN: Luôn có (vì nghỉ CN thì phải dùng profile này)
+        const dataOffSun   = liveData.off_sunday;
 
-            const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-            const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
+        // --- Tìm Max Y để đồng bộ tỷ lệ ---
+        let maxVal = 0;
+        [dataWorkWeek, dataWorkSun, dataOffWeek, dataOffSun].forEach(data => {
+            if (data) {
+                const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
+                const currentMax = Math.max(...hourlyTotals);
+                if (currentMax > maxVal) maxVal = currentMax;
+            }
+        });
 
-            return new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: liveData.labels,
-                    datasets: [
-                        { 
-                            type: 'line', 
-                            label: 'Tổng công suất (kW)', 
-                            data: totalLoad, 
-                            borderColor: DARK_YELLOW, 
-                            borderWidth: 3, 
-                            pointRadius: 3, 
-                            pointHoverRadius: 6, 
-                            pointBackgroundColor: 'white', 
-                            pointBorderColor: DARK_YELLOW, 
-                            tension: 0.4, 
-                            fill: false, 
-                            order: 0, 
-                            // Chỉ cho phép drag nếu allowDrag = true
-                            dragData: allowDrag 
-                        },
-                        { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
-                        { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
-                        { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
-                    ]
-                },
-                options: {
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    animation: false, // Tắt animation để update mượt hơn
-                    scales: { 
-                        y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
-                        x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
+        if (!window.HARD_LIMIT) {
+            window.HARD_LIMIT = maxVal * 2; 
+            if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
+        }
+        const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
+
+        // --- Hủy biểu đồ cũ ---
+        ['chart_work_weekday', 'chart_work_sunday', 'chart_off_weekday', 'chart_off_sunday'].forEach(id => {
+            if (window.charts[id]) window.charts[id].destroy();
+        });
+
+        // --- Vẽ biểu đồ mới với dữ liệu đã lọc ---
+        // Cho phép KÉO (Drag) ở biểu đồ số 1
+        window.charts['chart_work_weekday'] = createChart('chart_work_weekday', dataWorkWeek, COMMON_MAX_Y, true); 
+        
+        // Các biểu đồ còn lại:
+        // Nếu dataWorkSun là toàn số 0 (do không làm CN) -> Biểu đồ sẽ trắng trơn -> Đúng logic
+        window.charts['chart_work_sunday']  = createChart('chart_work_sunday', dataWorkSun, COMMON_MAX_Y, false);
+        window.charts['chart_off_weekday']  = createChart('chart_off_weekday', dataOffWeek, COMMON_MAX_Y, false);
+        window.charts['chart_off_sunday']   = createChart('chart_off_sunday', dataOffSun, COMMON_MAX_Y, false);
+    }
+
+    // --- 2. HÀM VẼ CHART (Giữ nguyên) ---
+    function createChart(canvasId, dataSrc, maxYValue, allowDrag) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+        // Tính tổng (Nếu dataSrc là mảng 0 thì tổng là 0)
+        const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
+
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: liveData.labels,
+                datasets: [
+                    { 
+                        type: 'line', 
+                        label: 'Tổng công suất (kW)', 
+                        data: totalLoad, 
+                        borderColor: DARK_YELLOW, 
+                        borderWidth: 3, 
+                        pointRadius: 3, 
+                        pointHoverRadius: 6, 
+                        pointBackgroundColor: 'white', 
+                        pointBorderColor: DARK_YELLOW, 
+                        tension: 0.4, 
+                        fill: false, 
+                        order: 0, 
+                        dragData: allowDrag 
                     },
-                    plugins: {
-                        dragData: {
-                            round: 1, showTooltip: true,
-                            onDragStart: function(e) { if(allowDrag) e.target.style.cursor = 'grabbing'; },
-                            onDrag: function(e, datasetIndex, index, value) { 
-                                if (!allowDrag) return false;
-                                if (datasetIndex !== 0) return false; 
-                                if (value < 0) return false; 
-                                if (value > window.HARD_LIMIT) return false; 
-                            },
-                            onDragEnd: function(e, datasetIndex, index, newValue) {
-                                if (!allowDrag || datasetIndex !== 0) return;
-                                e.target.style.cursor = 'default';
-                                if (newValue < 0) newValue = 0;
-                                if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
-                                
-                                // Gọi hàm tính toán (Sử dụng code logic đã fix ở câu trước)
-                                recalculateSystem(canvasId, index, newValue);
-                            }
+                    { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
+                    { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                    { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
+                ]
+            },
+            options: {
+                responsive: true, 
+                maintainAspectRatio: false, 
+                animation: false,
+                scales: { 
+                    y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
+                    x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
+                },
+                plugins: {
+                    dragData: {
+                        round: 1, showTooltip: true,
+                        onDragStart: function(e) { if(allowDrag) e.target.style.cursor = 'grabbing'; },
+                        onDrag: function(e, datasetIndex, index, value) { 
+                            if (!allowDrag) return false;
+                            if (datasetIndex !== 0) return false; 
+                            if (value < 0) return false; 
+                            if (value > window.HARD_LIMIT) return false; 
                         },
-                        legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
-                        tooltip: { 
-                            mode: 'index', intersect: false,
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) label += ': ';
-                                    if (context.parsed.y !== null) label += context.parsed.y.toFixed(2) + ' kW';
-                                    return label;
-                                }
+                        onDragEnd: function(e, datasetIndex, index, newValue) {
+                            if (!allowDrag || datasetIndex !== 0) return;
+                            e.target.style.cursor = 'default';
+                            if (newValue < 0) newValue = 0;
+                            if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
+                            
+                            recalculateSystem(canvasId, index, newValue);
+                        }
+                    },
+                    legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
+                    tooltip: { 
+                        mode: 'index', intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) label += context.parsed.y.toFixed(2) + ' kW';
+                                return label;
                             }
                         }
                     }
                 }
-            });
-        }
+            }
+        });
+    }
 
         // --- 1. HÀM TÍNH TOÁN CHÍNH ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
