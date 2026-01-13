@@ -27,17 +27,20 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
     
-# --- HÀM ĐỌC HÓA ĐƠN (PHIÊN BẢN SIÊU TƯƠNG THÍCH) ---
+# --- HÀM ĐỌC HÓA ĐƠN (PHIÊN BẢN SIÊU TƯƠNG THÍCH - ĐÃ CẬP NHẬT) ---
 def ai_doc_hoa_don(file_path):
     # Chỉ xử lý nếu là file PDF
     if not file_path.lower().endswith('.pdf'):
         print("Lỗi: Thư viện này chỉ hỗ trợ file PDF gốc.")
         return None
 
+    # Khởi tạo dữ liệu mặc định
     data = {
-        "kwh_bt": 0,
-        "kwh_cd": 0,
-        "kwh_td": 0,
+        "loai_hinh": "can_ho", # Mặc định là hộ gia đình
+        "kwh_tong": 0,         # Dành cho hộ gia đình
+        "kwh_bt": 0,           # Dành cho KD/SX
+        "kwh_cd": 0,           # Dành cho KD/SX
+        "kwh_td": 0,           # Dành cho KD/SX
         "ngay_dau": "",
         "ngay_cuoi": ""
     }
@@ -50,34 +53,40 @@ def ai_doc_hoa_don(file_path):
                 if text:
                     full_text += text + "\n"
 
-            # 1. Trích xuất Ngày (Kỳ hóa đơn)
-            # Tìm mẫu: từ 01/01/2025 đến 10/01/2025
+            # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT ---
+            # Nếu thấy từ khóa về khung giờ thì chuyển sang mô hình kinh doanh
+            if any(x in full_text for x in ["Khung giờ", "BT:", "CD:", "TD:"]):
+                data["loai_hinh"] = "kinh_doanh"
+            else:
+                data["loai_hinh"] = "can_ho"
+
+            # --- 2. TRÍCH XUẤT NGÀY THÁNG (Giữ nguyên của bạn) ---
             date_match = re.search(r"từ\s+(\d{2}/\d{2}/\d{4})\s+đến\s+(\d{2}/\d{2}/\d{4})", full_text)
             if date_match:
-                # Chuyển định dạng DD/MM/YYYY sang YYYY-MM-DD cho HTML input date
                 d1 = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
                 d2 = datetime.strptime(date_match.group(2), "%d/%m/%Y").strftime("%Y-%m-%d")
                 data["ngay_dau"] = d1
                 data["ngay_cuoi"] = d2
 
-            # 2. Trích xuất Sản lượng (kWh)
-            # Dựa trên bảng kê EVN bạn gửi, chúng ta tìm số ở cột cuối cùng của các dòng Khung giờ
-            # Bình thường: 251.256, Cao điểm: 78.492, Thấp điểm: 109.584
-            
-            # Tìm dòng "Khung giờ bình thường" và lấy số cuối cùng của dòng đó
-            bt_match = re.search(r"Khung giờ bình thường.*?([\d\.,]+)$", full_text, re.MULTILINE)
-            if bt_match:
-                data["kwh_bt"] = float(bt_match.group(1).replace('.', '').replace(',', ''))
+            # --- 3. TRÍCH XUẤT SẢN LƯỢNG (KWH) ---
+            if data["loai_hinh"] == "can_ho":
+                # HỘ GIA ĐÌNH: Tìm số tổng sản lượng (thường đứng sau các từ như Sản lượng hoặc Tổng cộng)
+                tong_match = re.search(r"(?:Tổng điện năng tiêu thụ|Sản lượng|Tổng cộng).*?([\d\.,]+)$", full_text, re.MULTILINE | re.IGNORECASE)
+                if tong_match:
+                    data["kwh_tong"] = float(tong_match.group(1).replace('.', '').replace(',', ''))
+            else:
+                # KINH DOANH / SẢN XUẤT: Lấy 3 chỉ số theo khung giờ (Giữ logic của bạn)
+                bt_match = re.search(r"Khung giờ bình thường.*?([\d\.,]+)$", full_text, re.MULTILINE)
+                if bt_match:
+                    data["kwh_bt"] = float(bt_match.group(1).replace('.', '').replace(',', ''))
 
-            # Tìm dòng "Khung giờ cao điểm"
-            cd_match = re.search(r"Khung giờ cao điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
-            if cd_match:
-                data["kwh_cd"] = float(cd_match.group(1).replace('.', '').replace(',', ''))
+                cd_match = re.search(r"Khung giờ cao điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
+                if cd_match:
+                    data["kwh_cd"] = float(cd_match.group(1).replace('.', '').replace(',', ''))
 
-            # Tìm dòng "Khung giờ thấp điểm"
-            td_match = re.search(r"Khung giờ thấp điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
-            if td_match:
-                data["kwh_td"] = float(td_match.group(1).replace('.', '').replace(',', ''))
+                td_match = re.search(r"Khung giờ thấp điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
+                if td_match:
+                    data["kwh_td"] = float(td_match.group(1).replace('.', '').replace(',', ''))
 
         return data
 

@@ -116,6 +116,13 @@
             
             <form method="POST" action="/">
                 <div class="card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    
+                    <div style="background: #f0f9f4; padding: 15px; border-radius: 8px; border: 1px solid #16a085; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                        <strong style="color: #16a085;">📸 Nhập nhanh bằng AI (PDF/Ảnh)</strong>
+                        <button type="button" onclick="document.getElementById('inp_scan_img').click()" class="btn-calc" style="width: auto; margin: 0; padding: 5px 15px; background: #16a085;">Tải file lên</button>
+                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="uploadVaQuetAnh(this)">
+                    </div>
+
                     <label>Tên Khách Hàng:</label>
                     <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_kh', '') }}" required>
                     
@@ -126,50 +133,21 @@
 
                     <label>Mô hình lắp đặt:</label>
                     <select name="loai_hinh" id="loai_hinh" class="form-control" 
-                            onchange="resetAllResults(); capNhatGiaoDien()"> <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏠 Hộ Gia Đình</option>
+                            onchange="resetAllResults(); capNhatGiaoDien()"> 
+                        <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏠 Hộ Gia Đình</option>
                         <option value="kinh_doanh" {% if du_lieu_nhap.loai_hinh == 'kinh_doanh' %}selected{% endif %}>🏢 Kinh Doanh</option>
                         <option value="san_xuat" {% if du_lieu_nhap.loai_hinh == 'san_xuat' %}selected{% endif %}>🏭 Sản Xuất</option>
                     </select>
 
                     <div id="khung_ho_gia_dinh">
-                        <label style="margin-top:15px">Nhập liệu theo:</label>
-                        <div class="input-mode-group" style="margin-bottom: 10px;">
-                            <label class="radio-label" style="margin-right: 15px;">
-                                <input type="radio" 
-                                    name="che_do_nhap" 
-                                    value="theo_tien" 
-                                    onchange="toggleUnit(this)" 
-                                    {% if du_lieu_nhap.che_do == 'theo_tien' %}checked{% endif %}> 
-                                Số tiền (VNĐ)
-                            </label>
-                            
-                            <label class="radio-label">
-                                <input type="radio" 
-                                    name="che_do_nhap" 
-                                    value="theo_kwh" 
-                                    onchange="toggleUnit(this)" 
-                                    {% if du_lieu_nhap.che_do == 'theo_kwh' %}checked{% endif %}> 
-                                Số điện (kWh)
-                            </label>
-                        </div>
-
-                        <label id="input-label">
-                            {% if du_lieu_nhap.che_do == 'theo_kwh' %}
-                                Số điện trung bình tháng (kWh/Month):
-                            {% else %}
-                                Tiền điện trung bình tháng (VNĐ/Month):
-                            {% endif %}
-                        </label>
-                        
-                        <input type="text" 
-                            inputmode="numeric" 
+                        <input type="hidden" name="che_do_nhap" value="theo_kwh"> <label style="margin-top:15px">Số điện tiêu thụ trung bình tháng (kWh/Tháng):</label>
+                        <input type="number" 
                             name="gia_tri_dau_vao" 
                             id="gia_tri_input" 
                             class="form-control"
-                            placeholder="Ví dụ: 2.000.000"
+                            placeholder="Ví dụ: 500"
                             required
-                            value="{{ du_lieu_nhap.gia_tri }}" 
-                            oninput="formatCurrency(this)">
+                            value="{{ du_lieu_nhap.gia_tri }}">
 
                         <div id="khung_dac_diem" style="margin-top: 15px;">
                             <label>Đặc điểm sử dụng:</label>
@@ -182,12 +160,6 @@
                     </div>
 
                     <div id="khung_chuyen_nghiep" style="display: none; border-top: 2px dashed #eee; margin-top: 20px; padding-top: 10px;">
-                        <div style="background: #f0f9f4; padding: 15px; border-radius: 5px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
-                            <strong style="color: #16a085;">📸 Nhập nhanh bằng AI (PDF/Ảnh)</strong>
-                            <button type="button" onclick="document.getElementById('inp_scan_img').click()" class="btn-calc" style="width: auto; margin: 0; padding: 5px 15px; background: #16a085;">Tải file lên</button>
-                            <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="uploadVaQuetAnh(this)">
-                        </div>
-
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div><label>Ngày đầu kỳ:</label><input type="date" name="ngay_dau" class="form-control" value="{{ du_lieu_nhap.get('ngay_dau', '') }}"></div>
                             <div><label>Ngày cuối kỳ:</label><input type="date" name="ngay_cuoi" class="form-control" value="{{ du_lieu_nhap.get('ngay_cuoi', '') }}"></div>
@@ -640,9 +612,11 @@
         function uploadVaQuetAnh(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
-                const btn = document.getElementById('btn_scan_trigger');
-                
-                // Hiệu ứng loading
+                // Tìm nút bấm dựa trên class btn-calc nằm trong khung AI
+                const btn = input.parentElement.querySelector('.btn-calc');
+                const oldText = btn ? btn.innerHTML : "Tải file lên";
+
+                // --- GIỮ NGUYÊN: Hiệu ứng loading ---
                 if(btn) {
                     btn.innerHTML = "⏳ Đang đọc...";
                     btn.style.opacity = "0.7";
@@ -660,13 +634,27 @@
                 .then(res => {
                     if (res.success && res.data) {
                         const d = res.data;
-                        
-                        // Code điền dữ liệu
-                        if(d.kwh_bt) document.querySelector('input[name="kwh_bt"]').value = d.kwh_bt.toString().replace(/\./g, '');
-                        if(d.kwh_cd) document.querySelector('input[name="kwh_cd"]').value = d.kwh_cd.toString().replace(/\./g, '');
-                        if(d.kwh_td) document.querySelector('input[name="kwh_td"]').value = d.kwh_td.toString().replace(/\./g, '');
-                        
-                        // Xử lý ngày tháng
+
+                        // --- THÊM MỚI 1: Tự động chọn mô hình lắp đặt ---
+                        const selectLoaiHinh = document.getElementById('loai_hinh');
+                        if (d.loai_hinh) {
+                            selectLoaiHinh.value = d.loai_hinh;
+                            // Gọi hàm cập nhật giao diện để ẩn/hiện khung Hộ gia đình hoặc Kinh doanh
+                            if(typeof capNhatGiaoDien === 'function') capNhatGiaoDien();
+                        }
+
+                        // --- THÊM MỚI 2: Điền số điện dựa trên mô hình đã nhận diện ---
+                        if (d.loai_hinh === 'can_ho') {
+                            // Nếu là Hộ gia đình: điền vào ô duy nhất
+                            if(d.kwh_tong) document.getElementById('gia_tri_input').value = d.kwh_tong.toString().replace(/\./g, '');
+                        } else {
+                            // Nếu là Kinh doanh/Sản xuất: điền vào 3 ô khung giờ (GIỮ NGUYÊN logic cũ của bạn)
+                            if(d.kwh_bt) document.querySelector('input[name="kwh_bt"]').value = d.kwh_bt.toString().replace(/\./g, '');
+                            if(d.kwh_cd) document.querySelector('input[name="kwh_cd"]').value = d.kwh_cd.toString().replace(/\./g, '');
+                            if(d.kwh_td) document.querySelector('input[name="kwh_td"]').value = d.kwh_td.toString().replace(/\./g, '');
+                        }
+
+                        // --- GIỮ NGUYÊN: Xử lý ngày tháng ---
                         const chuanHoaNgay = (strNgay) => {
                             if (!strNgay) return "";
                             if (strNgay.includes('/')) {
@@ -678,7 +666,7 @@
                         if(d.ngay_dau) document.querySelector('input[name="ngay_dau"]').value = chuanHoaNgay(d.ngay_dau);
                         if(d.ngay_cuoi) document.querySelector('input[name="ngay_cuoi"]').value = chuanHoaNgay(d.ngay_cuoi);
                         
-                        alert("✅ Đã trích xuất xong!");
+                        alert("✅ Đã trích xuất xong mô hình và số liệu!");
                     } else {
                         alert("⚠️ Không tìm thấy dữ liệu.");
                     }
@@ -688,8 +676,9 @@
                     alert("❌ Lỗi kết nối server.");
                 })
                 .finally(() => {
+                    // --- GIỮ NGUYÊN: Reset trạng thái nút bấm ---
                     if(btn) {
-                        btn.innerHTML = "Tải ảnh lên";
+                        btn.innerHTML = oldText;
                         btn.style.opacity = "1";
                         btn.disabled = false;
                     }
