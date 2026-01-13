@@ -810,77 +810,68 @@
         // --- 2. HÀM PHÂN BỔ NỢ TOÀN CỤC (GLOBAL) ---
         function distributeGlobalNormalDebt(kwhDebt, skipIndex) {
             let candidates = [];
-            let totalWeight = 0; // Tổng dung lượng (đơn vị: slot-ngày)
+            let totalWeight = 0; 
 
-            // Helper: Quét tìm các giờ Bình thường trong 1 dataset
-            // weightPerSlot: 26 (nếu là ngày thường) hoặc 4 (nếu là CN)
+            // Helper quét tìm giờ
             const scanAndCollect = (dataSet, weightPerSlot, isSundayMode) => {
                 if (!dataSet) return;
 
                 for (let i = 0; i < 48; i++) {
-                    // Bỏ qua ô đang kéo
+                    // 1. Bỏ qua ô đang kéo
                     if (i === skipIndex) continue;
-                    // Bỏ qua vùng cấm (nếu có logic vùng cấm)
-                    if (i >= 34 || (i >= 8 && i < 16 && !isSundayMode)) {
-                        // Lưu ý: Nếu là CN thì 8h-16h không bị cấm vì nó là giờ BT/TD
-                        // Tùy logic cấm tải của bạn, ở đây mình check đơn giản
-                        if (!isSundayMode && (i >= 8 && i < 16)) continue; 
-                    }
-                    if (i >= 34) continue; // Giả sử sau 17h không bù trừ (tuỳ bạn)
+                    
+                    // 2. CHỈ GIỮ LẠI ĐIỀU KIỆN NÀY: Bỏ qua giờ sau 17h nếu muốn (tuỳ bạn chọn)
+                    // Nếu hệ thống chạy 24/7 thì bỏ luôn dòng này cũng được
+                    if (i >= 34) continue; 
+
+                    // --- ĐÃ XÓA ĐOẠN (i >= 8 && i < 16) GÂY LỖI ---
 
                     const t = getTariffType(i);
                     
-                    // Logic xác định "Đây có phải giờ Bình thường không?"
+                    // 3. Xác định giờ có được phép gánh nợ không? (Là giờ Bình thường)
                     let isNormalSlot = false;
-                    
                     if (isSundayMode) {
-                        // Ở CN: Type 1 (BT) và Type 2 (CĐ) đều tính là Bình thường
+                        // CN: Bình thường (1) hoặc Cao điểm (2 - quy về bình thường)
                         if (t === 1 || t === 2) isNormalSlot = true;
                     } else {
-                        // Ở Ngày thường: Chỉ Type 1 là Bình thường
+                        // Ngày thường: Chỉ giờ Bình thường (1)
                         if (t === 1) isNormalSlot = true;
                     }
 
-                    // Nếu đúng là giờ Bình thường -> Đưa vào danh sách chịu phạt
+                    // 4. Nếu đúng là giờ xanh và đang có điện -> Đưa vào danh sách
                     if (isNormalSlot) {
                         const currentVal = dataSet.bt_l[i] + dataSet.cd_l[i] + dataSet.td[i];
-                        // Chỉ chọn những ô đang có điện (để trừ)
                         if (currentVal > 0.01) {
-                            candidates.push({ 
-                                data: dataSet, 
-                                idx: i, 
-                                isSun: isSundayMode 
-                            });
-                            // CỘNG DỒN TRỌNG SỐ: Quan trọng nhất đoạn này
-                            // Tìm thấy 1 ô ở ngày thường -> cộng 26
-                            // Tìm thấy 1 ô ở CN -> cộng 4
+                            candidates.push({ data: dataSet, idx: i, isSun: isSundayMode });
                             totalWeight += weightPerSlot; 
                         }
                     }
                 }
             };
 
-            // 1. Quét Ngày thường (Weight = 26 ngày)
+            // Quét cả 2 hệ thống
             scanAndCollect(liveData.weekday_work, DAYS_WEEK, false);
+            if (DAYS_SUN > 0) scanAndCollect(liveData.sunday_work, DAYS_SUN, true);
 
-            // 2. Quét Chủ Nhật (Weight = 4 ngày)
-            if (DAYS_SUN > 0) {
-                scanAndCollect(liveData.sunday_work, DAYS_SUN, true);
-            }
-
-            // 3. Thực hiện chia đều và trừ
+            // LOGIC CHIA VÀ TRỪ
             if (totalWeight > 0) {
-                // Tính số kW cần trừ cho mỗi slot
-                // Ví dụ: Nợ 40kWh / 316 trọng số = 0.126 kW
+                // In ra Console để kiểm chứng
                 const kwReduction = -(kwhDebt / totalWeight);
+                console.log(`=== PHÂN BỔ NỢ ===`);
+                console.log(`Tổng nợ phát sinh: ${kwhDebt.toFixed(2)} kWh`);
+                console.log(`Tổng trọng số (số ngày * số giờ xanh): ${totalWeight}`);
+                console.log(`=> Mỗi giờ xanh sẽ bị GIẢM: ${Math.abs(kwReduction).toFixed(4)} kW`);
 
                 candidates.forEach(item => {
                     const cur = item.data.bt_l[item.idx] + item.data.cd_l[item.idx] + item.data.td[item.idx];
                     let neu = cur + kwReduction;
-                    if (neu < 0) neu = 0; // Không cho âm
+                    if (neu < 0) neu = 0;
                     
+                    // Cập nhật lại
                     setLoadValue(item.data, item.idx, neu, item.isSun);
                 });
+            } else {
+                console.warn("Không tìm thấy giờ Bình thường nào để trừ nợ!");
             }
         }
 
