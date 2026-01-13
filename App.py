@@ -10,7 +10,8 @@ from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_file
 
-API_KEY = "AIzaSyAkDousFLZy33pXCo3by3zZ8ar3Pphuy0c"
+SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
+SETTINGS['tinh_thanh'] = load_excel_provinces()
 
 # --- CẤU HÌNH ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -286,8 +287,6 @@ def home():
     if 'user' not in session: return redirect(url_for('login'))
     
     current_user, current_role = session['user'], session.get('role', 'user')
-    SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
-    SETTINGS['tinh_thanh'] = load_excel_provinces()
     USERS = load_json_file(users_path, DEFAULT_USERS)
     
     ket_qua, msg_update = None, None
