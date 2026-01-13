@@ -10,9 +10,6 @@ from datetime import datetime, timedelta # Thêm timedelta
 from datetime import datetime
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_file
 
-SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
-SETTINGS['tinh_thanh'] = load_excel_provinces()
-
 # --- CẤU HÌNH ---
 base_dir = os.path.abspath(os.path.dirname(__file__))
 settings_path = os.path.join(base_dir, 'data', 'settings.json')
@@ -20,6 +17,9 @@ users_path = os.path.join(base_dir, 'data', 'users.json')
 excel_path = os.path.join(base_dir, 'data', 'tinh_thanh.xlsx')
 history_path = os.path.join(base_dir, 'data', 'lich_su_khach_hang.xlsx')
 template_path = os.path.join(base_dir, 'templates')
+
+SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
+SETTINGS['tinh_thanh'] = load_excel_provinces()
 
 app = Flask(__name__, template_folder=template_path)
 app.secret_key = 'khoa_bi_mat_cua_du_an_solar'
