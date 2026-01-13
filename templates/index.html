@@ -751,46 +751,53 @@
             const slave = liveData.sunday_work;
             const hasSunday = (DAYS_SUN > 0);
 
-            // 1. Tính Delta
+            // 1. Tính độ lệch (Delta)
             const oldVal = master.td[targetIndex] + master.bt_l[targetIndex] + master.cd_l[targetIndex];
             const deltaKW = newTotalValue - oldVal;
 
-            // 2. Cập nhật Master (Đổi tên hàm ở đây)
+            // 2. Cập nhật giá trị mới cho vị trí đang kéo (Cả Master và Slave)
             setLoadValue(master, targetIndex, newTotalValue, false);
-
-            // 3. Đồng bộ Slave (Chủ nhật)
-            if (hasSunday && slave) {
+            if (hasSunday) {
                 setLoadValue(slave, targetIndex, newTotalValue, true);
             }
 
-            // 4. Tính toán bù trừ
+            // --- BẮT ĐẦU LOGIC BÙ TRỪ ---
             const type = getTariffType(targetIndex);
+            let globalNormalDebt = 0; // Biến tích lũy nợ cho phe Xanh (Normal)
 
-            // --- CASE A: GIỜ CAO ĐIỂM (Type 2) ---
-            if (type === 2) {
-                // Master: Tự cân bằng nội bộ (Đỏ bù Đỏ)
+            // A. XỬ LÝ NGÀY THƯỜNG (Weekday)
+            if (type === 2) { 
+                // Nếu là Cao điểm: Bù trừ nội bộ Đỏ vs Đỏ
                 balanceInternal(master, targetIndex, deltaKW, 2);
+            } else if (type === 1) { 
+                // Nếu là Bình thường: Ghi nợ vào quỹ Xanh
+                globalNormalDebt += deltaKW * DAYS_WEEK;
+            } else {
+                // Nếu là Thấp điểm: Bù trừ nội bộ Vàng vs Vàng
+                balanceInternal(master, targetIndex, deltaKW, 0);
+            }
 
-                // Slave: Vì CN không có Cao điểm, nó biến thành Bình thường.
-                // Khoản tăng này gây nợ vào quỹ Bình thường toàn cục.
-                if (hasSunday) {
-                    const debtKwh = deltaKW * DAYS_SUN;
-                    distributeGlobalNormalDebt(debtKwh, targetIndex);
+            // B. XỬ LÝ CHỦ NHẬT (Sunday)
+            if (hasSunday) {
+                // Xác định loại giờ thực tế vào Chủ Nhật
+                // (Ở CN: Giờ Cao điểm (2) chuyển thành Bình thường (1))
+                let sunType = type;
+                if (type === 2) sunType = 1; 
+
+                if (sunType === 1) {
+                    // Nếu CN là giờ Bình thường (bao gồm cả khúc 9h30):
+                    // Việc tăng công suất tạo ra nợ cho quỹ Xanh
+                    globalNormalDebt += deltaKW * DAYS_SUN;
+                } else if (sunType === 0) {
+                    // Thấp điểm bù nội bộ
+                    balanceInternal(slave, targetIndex, deltaKW, 0);
                 }
             }
-            // --- CASE B: GIỜ BÌNH THƯỜNG (Type 1) ---
-            else if (type === 1) {
-                // Ảnh hưởng cả tuần + CN
-                let totalDays = DAYS_WEEK;
-                if (hasSunday) totalDays += DAYS_SUN;
-                
-                const debtKwh = deltaKW * totalDays;
-                distributeGlobalNormalDebt(debtKwh, targetIndex);
-            }
-            // --- CASE C: GIỜ THẤP ĐIỂM (Type 0) ---
-            else {
-                balanceInternal(master, targetIndex, deltaKW, 0);
-                if (hasSunday && slave) balanceInternal(slave, targetIndex, deltaKW, 0);
+
+            // C. THANH TOÁN NỢ XANH (Bước quan trọng nhất bạn đang tìm)
+            // Nếu biến này khác 0, nghĩa là có sự thay đổi ở phe Xanh (do kéo giờ Xanh ngày thường HOẶC kéo giờ 9h30 CN)
+            if (globalNormalDebt !== 0) {
+                distributeGlobalNormalDebt(globalNormalDebt, targetIndex);
             }
 
             initAllCharts();
