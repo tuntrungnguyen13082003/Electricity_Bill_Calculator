@@ -106,14 +106,24 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # --- 1. MỚI: TRÍCH XUẤT TÊN KHÁCH HÀNG ---
-            # Tìm dòng "Khách hàng" và lấy nội dung phía sau 
-            name_match = re.search(r"Khách hàng\s*[\n\r]\s*(.*)", full_text, re.IGNORECASE)
-            if name_match:
-                data["ten_kh"] = name_match.group(1).strip().replace('"', '').replace(',', '')
-                print(f"✅ Tìm thấy tên: {data['ten_kh']}") # [cite: 2, 61, 118]
+            # --- 1. MỚI: TRÍCH XUẤT TÊN KHÁCH HÀNG (BẢN ĐỌC ĐA DÒNG) ---
+            # Sử dụng re.DOTALL để dấu "." khớp với cả ký tự xuống dòng
+            # Regex này lấy tất cả chữ nằm giữa "Khách hàng" và "Địa chỉ"
+            name_block = re.search(r"Khách hàng\s*[\n\r]+(.*?)(?=\s*Địa chỉ)", full_text, re.IGNORECASE | re.DOTALL)
+
+            if name_block:
+                raw_name = name_block.group(1).strip()
+                # Dọn dẹp: Thay thế dấu xuống dòng bằng khoảng trắng và xóa ký tự dư thừa
+                clean_name = raw_name.replace('\n', ' ').replace('"', '').replace(',', '')
+                # Xử lý khoảng trắng thừa ở giữa
+                data["ten_kh"] = ' '.join(clean_name.split())
+                print(f"✅ Tìm thấy tên đầy đủ: {data['ten_kh']}") [cite: 2, 61, 118]
             else:
-                print("⚠️ Không tìm thấy tên khách hàng.")
+                # Fallback: Nếu không thấy chữ "Địa chỉ" làm điểm dừng, lấy tạm 2 dòng tiếp theo
+                backup_match = re.search(r"Khách hàng\s*[\n\r]+\s*([^\n\r]+(?:\s+[^\n\r]+)?)", full_text, re.IGNORECASE)
+                if backup_match:
+                    data["ten_kh"] = backup_match.group(1).strip().replace('"', '')
+                    print(f"✅ Tìm thấy tên (Backup): {data['ten_kh']}")
             
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
