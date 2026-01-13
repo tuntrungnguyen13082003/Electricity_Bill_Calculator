@@ -229,7 +229,7 @@
                     <button type="submit" name="btn_calc" class="btn-calc" style="margin-top: 25px; font-size: 18px;">TÍNH TOÁN CÔNG SUẤT & BÁO GIÁ</button>
                 </div>
             </form>
-
+            <div id="vung-ket-qua-solar">
             {% if ket_qua %}
             <div class="result-box">
                 <div>Công suất đề xuất:</div>
@@ -254,8 +254,10 @@
                 <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; display: none;">
                     <canvas id="chart_off"></canvas>
                 </div>
+            </div>
             {% endif %}
-        </div>
+            </div>
+        
 
         {% if role == 'admin' %}
         <div id="config" class="tab-content {{ 'active' if active_tab == 'config' else '' }}">
@@ -527,38 +529,27 @@
             }
         });
         function resetAllResults() {
-        // 1. XÓA BIỂU ĐỒ (Giữ nguyên logic cũ)
-        if (window.charts) {
-            Object.keys(window.charts).forEach(key => {
-                if (window.charts[key]) window.charts[key].destroy();
-            });
-            window.charts = {}; 
+            console.log("Xóa sạch hẵn toàn bộ kết quả khỏi màn hình...");
+
+            // 1. Hủy các đối tượng biểu đồ để giải phóng RAM
+            if (window.charts) {
+                Object.keys(window.charts).forEach(key => {
+                    if (window.charts[key]) {
+                        window.charts[key].destroy();
+                    }
+                });
+                window.charts = {};
+            }
+
+            // 2. XÓA SẠCH MÃ HTML (Mất hẳn các thẻ div, canvas, h1, h3...)
+            const container = document.getElementById('vung-ket-qua-solar');
+            if (container) {
+                container.innerHTML = ""; // Xóa trắng không còn một dấu vết
+            }
+
+            // 3. Reset dữ liệu ngầm (nếu có)
+            if (typeof liveData !== 'undefined') liveData = null;
         }
-
-        // 2. ẨN BIỂU ĐỒ (Chỉ ẩn phần vẽ thôi, không ẩn phần số)
-        const chartGrid = document.querySelector('.row.chart-wrapper-grid'); 
-        if (chartGrid) chartGrid.style.display = 'none';
-
-        // 3. [QUAN TRỌNG] KHÔNG ẨN DIV KẾT QUẢ, MÀ CHỈ RESET SỐ LIỆU
-        // Đừng dùng style.display = 'none' nữa
-        
-        // Tìm các thẻ đang hiển thị số và đưa về '---'
-        // Bạn thay ID bên dưới bằng ID thật của mấy cái số to đùng màu xanh đó nhé
-        const elCongSuat = document.getElementById('hien_thi_cong_suat'); // Ví dụ ID
-        if (elCongSuat) elCongSuat.innerHTML = '--- kWp';
-
-        const elDienTich = document.getElementById('hien_thi_dien_tich'); // Ví dụ ID
-        if (elDienTich) elDienTich.innerHTML = '--- m²';
-        
-        // Nếu bạn muốn reset cả ô nhập tiền (Để người dùng nhập lại từ đầu cho đúng mô hình mới)
-        const inputTien = document.querySelector('input[name="so_tien_dien"]');
-        if (inputTien) inputTien.value = ''; 
-
-        // 4. Reset biến dữ liệu
-        if (typeof liveData !== 'undefined') liveData = null;
-        
-        console.log("Đã Soft-Reset giao diện!");
-    }
     </script>
     <script>
         function uploadVaQuetAnh(input) {
