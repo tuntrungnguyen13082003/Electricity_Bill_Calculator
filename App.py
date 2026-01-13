@@ -341,12 +341,12 @@ def home():
                         uoc_luong = (gt / 2000) / 30 / gn if cd == 'theo_tien' else gt / 30 / gn
                         kwp_min = round(uoc_luong * 0.8, 2)
                         kwp_max = round(uoc_luong * 1.2, 2)
+                        don_vi = "VND" if cd == 'theo_tien' else "kWh"
+                        gia_tri_dau_vao_kem_dv = f"{raw_gt} {don_vi}"
+                        dt_uoc_tinh = round(kwp_min * he_so_dt, 1)
+                        ket_qua_kem_dt = f"{kwp_min} kWp (Mái: {dt_uoc_tinh} m²)"
                 else:
                     # --- B. NHÁNH KINH DOANH / SẢN XUẤT (THUẬT TOÁN MỚI) ---
-                    gia_tri_dau_vao_kem_dv = f"{kwh_bt + kwh_cd + kwh_td} kWh"
-                    dt_min = round(kwp_min * he_so_dt, 1)
-                    dt_max = round(kwp_max * he_so_dt, 1)
-                    ket_qua_kem_dt = f"{kwp_min} ➔ {kwp_max} kWp (Mái: {dt_min} ➔ {dt_max} m²)"
                     # 1. Hàm hỗ trợ (Giữ nguyên)
                     def get_hour_safe(key, default_h):
                         val = request.form.get(key, "")
@@ -383,6 +383,11 @@ def home():
                     total_kwh = kwh_bt + kwh_cd + kwh_td
                     kwp_min = round(((total_kwh * hs_min) / 30) / gn, 2)
                     kwp_max = round(((total_kwh * hs_max) / 30) / gn, 2)
+
+                    gia_tri_dau_vao_kem_dv = f"{total_kwh} kWh"
+                    dt_min = round(kwp_min * he_so_dt, 1)
+                    dt_max = round(kwp_max * he_so_dt, 1)
+                    ket_qua_kem_dt = f"{kwp_min} ➔ {kwp_max} kWp (Mái: {dt_min} ➔ {dt_max} m²)"
 
                     # --- C. THUẬT TOÁN PHÂN TÍCH BIỂU ĐỒ (CORE MỚI) ---
                     if request.form.get('co_ve_bieu_do') == 'yes' and d_start and d_end:
