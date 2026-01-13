@@ -732,7 +732,7 @@
             });
         }
 
-        // --- 3. TÍNH TOÁN LẠI (PHIÊN BẢN ĐỒNG BỘ CHÉO) ---
+        // --- 3. TÍNH TOÁN LẠI (ĐÃ SỬA LOGIC: THÔNG MINH HƠN) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
             // A. XỬ LÝ BIỂU ĐỒ GỐC (Cái bạn đang kéo)
             let sourceData;
@@ -741,11 +741,11 @@
             
             if (!sourceData) return;
 
-            // 1. Tính độ lệch pha (Bạn kéo lên hay kéo xuống bao nhiêu?)
+            // 1. Tính độ lệch pha
             const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
             const delta = newTotalValue - oldTotal;
 
-            // 2. Cập nhật chính nó và cân bằng lại các giờ khác trong ngày đó
+            // 2. Cân bằng nội bộ ngày đang kéo
             performBalancing(sourceData, targetIndex, newTotalValue, delta);
 
             // ============================================================
@@ -753,69 +753,72 @@
             // ============================================================
             const targetType = getTariffType(targetIndex);
             
-            // Chỉ đồng bộ khi:
-            // 1. Bạn đang kéo biểu đồ "Ngày làm việc" (chart_work)
-            // 2. Giờ bạn kéo là giờ CAO ĐIỂM (Type = 2)
-            // 3. Có ngày làm việc Chủ Nhật (stats.sun_work > 0)
+            // Chỉ đồng bộ khi: Đang kéo Ngày làm việc (Work) + Kéo giờ Cao điểm (Type 2) + Có làm CN
             if (sourceId === 'chart_work' && targetType === 2 && liveData.stats.sun_work > 0) {
-                
-                const sundayData = liveData.sunday_work; // Lấy dữ liệu Chủ Nhật
+                const sundayData = liveData.sunday_work; 
                 if (sundayData) {
                     // Lấy giá trị hiện tại của giờ đó bên Chủ Nhật
                     const sunOldVal = sundayData.td[targetIndex] + sundayData.bt_l[targetIndex] + sundayData.cd_l[targetIndex];
-                    
-                    // Tính độ lệch cần áp dụng cho Chủ Nhật (Để nó nhảy lên bằng giá trị mới)
-                    // Lưu ý: Giá trị đích là newTotalValue (để cao bằng ngày thường)
                     const sunDelta = newTotalValue - sunOldVal;
 
-                    // Thực hiện cân bằng cho biểu đồ Chủ Nhật
+                    // GỌI HÀM CÂN BẰNG CHO CHỦ NHẬT
+                    // (Hàm performBalancing ở dưới đã được nâng cấp để hiểu Chủ Nhật chỉ có màu Xanh)
                     performBalancing(sundayData, targetIndex, newTotalValue, sunDelta);
                 }
             }
 
-            // Vẽ lại toàn bộ
             initAllCharts();
         }
 
-        // --- HÀM CÂN BẰNG NỘI BỘ (Tách ra để tái sử dụng cho cả 2 biểu đồ) ---
-        // --- HÀM CÂN BẰNG (PHIÊN BẢN BIỆT LẬP TUYỆT ĐỐI) ---
+        // --- HÀM CÂN BẰNG THÔNG MINH (TỰ NHẬN DIỆN MÀU SẮC THỰC TẾ) ---
         function performBalancing(dataSet, targetIndex, newValue, delta) {
             // 1. Cập nhật chính điểm đang kéo
             distributeValueToComponents(dataSet, targetIndex, newValue);
 
-            // Xác định loại giờ đang kéo là gì? (0: Thấp điểm, 1: Bình thường, 2: Cao điểm)
-            const targetType = getTariffType(targetIndex); 
+            // 2. XÁC ĐỊNH "MÀU THỰC TẾ" CỦA CỘT ĐANG KÉO TẠI DATASET NÀY
+            // (Chứ không chỉ dựa vào giờ đồng hồ)
+            const staticType = getTariffType(targetIndex); 
+            let effectiveTargetType = staticType;
+
+            // Nếu giờ là Cao điểm (2), NHƯNG trong dataset này cột Cao điểm = 0 (tức là Chủ Nhật)
+            // Thì coi như nó là Bình thường (1)
+            if (staticType === 2 && dataSet.cd_l[targetIndex] === 0) {
+                effectiveTargetType = 1; 
+            }
 
             let candidates = [];
             for (let i = 0; i < 48; i++) {
-                if (i === targetIndex) continue; // Bỏ qua chính nó
+                if (i === targetIndex) continue;
 
-                // --- VÙNG CẤM BAY (Giữ nguyên logic bảo vệ tải nền sáng sớm/chiều muộn) ---
-                // Chỉ áp dụng cấm nếu không phải là giờ Thấp điểm
-                if (targetType !== 0) { 
+                // Vùng cấm bay (Sáng sớm & Chiều muộn) - Trừ khi là Thấp điểm
+                if (effectiveTargetType !== 0) { 
                     if (i >= 34) continue; // Sau 17h
                     if (i >= 8 && i < 16) continue; // 4h-8h
                 }
                 
-                // --- LOGIC MỚI: CHỈ CHẤP NHẬN ĐỒNG ĐỘI "CÙNG MÀU" ---
-                const currentType = getTariffType(i);
+                // 3. XÁC ĐỊNH "MÀU THỰC TẾ" CỦA CÁC ỨNG VIÊN
+                const currentStaticType = getTariffType(i);
+                let effectiveCurrentType = currentStaticType;
 
-                // QUAN TRỌNG: Chỉ khi nào CÙNG LOẠI (Type === Type) mới được bù trừ
-                // Đỏ bù Đỏ, Xanh bù Xanh. Không xâm phạm lẫn nhau.
-                if (currentType === targetType) {
+                // Tương tự: Nếu giờ là Cao điểm (2) mà data lại là 0 -> Thì nó là Bình thường (1)
+                // (Logic này giúp Chủ Nhật: Giờ 9h30 (vốn là cao điểm) sẽ bù trừ được với giờ 13h (bình thường))
+                if (currentStaticType === 2 && dataSet.cd_l[i] === 0) {
+                    effectiveCurrentType = 1;
+                }
+
+                // CHỈ BÙ TRỪ KHI CÙNG "MÀU THỰC TẾ"
+                if (effectiveCurrentType === effectiveTargetType) {
                      const val = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
-                     // Chỉ chọn những cột đang có điện (để tránh lỗi chia cho số quá nhỏ)
                      if (val > 0.1) candidates.push(i);
                 }
             }
 
-            // 3. Thực hiện chia đều phần chênh lệch
+            // 4. Chia đều
             if (candidates.length > 0) {
                 const compensation = -delta / candidates.length;
                 candidates.forEach(i => {
                     const cur = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
                     let neu = cur + compensation;
-                    // Chặn không cho âm
                     if (neu < 0) neu = 0; 
                     distributeValueToComponents(dataSet, i, neu);
                 });
