@@ -608,6 +608,7 @@
         window.charts = {}; 
         const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
         let liveData = JSON.parse(JSON.stringify(chartDataRaw));
+        const IS_WORKING_SUNDAY = (liveData.stats.sun_work > 0);
 
         // --- HÀM CHUYỂN TAB ---
         function switchChartTab(canvasId, btn) {
@@ -667,6 +668,17 @@
                 } else {
                     dataHienThi = liveData.off_weekday;
                 }
+                
+                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
+            }
+            
+            if(document.getElementById('chart_off')) {
+                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
+                
+                // LOGIC MỚI:
+                // Nếu có đi làm CN -> Hiển thị biểu đồ CN (Đã được đồng bộ ở trên)
+                // Nếu nghỉ CN -> Hiển thị biểu đồ Ngày nghỉ (Tải nền thấp)
+                let dataHienThi = IS_WORKING_SUNDAY ? liveData.sunday_work : liveData.off_weekday;
                 
                 window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
             }
@@ -734,63 +746,87 @@
 
         // --- 3. TÍNH TOÁN LẠI (ĐÃ SỬA CHẶN 4h-8h) ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
-            let sourceData;
+            // 1. LUÔN LUÔN XỬ LÝ TRÊN NGÀY THƯỜNG TRƯỚC (Làm bản gốc)
+            const masterData = liveData.weekday_work;
             
-            if (sourceId === 'chart_work') { sourceData = liveData.weekday_work; } 
-            else if (sourceId === 'chart_off') { sourceData = liveData.off_weekday; }
-            
-            if (!sourceData) return;
+            // Tính toán độ lệch (Delta) dựa trên ngày thường
+            const oldVal = masterData.td[targetIndex] + masterData.bt_l[targetIndex] + masterData.cd_l[targetIndex];
+            const delta = newTotalValue - oldVal;
 
-            const oldTotal = sourceData.td[targetIndex] + sourceData.bt_l[targetIndex] + sourceData.cd_l[targetIndex];
-            const delta = newTotalValue - oldTotal;
+            // 2. Cân bằng nội bộ cho Ngày thường (Đỏ bù Đỏ, Xanh bù Xanh)
+            // (Hàm này mình sẽ viết ở Bước 3)
+            performBalancingInternal(masterData, targetIndex, newTotalValue, delta);
 
-            // 1. Cập nhật chính điểm đang kéo
-            distributeValueToComponents(sourceData, targetIndex, newTotalValue);
+            // 3. NẾU CÓ LÀM CHỦ NHẬT -> COPY DỮ LIỆU SANG (Clone)
+            // (Hàm này cũng viết ở Bước 3)
+            if (IS_WORKING_SUNDAY) {
+                syncToSunday();
+            }
 
-            // 2. Tìm đồng đội để chia sẻ
-            const targetType = getTariffType(targetIndex);
-            
-            // Nếu đang kéo Thấp điểm (Xanh lá) -> Cho phép chỉnh sửa full 24h
-            // Nếu đang kéo Bình thường/Cao điểm -> Bị chặn tải nền
-            const isEditingLowPeak = (targetType === 0); 
-            
-            let candidates = []; 
+            // 4. Vẽ lại biểu đồ
+            initAllCharts();
+        }
 
+        function performBalancingInternal(dataSet, targetIndex, newValue, delta) {
+            // Cập nhật điểm đang kéo
+            distributeValueToComponents(dataSet, targetIndex, newValue);
+
+            const targetType = getTariffType(targetIndex); // 0: Thấp, 1: Bình, 2: Cao
+
+            // Tìm các giờ khác cùng màu để bù trừ
+            let candidates = [];
             for (let i = 0; i < 48; i++) {
-                // Bỏ qua chính nó
                 if (i === targetIndex) continue;
-
-                // --- QUAN TRỌNG: VÙNG CẤM BAY ---
-                if (!isEditingLowPeak) {
-                    // 1. Chặn sau 17h (Tan ca) -> Index >= 34
-                    if (i >= 34) continue;
-
-                    // 2. Chặn từ 4h đến 8h (Tải nền sáng sớm)
-                    // 4h = Index 8. 8h = Index 16.
-                    // Nếu i nằm trong khoảng [8, 16) -> Bỏ qua
-                    if (i >= 8 && i < 16) continue;
-                }
                 
-                // Chỉ chia sẻ với giờ cùng màu
+                // Giữ nguyên vùng cấm bay (Sáng sớm / Chiều tối) để bảo vệ tải nền
+                if (targetType !== 0) {
+                    if (i >= 34) continue; // Sau 17h
+                    if (i >= 8 && i < 16) continue; // 4h-8h
+                }
+
+                // QUAN TRỌNG: Chỉ tìm thằng CÙNG LOẠI (Đỏ tìm Đỏ, Xanh tìm Xanh)
                 if (getTariffType(i) === targetType) {
-                    const val = sourceData.td[i] + sourceData.bt_l[i] + sourceData.cd_l[i];
+                    const val = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
                     if (val > 0.1) candidates.push(i);
                 }
             }
 
+            // Thực hiện chia đều phần chênh lệch
             if (candidates.length > 0) {
                 const compensation = -delta / candidates.length;
-
                 candidates.forEach(i => {
-                    const d = sourceData;
-                    const cur = d.td[i] + d.bt_l[i] + d.cd_l[i];
+                    const cur = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
                     let neu = cur + compensation;
                     if (neu < 0) neu = 0;
-                    distributeValueToComponents(d, i, neu);
+                    distributeValueToComponents(dataSet, i, neu);
                 });
             }
+        }
 
-            initAllCharts();
+        function syncToSunday() {
+            const master = liveData.weekday_work; // Bản gốc (Ngày thường)
+            const slave = liveData.sunday_work;   // Bản sao (Chủ Nhật)
+
+            if (!slave) return;
+
+            for (let i = 0; i < 48; i++) {
+                // Lấy tổng công suất từ ngày thường
+                const masterPower = master.td[i] + master.bt_l[i] + master.cd_l[i];
+                
+                // Reset dữ liệu Chủ Nhật tại giờ đó
+                slave.td[i] = 0; slave.bt_l[i] = 0; slave.cd_l[i] = 0;
+
+                // Áp vào Chủ Nhật (Tự động đổi màu)
+                const type = getTariffType(i);
+                
+                if (type === 0) {
+                    slave.td[i] = masterPower; // Thấp điểm giữ nguyên
+                } else {
+                    // Cả Bình thường (1) và Cao điểm (2) của ngày thường
+                    // Sang Chủ Nhật đều biến thành Bình thường (bt_l)
+                    slave.bt_l[i] = masterPower; 
+                }
+            }
         }
 
         // --- 4. PHÂN MÀU ---
