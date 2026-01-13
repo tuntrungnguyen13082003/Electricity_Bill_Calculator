@@ -239,65 +239,23 @@
             {% endif %}
 
             {% if du_lieu_nhap.get('chart_data') %}
-            <div class="row" style="margin-top: 20px;">
-                <div class="col-md-6 mb-4">
-                    <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">1. Ngày Làm Việc (Thứ 2 - Thứ 7) [MASTER]</h5>
-                            <small>Kéo biểu đồ này để kích hoạt tính toán</small>
-                        </div>
-                        <div class="card-body">
-                            <div style="height: 300px;">
-                                <canvas id="chart_work_weekday"></canvas>
-                            </div>
-                        </div>
-                    </div>
+            <div id="chart_section" style="margin-top: 30px;">
+                <h3 style="text-align: center;">📊 Phân Tích Biểu Đồ</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">Ngày Làm Việc</button>
+                    {% if du_lieu_nhap.chart_data.stats.off > 0 %}
+                    <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">Ngày Nghỉ</button>
+                    {% endif %}
                 </div>
 
-                <div class="col-md-6 mb-4">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="mb-0">2. Ngày Làm Việc (Chủ Nhật) [SLAVE]</h5>
-                            <small>Tự động chạy theo & chuyển màu Cao điểm -> Bình thường</small>
-                        </div>
-                        <div class="card-body">
-                            <div style="height: 300px;">
-                                <canvas id="chart_work_sunday"></canvas>
-                            </div>
-                        </div>
-                    </div>
+                <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px;">
+                    <canvas id="chart_work"></canvas>
                 </div>
-
-                <div class="col-md-6 mb-4">
-                    <div class="card">
-                        <div class="card-header bg-secondary text-white">
-                            <h5 class="mb-0">3. Ngày Nghỉ (Thứ 2 - Thứ 7)</h5>
-                            <small>Tải nền (Ít biến động)</small>
-                        </div>
-                        <div class="card-body">
-                            <div style="height: 300px;">
-                                <canvas id="chart_off_weekday"></canvas>
-                            </div>
-                        </div>
-                    </div>
+                <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; display: none;">
+                    <canvas id="chart_off"></canvas>
                 </div>
-
-                <div class="col-md-6 mb-4">
-                    <div class="card">
-                        <div class="card-header bg-dark text-white">
-                            <h5 class="mb-0">4. Ngày Nghỉ (Chủ Nhật)</h5>
-                            <small>Tải nền (Ít biến động)</small>
-                        </div>
-                        <div class="card-body">
-                            <div style="height: 300px;">
-                                <canvas id="chart_off_sunday"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             {% endif %}
-        
+        </div>
 
         {% if role == 'admin' %}
         <div id="config" class="tab-content {{ 'active' if active_tab == 'config' else '' }}">
@@ -648,155 +606,145 @@
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
         window.charts = {}; 
-    const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
-    let liveData = JSON.parse(JSON.stringify(chartDataRaw));
-    
-    // --- CẤU HÌNH LOGIC HIỂN THỊ (SỬA Ở ĐÂY) ---
-    const IS_WORKING_SUNDAY = (liveData.stats.sun_work > 0); // Có làm Chủ Nhật không?
-    
-    // BẠN SỬA DÒNG NÀY: false nghĩa là "Tôi làm full tuần, không có ngày nghỉ thường"
-    // Khi set là false, biểu đồ số 3 sẽ về 0 hết.
-    const HAS_WEEKDAY_OFF = true; 
+        const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+        let liveData = JSON.parse(JSON.stringify(chartDataRaw));
+        const IS_WORKING_SUNDAY = (liveData.stats.sun_work > 0);
+        const DAYS_WEEK = liveData.stats.week_work || 26; 
+        const DAYS_SUN  = liveData.stats.sun_work || 0;
 
-    // --- HÀM TẠO DỮ LIỆU RỖNG (QUAN TRỌNG) ---
-    function getEffectiveData(originalData, isActive) {
-        // Nếu isActive = true thì trả về dữ liệu gốc
-        if (isActive && originalData) return originalData;
-        
-        // Nếu isActive = false thì trả về mảng toàn số 0 (Biểu đồ phẳng lì)
-        return {
-            td: Array(48).fill(0),
-            bt_l: Array(48).fill(0),
-            cd_l: Array(48).fill(0)
-        };
-    }
-
-    document.addEventListener("DOMContentLoaded", function() {
-        initAllCharts();
-    });
-
-    // --- 1. KHỞI TẠO 4 BIỂU ĐỒ ---
-    function initAllCharts() {
-        // 1. Ngày làm việc thường (Thứ 2 - Thứ 7): Luôn hiển thị
-        const dataWorkWeek = liveData.weekday_work;
-        
-        // 2. Ngày làm việc CN: Chỉ hiển thị nếu IS_WORKING_SUNDAY = true
-        const dataWorkSun  = getEffectiveData(liveData.sunday_work, IS_WORKING_SUNDAY);
-        
-        // 3. Ngày nghỉ thường: Chỉ hiển thị nếu HAS_WEEKDAY_OFF = true (Đã sửa)
-        const dataOffWeek  = getEffectiveData(liveData.off_weekday, HAS_WEEKDAY_OFF); 
-        
-        // 4. Ngày nghỉ CN: Luôn hiển thị (Profile dùng cho những ngày CN được nghỉ)
-        const dataOffSun   = liveData.off_sunday;
-
-        // --- Tìm Max Y để đồng bộ tỷ lệ ---
-        let maxVal = 0;
-        [dataWorkWeek, dataWorkSun, dataOffWeek, dataOffSun].forEach(data => {
-            if (data) {
-                const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
-                const currentMax = Math.max(...hourlyTotals);
-                if (currentMax > maxVal) maxVal = currentMax;
-            }
-        });
-
-        if (!window.HARD_LIMIT) {
-            window.HARD_LIMIT = maxVal * 2; 
-            if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
+        // --- HÀM CHUYỂN TAB ---
+        function switchChartTab(canvasId, btn) {
+            document.querySelectorAll('.chart-wrapper').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.chart-tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('wrapper_' + canvasId).style.display = 'block';
+            btn.classList.add('active');
         }
-        const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
 
-        // --- Hủy biểu đồ cũ ---
-        ['chart_work_weekday', 'chart_work_sunday', 'chart_off_weekday', 'chart_off_sunday'].forEach(id => {
-            if (window.charts[id]) window.charts[id].destroy();
+        document.addEventListener("DOMContentLoaded", function() {
+            const tabBtn = document.getElementById('btn_tab_bieu_do');
+            if(tabBtn) openSubTab('sub_bieu_do', tabBtn);
+            initAllCharts();
         });
 
-        // --- Vẽ biểu đồ ---
-        // Biểu đồ 1: Master (Cho phép kéo)
-        window.charts['chart_work_weekday'] = createChart('chart_work_weekday', dataWorkWeek, COMMON_MAX_Y, true); 
-        
-        // Biểu đồ 2: Slave (Chạy theo logic CN)
-        window.charts['chart_work_sunday']  = createChart('chart_work_sunday', dataWorkSun, COMMON_MAX_Y, false);
-        
-        // Biểu đồ 3: Ngày nghỉ thường (Sẽ phẳng lì nếu HAS_WEEKDAY_OFF = false)
-        window.charts['chart_off_weekday']  = createChart('chart_off_weekday', dataOffWeek, COMMON_MAX_Y, false);
-        
-        // Biểu đồ 4: Ngày nghỉ CN
-        window.charts['chart_off_sunday']   = createChart('chart_off_sunday', dataOffSun, COMMON_MAX_Y, false);
-    }
+        // --- 1. KHỞI TẠO ---
+        function initAllCharts() {
+            let maxVal = 0;
+            // Bước 1: Duyệt qua tất cả các kịch bản để tìm giá trị đỉnh (Max) đồng bộ trục Y
+            // Bao gồm cả sunday_work và off_sunday để tính toán chính xác
+            const allDatasets = [
+                liveData.weekday_work, 
+                liveData.sunday_work, 
+                liveData.off_weekday, 
+                liveData.off_sunday
+            ];
+            
+            allDatasets.forEach(data => {
+                if (data) {
+                    const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
+                    const currentMax = Math.max(...hourlyTotals);
+                    if (currentMax > maxVal) maxVal = currentMax;
+                }
+            });
 
-    // --- 2. HÀM VẼ CHART (Giữ nguyên) ---
-    function createChart(canvasId, dataSrc, maxYValue, allowDrag) {
-        const ctx = document.getElementById(canvasId);
-        if (!ctx) return;
+            // Giới hạn trần (Gấp 2 lần đỉnh)
+            if (!window.HARD_LIMIT) {
+                window.HARD_LIMIT = maxVal * 2; 
+                if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
+            }
 
-        const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-        const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
+            const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
 
-        return new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: liveData.labels,
-                datasets: [
-                    { 
-                        type: 'line', 
-                        label: 'Tổng công suất (kW)', 
-                        data: totalLoad, 
-                        borderColor: DARK_YELLOW, 
-                        borderWidth: 3, 
-                        pointRadius: 3, 
-                        pointHoverRadius: 6, 
-                        pointBackgroundColor: 'white', 
-                        pointBorderColor: DARK_YELLOW, 
-                        tension: 0.4, 
-                        fill: false, 
-                        order: 0, 
-                        dragData: allowDrag 
-                    },
-                    { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
-                    { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
-                    { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, animation: false,
-                scales: { 
-                    y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
-                    x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
+            // 1. Vẽ Biểu đồ Ngày Làm Việc
+            if(window.charts['chart_work']) window.charts['chart_work'].destroy();
+            window.charts['chart_work'] = createChart('chart_work', liveData.weekday_work, COMMON_MAX_Y);
+            
+            // 2. Vẽ Biểu đồ Ngày Nghỉ (LOGIC THÔNG MINH MỚI)
+            if(document.getElementById('chart_off')) {
+                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
+                
+                // KIỂM TRA: Nếu có số ngày nghỉ Chủ Nhật > 0, ưu tiên lấy profile off_sunday 
+                // (Tập dữ liệu này đã được Python xử lý bỏ màu đỏ/giờ cao điểm)
+                let dataHienThi;
+                if (liveData.stats.off_sunday_count > 0) {
+                    dataHienThi = liveData.off_sunday;
+                } else {
+                    dataHienThi = liveData.off_weekday;
+                }
+                
+                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
+            }
+
+            if(document.getElementById('chart_off')) {
+                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
+                
+                // LOGIC MỚI:
+                // Nếu có đi làm CN -> Hiển thị biểu đồ CN (Đã được đồng bộ ở trên)
+                // Nếu nghỉ CN -> Hiển thị biểu đồ Ngày nghỉ (Tải nền thấp)
+                let dataHienThi = IS_WORKING_SUNDAY ? liveData.sunday_work : liveData.off_weekday;
+                
+                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
+            }
+        }
+
+        // --- 2. VẼ BIỂU ĐỒ ---
+        function createChart(canvasId, dataSrc, maxYValue) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
+            
+            if (!dataSrc) return;
+
+            const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
+
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: liveData.labels,
+                    datasets: [
+                        { type: 'line', label: 'Tổng công suất (kW)', data: totalLoad, borderColor: DARK_YELLOW, borderWidth: 3, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2, tension: 0.4, fill: false, order: 0, dragData: true },
+                        { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
+                        { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
+                        { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
+                    ]
                 },
-                plugins: {
-                    dragData: {
-                        round: 1, showTooltip: true,
-                        onDragStart: function(e) { if(allowDrag) e.target.style.cursor = 'grabbing'; },
-                        onDrag: function(e, datasetIndex, index, value) { 
-                            if (!allowDrag) return false;
-                            if (datasetIndex !== 0) return false; 
-                            if (value < 0) return false; 
-                            if (value > window.HARD_LIMIT) return false; 
-                        },
-                        onDragEnd: function(e, datasetIndex, index, newValue) {
-                            if (!allowDrag || datasetIndex !== 0) return;
-                            e.target.style.cursor = 'default';
-                            if (newValue < 0) newValue = 0;
-                            if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
-                            recalculateSystem(canvasId, index, newValue);
-                        }
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    scales: { 
+                        y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
+                        x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
                     },
-                    legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
-                    tooltip: { 
-                        mode: 'index', intersect: false,
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) label += ': ';
-                                if (context.parsed.y !== null) label += context.parsed.y.toFixed(2) + ' kW';
-                                return label;
+                    plugins: {
+                        dragData: {
+                            round: 1, showTooltip: true,
+                            onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
+                            onDrag: function(e, datasetIndex, index, value) { 
+                                if (datasetIndex !== 0) return false; 
+                                if (value < 0) return false; 
+                                if (value > window.HARD_LIMIT) return false; 
+                            },
+                            onDragEnd: function(e, datasetIndex, index, newValue) {
+                                if (datasetIndex !== 0) return;
+                                e.target.style.cursor = 'default';
+                                if (newValue < 0) newValue = 0;
+                                if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
+                                recalculateSystem(canvasId, index, newValue);
+                            }
+                        },
+                        legend: { position: 'bottom', labels: { filter: i => i.text !== '' && i.text !== 'Tổng công suất' } },
+                        tooltip: { 
+                            mode: 'index', intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) label += context.parsed.y + ' kW';
+                                    return label;
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
 
         // --- 1. HÀM TÍNH TOÁN CHÍNH ---
         function recalculateSystem(sourceId, targetIndex, newTotalValue) {
