@@ -509,7 +509,14 @@ def home():
                     map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
                     ten_sheet = map_sheet.get(lh, 'Khác')
                     thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    new_row = pd.DataFrame([{"Tên KH": ten_kh, "Thời Gian": thoi_gian, "Khu Vực": tc, "Kết Quả": f"{kwp_min}-{kwp_max} kWp"}])
+                    gia_tri_luu = du_lieu_nhap.get('gia_tri', '0') if lh == 'can_ho' else f"{kwh_bt + kwh_cd + kwh_td} kWh"
+                    new_row = pd.DataFrame([{
+                                "Thời Gian": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                                "Tên Khách Hàng": ten_kh, 
+                                "Khu Vực": tc, 
+                                "Đầu Vào": gia_tri_luu, 
+                                "Kết Quả (kWp)": f"{kwp_min}-{kwp_max}"
+                            }])
                     
                     if os.path.exists(history_path):
                         all_sheets = pd.read_excel(history_path, sheet_name=None)
@@ -537,6 +544,7 @@ def home():
             all_sheets = pd.read_excel(history_path, sheet_name=None)
             for s_name, df in all_sheets.items():
                 if not df.empty:
+                    df = df.fillna('')
                     df['id_row'] = df.index
                     df['sheet_source'] = s_name
                     lich_su_data.extend(df.to_dict('records'))
