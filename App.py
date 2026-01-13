@@ -18,6 +18,52 @@ excel_path = os.path.join(base_dir, 'data', 'tinh_thanh.xlsx')
 history_path = os.path.join(base_dir, 'data', 'lich_su_khach_hang.xlsx')
 template_path = os.path.join(base_dir, 'templates')
 
+# Dữ liệu mặc định
+DEFAULT_SETTINGS = { 
+    "evn_bac": [1806, 1866, 2167, 2729, 3050, 3151], 
+    "gia_kinh_doanh": 2666, "gia_san_xuat": 1600, "tinh_thanh": {}, "dien_tich_kwp": 4.5,
+    "he_so_nhom": { 
+        "gd_co_nguoi": 0.2, "gd_di_lam": 0.15, "gd_ban_dem": 0.15, 
+        "kd_min": 0.1, "kd_max": 0.25,
+        "sx_min": 0.1, "sx_max": 0.25
+    }
+}
+DEFAULT_USERS = { "admin": {"password": "admin", "role": "admin"}, "user": {"password": "user", "role": "user"} }
+
+# --- HÀM XỬ LÝ EXCEL (ĐỌC) ---
+def load_excel_provinces():
+    default_data = {"Hà Nội": 3.8, "TP. HCM": 4.5}
+    try:
+        if not os.path.exists(excel_path): return default_data
+        df = pd.read_excel(excel_path)
+        df.columns = df.columns.str.strip()
+        if 'Ten_Tinh' not in df.columns or 'Gio_Nang' not in df.columns: return default_data
+        df = df.dropna(subset=['Ten_Tinh', 'Gio_Nang'])
+        df['Gio_Nang'] = df['Gio_Nang'].astype(str).str.replace(',', '.', regex=False)
+        df['Gio_Nang'] = pd.to_numeric(df['Gio_Nang'], errors='coerce') 
+        df = df.dropna(subset=['Gio_Nang'])
+        return pd.Series(df.Gio_Nang.values, index=df.Ten_Tinh).to_dict()
+    except: return default_data
+
+# --- HÀM XỬ LÝ EXCEL (GHI) ---
+def save_excel_provinces(dict_data):
+    try:
+        df = pd.DataFrame(list(dict_data.items()), columns=['Ten_Tinh', 'Gio_Nang'])
+        df.to_excel(excel_path, index=False)
+    except: pass
+
+# --- HÀM XỬ LÝ JSON ---
+def load_json_file(filepath, default_data):
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f: return json.load(f)
+    except: return default_data
+
+def save_json_file(filepath, data):
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
+    except: pass
+    
+
 SETTINGS = load_json_file(settings_path, DEFAULT_SETTINGS)
 SETTINGS['tinh_thanh'] = load_excel_provinces()
 
@@ -182,50 +228,6 @@ def scan_invoice():
         else:
             return jsonify({'success': False, 'error': 'AI không đọc được dữ liệu'}), 500
 
-# --- HÀM XỬ LÝ EXCEL (ĐỌC) ---
-def load_excel_provinces():
-    default_data = {"Hà Nội": 3.8, "TP. HCM": 4.5}
-    try:
-        if not os.path.exists(excel_path): return default_data
-        df = pd.read_excel(excel_path)
-        df.columns = df.columns.str.strip()
-        if 'Ten_Tinh' not in df.columns or 'Gio_Nang' not in df.columns: return default_data
-        df = df.dropna(subset=['Ten_Tinh', 'Gio_Nang'])
-        df['Gio_Nang'] = df['Gio_Nang'].astype(str).str.replace(',', '.', regex=False)
-        df['Gio_Nang'] = pd.to_numeric(df['Gio_Nang'], errors='coerce') 
-        df = df.dropna(subset=['Gio_Nang'])
-        return pd.Series(df.Gio_Nang.values, index=df.Ten_Tinh).to_dict()
-    except: return default_data
-
-# --- HÀM XỬ LÝ EXCEL (GHI) ---
-def save_excel_provinces(dict_data):
-    try:
-        df = pd.DataFrame(list(dict_data.items()), columns=['Ten_Tinh', 'Gio_Nang'])
-        df.to_excel(excel_path, index=False)
-    except: pass
-
-# --- HÀM XỬ LÝ JSON ---
-def load_json_file(filepath, default_data):
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f: return json.load(f)
-    except: return default_data
-
-def save_json_file(filepath, data):
-    try:
-        with open(filepath, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
-    except: pass
-
-# Dữ liệu mặc định
-DEFAULT_SETTINGS = { 
-    "evn_bac": [1806, 1866, 2167, 2729, 3050, 3151], 
-    "gia_kinh_doanh": 2666, "gia_san_xuat": 1600, "tinh_thanh": {}, "dien_tich_kwp": 4.5,
-    "he_so_nhom": { 
-        "gd_co_nguoi": 0.2, "gd_di_lam": 0.15, "gd_ban_dem": 0.15, 
-        "kd_min": 0.1, "kd_max": 0.25,
-        "sx_min": 0.1, "sx_max": 0.25
-    }
-}
-DEFAULT_USERS = { "admin": {"password": "admin", "role": "admin"}, "user": {"password": "user", "role": "user"} }
 
 # --- HÀM TÍNH TOÁN ---
 def tinh_nguoc_kwh_evn(tong_tien, settings):
