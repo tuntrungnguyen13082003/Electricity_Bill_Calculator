@@ -70,21 +70,37 @@ def ai_doc_hoa_don(file_path):
 
             # --- 3. TRÍCH XUẤT SẢN LƯỢNG (KWH) ---
             if data["loai_hinh"] == "can_ho":
-                # HỘ GIA ĐÌNH: Tìm cụm từ cụ thể "Tổng điện năng tiêu thụ (kWh)" 
-                # Loại bỏ từ "Tổng cộng" để không bị nhầm với tiền thanh toán (816.750)
+                # Ưu tiên tìm dòng Tổng điện năng tiêu thụ (kWh) có trong hóa đơn sinh hoạt 
                 tong_match = re.search(r"Tổng điện năng tiêu thụ \(kWh\).*?([\d\.,]+)", full_text, re.IGNORECASE)
-                
                 if not tong_match:
-                    # Nếu không thấy dòng trên, tìm trong bảng chỉ số: "Toàn thời gian" ... [số cuối cùng]
-                    # Đây là dòng chứa chỉ số 305 trong bảng kê chỉ số
-                    tong_match = re.search(r"Toàn thời gian.*?([\d\.,]+)$", full_text, re.MULTILINE)
+                    # Nếu không thấy, tìm dòng "Toàn thời gian" (thường chứa tổng sản lượng hộ gia đình) [cite: 10, 50]
+                    tong_match = re.search(r"Toàn thời gian.*?([\d\.,]+)\s+[\d\.,]+$", full_text, re.MULTILINE)
                 
                 if tong_match:
-                    # Làm sạch số: Xóa dấu chấm (ngăn cách nghìn) và chuyển phẩy thành chấm (nếu có thập phân)
-                    val = tong_match.group(1).replace('.', '')
-                    if ',' in val:
-                        val = val.replace(',', '.')
+                    val = tong_match.group(1).replace('.', '').replace(',', '.')
                     data["kwh_tong"] = float(val)
+            else:
+                # --- NHÁNH KINH DOANH / SẢN XUẤT ---
+                # Sử dụng Regex linh hoạt hơn để bắt được số ở giữa Đơn giá và Thành tiền
+                # Mẫu: [Tên khung giờ] [Đơn giá] [Sản lượng cần lấy] [Thành tiền]
+                
+                def extract_biz_kwh(pattern_str):
+                    # Tìm dòng chứa từ khóa, lấy con số nằm ở cột Sản lượng (thường là số thứ 2 hoặc số gần cuối)
+                    match = re.search(pattern_str + r".*?[\d\.,]+\s+([\d\.,]+)\s+[\d\.,]+", full_text, re.IGNORECASE | re.MULTILINE)
+                    if not match:
+                        # Backup: Tìm theo cách cũ nếu định dạng text bị trôi dòng
+                        match = re.search(pattern_str + r".*?([\d\.,]+)$", full_text, re.IGNORECASE | re.MULTILINE)
+                    return float(match.group(1).replace('.', '').replace(',', '.')) if match else 0
+
+                data["kwh_bt"] = extract_biz_kwh("Bình thường")
+                data["kwh_cd"] = extract_biz_kwh("Cao điểm")
+                data["kwh_td"] = extract_biz_kwh("Thấp điểm")
+                
+                # Nếu tất cả bằng 0, thử tìm theo từ viết tắt (BT, CD, TD)
+                if data["kwh_bt"] == 0 and data["kwh_cd"] == 0:
+                    data["kwh_bt"] = extract_biz_kwh("BT")
+                    data["kwh_cd"] = extract_biz_kwh("CD")
+                    data["kwh_td"] = extract_biz_kwh("TD")
 
         return data
 
