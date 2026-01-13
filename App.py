@@ -70,37 +70,37 @@ def ai_doc_hoa_don(file_path):
 
             # --- 3. TRÍCH XUẤT SẢN LƯỢNG (KWH) ---
             if data["loai_hinh"] == "can_ho":
-                # Ưu tiên tìm dòng Tổng điện năng tiêu thụ (kWh) có trong hóa đơn sinh hoạt 
+                # HỘ GIA ĐÌNH: Tìm chính xác cụm "Tổng điện năng tiêu thụ (kWh)" để lấy số 305
+                # Bỏ qua "Tổng cộng" để không nhầm với 816.750 [cite: 10, 56]
                 tong_match = re.search(r"Tổng điện năng tiêu thụ \(kWh\).*?([\d\.,]+)", full_text, re.IGNORECASE)
                 if not tong_match:
-                    # Nếu không thấy, tìm dòng "Toàn thời gian" (thường chứa tổng sản lượng hộ gia đình) [cite: 10, 50]
-                    tong_match = re.search(r"Toàn thời gian.*?([\d\.,]+)\s+[\d\.,]+$", full_text, re.MULTILINE)
+                    # Backup: Lấy số cuối cùng của dòng "Toàn thời gian" trong bảng chỉ số [cite: 10]
+                    tong_match = re.search(r"Toàn thời gian.*?([\d\.,]+)$", full_text, re.MULTILINE)
                 
                 if tong_match:
                     val = tong_match.group(1).replace('.', '').replace(',', '.')
                     data["kwh_tong"] = float(val)
             else:
-                # --- NHÁNH KINH DOANH / SẢN XUẤT ---
-                # Sử dụng Regex linh hoạt hơn để bắt được số ở giữa Đơn giá và Thành tiền
-                # Mẫu: [Tên khung giờ] [Đơn giá] [Sản lượng cần lấy] [Thành tiền]
-                
-                def extract_biz_kwh(pattern_str):
-                    # Tìm dòng chứa từ khóa, lấy con số nằm ở cột Sản lượng (thường là số thứ 2 hoặc số gần cuối)
-                    match = re.search(pattern_str + r".*?[\d\.,]+\s+([\d\.,]+)\s+[\d\.,]+", full_text, re.IGNORECASE | re.MULTILINE)
-                    if not match:
-                        # Backup: Tìm theo cách cũ nếu định dạng text bị trôi dòng
-                        match = re.search(pattern_str + r".*?([\d\.,]+)$", full_text, re.IGNORECASE | re.MULTILINE)
-                    return float(match.group(1).replace('.', '').replace(',', '.')) if match else 0
+                # --- KINH DOANH / SẢN XUẤT ---
+                # Logic: Lấy con số CUỐI CÙNG trên dòng có tên khung giờ 
+                def extract_last_number(pattern_str):
+                    # Regex này tìm từ khóa và bắt lấy nhóm số cuối cùng ở cuối dòng (\s+[\d\.,]+$)
+                    # Giúp bỏ qua Chỉ số mới (422.724) để lấy đúng Sản lượng (251.256) 
+                    match = re.search(pattern_str + r".*?([\d\.,]+)$", full_text, re.IGNORECASE | re.MULTILINE)
+                    if match:
+                        val = match.group(1).replace('.', '').replace(',', '.')
+                        return float(val)
+                    return 0
 
-                data["kwh_bt"] = extract_biz_kwh("Bình thường")
-                data["kwh_cd"] = extract_biz_kwh("Cao điểm")
-                data["kwh_td"] = extract_biz_kwh("Thấp điểm")
+                data["kwh_bt"] = extract_last_number("Bình thường")
+                data["kwh_cd"] = extract_last_number("Cao điểm")
+                data["kwh_td"] = extract_last_number("Thấp điểm")
                 
-                # Nếu tất cả bằng 0, thử tìm theo từ viết tắt (BT, CD, TD)
+                # Nếu tìm theo tên đầy đủ không ra, thử tìm theo ký hiệu viết tắt
                 if data["kwh_bt"] == 0 and data["kwh_cd"] == 0:
-                    data["kwh_bt"] = extract_biz_kwh("BT")
-                    data["kwh_cd"] = extract_biz_kwh("CD")
-                    data["kwh_td"] = extract_biz_kwh("TD")
+                    data["kwh_bt"] = extract_last_number("BT")
+                    data["kwh_cd"] = extract_last_number("CD")
+                    data["kwh_td"] = extract_last_number("TD")
 
         return data
 
