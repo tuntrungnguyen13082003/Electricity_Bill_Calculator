@@ -125,8 +125,8 @@
                     </select>
 
                     <label>Mô hình lắp đặt:</label>
-                    <select name="loai_hinh" id="loai_hinh" class="form-control" onchange="capNhatGiaoDien()">
-                        <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏠 Hộ Gia Đình</option>
+                    <select name="loai_hinh" id="loai_hinh" class="form-control" 
+                            onchange="resetAllResults(); capNhatGiaoDien()"> <option value="can_ho" {% if du_lieu_nhap.loai_hinh == 'can_ho' %}selected{% endif %}>🏠 Hộ Gia Đình</option>
                         <option value="kinh_doanh" {% if du_lieu_nhap.loai_hinh == 'kinh_doanh' %}selected{% endif %}>🏢 Kinh Doanh</option>
                         <option value="san_xuat" {% if du_lieu_nhap.loai_hinh == 'san_xuat' %}selected{% endif %}>🏭 Sản Xuất</option>
                     </select>
@@ -526,6 +526,45 @@
                 }
             }
         });
+        function resetAllResults() {
+            console.log("--- ĐANG RESET TOÀN BỘ KẾT QUẢ ---");
+
+            // 1. XÓA BIỂU ĐỒ (Phần cũ)
+            if (window.charts) {
+                Object.keys(window.charts).forEach(key => {
+                    if (window.charts[key]) {
+                        window.charts[key].destroy(); 
+                    }
+                });
+                window.charts = {}; 
+            }
+
+            // 2. ẨN KHUNG CHỨA BIỂU ĐỒ (Cái khung Grid 4 cái)
+            const chartGrid = document.querySelector('.row.chart-wrapper-grid'); // Hoặc ID cụ thể nếu bạn đã đặt
+            if (chartGrid) {
+                chartGrid.style.display = 'none';
+                // Hoặc xóa trắng luôn HTML nội dung bên trong nếu muốn:
+                chartGrid.innerHTML = ''; 
+            }
+
+            // 3. XÓA/ẨN KẾT QUẢ CÔNG SUẤT ĐỀ XUẤT (Phần bạn vừa yêu cầu)
+            // Giả sử toàn bộ phần hiển thị kết quả nằm trong 1 div lớn có id="ket_qua_tinh_toan"
+            const resultSection = document.getElementById('ket_qua_tinh_toan'); 
+            if (resultSection) {
+                resultSection.style.display = 'none'; // Ẩn nguyên khối kết quả đi
+            }
+
+            // [TÙY CHỌN] Nếu bạn muốn xóa trắng các ô input cụ thể thay vì ẩn cả khối:
+            
+            document.getElementById('txt_cong_suat_de_xuat').value = '';
+            document.getElementById('txt_so_tam_pin').innerText = '0';
+            document.getElementById('txt_san_luong_du_kien').innerText = '0 kWh';
+
+            // 4. RESET BIẾN DỮ LIỆU GỐC
+            if (typeof liveData !== 'undefined') {
+                liveData = null;
+            }
+        }
     </script>
     <script>
         function uploadVaQuetAnh(input) {
