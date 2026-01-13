@@ -308,6 +308,11 @@ def home():
                     # =================================================
                     # 1. LOGIC HỘ GIA ĐÌNH (ĐÃ KHÔI PHỤC ĐẦY ĐỦ)
                     # =================================================
+                    don_vi = "VND" if cd == 'theo_tien' else "kWh"
+                    gia_tri_dau_vao_kem_dv = f"{raw_gt} {don_vi}"
+                    dt_uoc_tinh = round(kwp_min * he_so_dt, 1)
+                    ket_qua_kem_dt = f"{kwp_min} kWp (Mái: {dt_uoc_tinh} m²)"
+
                     raw_gt = request.form.get('gia_tri_dau_vao', '0')
                     cd = request.form.get('che_do_nhap', 'theo_tien')
                     
@@ -338,7 +343,10 @@ def home():
                         kwp_max = round(uoc_luong * 1.2, 2)
                 else:
                     # --- B. NHÁNH KINH DOANH / SẢN XUẤT (THUẬT TOÁN MỚI) ---
-                    
+                    gia_tri_dau_vao_kem_dv = f"{kwh_bt + kwh_cd + kwh_td} kWh"
+                    dt_min = round(kwp_min * he_so_dt, 1)
+                    dt_max = round(kwp_max * he_so_dt, 1)
+                    ket_qua_kem_dt = f"{kwp_min} ➔ {kwp_max} kWp (Mái: {dt_min} ➔ {dt_max} m²)"
                     # 1. Hàm hỗ trợ (Giữ nguyên)
                     def get_hour_safe(key, default_h):
                         val = request.form.get(key, "")
@@ -509,13 +517,12 @@ def home():
                     map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
                     ten_sheet = map_sheet.get(lh, 'Khác')
                     thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    gia_tri_luu = du_lieu_nhap.get('gia_tri', '0') if lh == 'can_ho' else f"{kwh_bt + kwh_cd + kwh_td} kWh"
                     new_row = pd.DataFrame([{
-                                "Thời Gian": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                                "Thời Gian": thoi_gian,
                                 "Tên Khách Hàng": ten_kh, 
                                 "Khu Vực": tc, 
-                                "Đầu Vào": gia_tri_luu, 
-                                "Kết Quả (kWp)": f"{kwp_min}-{kwp_max}"
+                                "Đầu Vào": gia_tri_dau_vao_kem_dv, 
+                                "Kết Quả (kWp)": ket_qua_kem_dt
                             }])
                     
                     if os.path.exists(history_path):
