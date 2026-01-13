@@ -70,23 +70,21 @@ def ai_doc_hoa_don(file_path):
 
             # --- 3. TRÍCH XUẤT SẢN LƯỢNG (KWH) ---
             if data["loai_hinh"] == "can_ho":
-                # HỘ GIA ĐÌNH: Tìm số tổng sản lượng (thường đứng sau các từ như Sản lượng hoặc Tổng cộng)
-                tong_match = re.search(r"(?:Tổng điện năng tiêu thụ|Sản lượng|Tổng cộng).*?([\d\.,]+)$", full_text, re.MULTILINE | re.IGNORECASE)
+                # HỘ GIA ĐÌNH: Tìm cụm từ cụ thể "Tổng điện năng tiêu thụ (kWh)" 
+                # Loại bỏ từ "Tổng cộng" để không bị nhầm với tiền thanh toán (816.750)
+                tong_match = re.search(r"Tổng điện năng tiêu thụ \(kWh\).*?([\d\.,]+)", full_text, re.IGNORECASE)
+                
+                if not tong_match:
+                    # Nếu không thấy dòng trên, tìm trong bảng chỉ số: "Toàn thời gian" ... [số cuối cùng]
+                    # Đây là dòng chứa chỉ số 305 trong bảng kê chỉ số
+                    tong_match = re.search(r"Toàn thời gian.*?([\d\.,]+)$", full_text, re.MULTILINE)
+                
                 if tong_match:
-                    data["kwh_tong"] = float(tong_match.group(1).replace('.', '').replace(',', ''))
-            else:
-                # KINH DOANH / SẢN XUẤT: Lấy 3 chỉ số theo khung giờ (Giữ logic của bạn)
-                bt_match = re.search(r"Khung giờ bình thường.*?([\d\.,]+)$", full_text, re.MULTILINE)
-                if bt_match:
-                    data["kwh_bt"] = float(bt_match.group(1).replace('.', '').replace(',', ''))
-
-                cd_match = re.search(r"Khung giờ cao điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
-                if cd_match:
-                    data["kwh_cd"] = float(cd_match.group(1).replace('.', '').replace(',', ''))
-
-                td_match = re.search(r"Khung giờ thấp điểm.*?([\d\.,]+)$", full_text, re.MULTILINE)
-                if td_match:
-                    data["kwh_td"] = float(td_match.group(1).replace('.', '').replace(',', ''))
+                    # Làm sạch số: Xóa dấu chấm (ngăn cách nghìn) và chuyển phẩy thành chấm (nếu có thập phân)
+                    val = tong_match.group(1).replace('.', '')
+                    if ',' in val:
+                        val = val.replace(',', '.')
+                    data["kwh_tong"] = float(val)
 
         return data
 
