@@ -639,6 +639,14 @@
                 .then(res => {
                     if (res.success && res.data) {
                         const d = res.data;
+                        
+                        // --- THÊM MỚI 0: Tự động điền Tên và Khu vực ---
+                        if (d.ten_kh) {
+                            document.querySelector('input[name="ten_khach_hang"]').value = d.ten_kh;
+                        }
+                        if (d.tinh_thanh) {
+                            document.querySelector('select[name="tinh_thanh_chon"]').value = d.tinh_thanh;
+                        }
 
                         // --- THÊM MỚI 1: Tự động chọn mô hình lắp đặt ---
                         const selectLoaiHinh = document.getElementById('loai_hinh');

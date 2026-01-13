@@ -34,13 +34,15 @@ def ai_doc_hoa_don(file_path):
         print("Lỗi: Thư viện này chỉ hỗ trợ file PDF gốc.")
         return None
 
-    # Khởi tạo dữ liệu mặc định
+    # Khởi tạo dữ liệu mặc định - Bổ sung ten_kh và tinh_thanh
     data = {
-        "loai_hinh": "can_ho", # Mặc định là hộ gia đình
-        "kwh_tong": 0,         # Dành cho hộ gia đình
-        "kwh_bt": 0,           # Dành cho KD/SX
-        "kwh_cd": 0,           # Dành cho KD/SX
-        "kwh_td": 0,           # Dành cho KD/SX
+        "ten_kh": "",          # Tên khách hàng 
+        "tinh_thanh": "",      # Khu vực lắp đặt 
+        "loai_hinh": "can_ho", 
+        "kwh_tong": 0,         
+        "kwh_bt": 0,           
+        "kwh_cd": 0,           
+        "kwh_td": 0,           
         "ngay_dau": "",
         "ngay_cuoi": ""
     }
@@ -53,13 +55,29 @@ def ai_doc_hoa_don(file_path):
                 if text:
                     full_text += text + "\n"
 
-            # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
-            # Tìm đoạn văn bản sau cụm "Mục đích sử dụng điện"
+            # --- 1. MỚI: TRÍCH XUẤT TÊN KHÁCH HÀNG ---
+            # Tìm dòng "Khách hàng" và lấy nội dung phía sau 
+            name_match = re.search(r"Khách hàng\s*[\n\r]\s*(.*)", full_text, re.IGNORECASE)
+            if name_match:
+                data["ten_kh"] = name_match.group(1).strip().replace('"', '').replace(',', '')
+
+            # --- 2. MỚI: TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) ---
+            # Tìm trong "Địa chỉ sử dụng điện" và so khớp với danh sách SETTINGS 
+            address_match = re.search(r"Địa chỉ sử dụng điện\s*(.*)", full_text, re.IGNORECASE)
+            if address_match:
+                address_str = address_match.group(1).lower()
+                # Duyệt qua danh sách tỉnh thành bạn có trong SETTINGS để chọn đúng Option
+                if 'tinh_thanh' in SETTINGS:
+                    for tinh in SETTINGS['tinh_thanh'].keys():
+                        if tinh.lower() in address_str:
+                            data["tinh_thanh"] = tinh
+                            break
+
+            # --- 3. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
+            # Giữ nguyên logic nhận diện dựa trên "Mục đích sử dụng điện" 
             purpose_match = re.search(r"Mục đích sử dụng điện\s*(.*)", full_text, re.IGNORECASE)
-            
             if purpose_match:
                 purpose_text = purpose_match.group(1).lower()
-                
                 if "sinh hoạt" in purpose_text:
                     data["loai_hinh"] = "can_ho"
                 elif "sản xuất" in purpose_text:
@@ -67,19 +85,17 @@ def ai_doc_hoa_don(file_path):
                 elif "kinh doanh" in purpose_text:
                     data["loai_hinh"] = "kinh_doanh"
                 else:
-                    # Nếu không tìm thấy từ khóa trong mục đích, dùng fallback khung giờ
                     if any(x in full_text for x in ["Khung giờ", "BT:", "CD:", "TD:"]):
-                        data["loai_hinh"] = "kinh_doanh"
+                        data["loai_hinh"] = "kin_doanh"
                     else:
                         data["loai_hinh"] = "can_ho"
             else:
-                # Fallback nếu không tìm thấy dòng "Mục đích sử dụng điện"
                 if any(x in full_text for x in ["Khung giờ", "BT:", "CD:", "TD:"]):
                     data["loai_hinh"] = "kinh_doanh"
                 else:
                     data["loai_hinh"] = "can_ho"
 
-            # --- 2. TRÍCH XUẤT NGÀY THÁNG (Giữ nguyên của bạn) ---
+            # --- 4. TRÍCH XUẤT NGÀY THÁNG (Giữ nguyên của bạn) --- [cite: 9, 67, 122]
             date_match = re.search(r"từ\s+(\d{2}/\d{2}/\d{4})\s+đến\s+(\d{2}/\d{2}/\d{4})", full_text)
             if date_match:
                 d1 = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
@@ -87,24 +103,20 @@ def ai_doc_hoa_don(file_path):
                 data["ngay_dau"] = d1
                 data["ngay_cuoi"] = d2
 
-            # --- 3. TRÍCH XUẤT SẢN LƯỢNG (KWH) ---
+            # --- 5. TRÍCH XUẤT SẢN LƯỢNG (KWH) ---
             if data["loai_hinh"] == "can_ho":
-                # HỘ GIA ĐÌNH: Tìm chính xác cụm "Tổng điện năng tiêu thụ (kWh)" để lấy số 305
-                # Bỏ qua "Tổng cộng" để không nhầm với 816.750 [cite: 10, 56]
+                # HỘ GIA ĐÌNH: Tìm chính xác cụm "Tổng điện năng tiêu thụ (kWh)" [cite: 50, 78, 106, 133]
                 tong_match = re.search(r"Tổng điện năng tiêu thụ \(kWh\).*?([\d\.,]+)", full_text, re.IGNORECASE)
                 if not tong_match:
-                    # Backup: Lấy số cuối cùng của dòng "Toàn thời gian" trong bảng chỉ số [cite: 10]
+                    # Backup: Lấy số cuối cùng của dòng "Toàn thời gian" [cite: 10]
                     tong_match = re.search(r"Toàn thời gian.*?([\d\.,]+)$", full_text, re.MULTILINE)
                 
                 if tong_match:
                     val = tong_match.group(1).replace('.', '').replace(',', '.')
                     data["kwh_tong"] = float(val)
             else:
-                # --- KINH DOANH / SẢN XUẤT ---
-                # Logic: Lấy con số CUỐI CÙNG trên dòng có tên khung giờ 
+                # --- KINH DOANH / SẢN XUẤT --- [cite: 77, 133]
                 def extract_last_number(pattern_str):
-                    # Regex này tìm từ khóa và bắt lấy nhóm số cuối cùng ở cuối dòng (\s+[\d\.,]+$)
-                    # Giúp bỏ qua Chỉ số mới (422.724) để lấy đúng Sản lượng (251.256) 
                     match = re.search(pattern_str + r".*?([\d\.,]+)$", full_text, re.IGNORECASE | re.MULTILINE)
                     if match:
                         val = match.group(1).replace('.', '').replace(',', '.')
@@ -115,7 +127,6 @@ def ai_doc_hoa_don(file_path):
                 data["kwh_cd"] = extract_last_number("Cao điểm")
                 data["kwh_td"] = extract_last_number("Thấp điểm")
                 
-                # Nếu tìm theo tên đầy đủ không ra, thử tìm theo ký hiệu viết tắt
                 if data["kwh_bt"] == 0 and data["kwh_cd"] == 0:
                     data["kwh_bt"] = extract_last_number("BT")
                     data["kwh_cd"] = extract_last_number("CD")
