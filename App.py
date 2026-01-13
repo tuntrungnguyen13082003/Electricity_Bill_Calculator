@@ -127,7 +127,7 @@ def ai_doc_hoa_don(file_path):
 
             # BƯỚC A: Tìm cụm "Thành phố/Tỉnh/TP + Tên" (Ưu tiên cao nhất)
             # Regex này tìm: (Thành phố|Tỉnh|TP) + khoảng trắng + [Tên Tỉnh]
-            keyword_pattern = r"(?:Thành phố|Tỉnh|TP\.?)\s+([^\d,\n\r]+)"
+            keyword_pattern = r"(?:thành phố|tỉnh|TP\.?)\s+([^\d,\n\r]+)"
             matches = re.findall(keyword_pattern, full_addr, re.IGNORECASE)
             
             # Kiểm tra các kết quả tìm được từ khóa xem có nằm trong danh sách SETTINGS không
