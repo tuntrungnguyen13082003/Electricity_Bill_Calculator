@@ -458,38 +458,41 @@
         function capNhatGiaoDien() {
             var loaiHinh = document.getElementById('loai_hinh').value;
             
-            // --- CÁC ID LẤY CHÍNH XÁC TỪ ẢNH MÀN HÌNH ---
+            // Lấy các phần tử giao diện
             var khungHGD = document.getElementById('khung_ho_gia_dinh');
-            var khungKD  = document.getElementById('khung_chuyen_nghiep'); // Đây là ID đúng!
+            var khungKD  = document.getElementById('khung_chuyen_nghiep');
+            var inputHGD = document.getElementById('gia_tri_input'); // Ô nhập tiền của Hộ GD
             
             var khungDacDiem = document.getElementById('khung_dac_diem');
             var dropdown = document.getElementById('chon_ngu_canh');
             var inputAn = document.getElementById('he_so_nhap');
             var thongBao = document.getElementById('thong_bao_he_so');
 
-            // Logic ẩn/hiện
             if (loaiHinh === 'can_ho') {
-                // --- TRƯỜNG HỢP HỘ GIA ĐÌNH ---
+                // --- TRƯỜNG HỢP 1: HỘ GIA ĐÌNH ---
                 if(khungHGD) khungHGD.style.display = 'block';
                 if(khungKD)  khungKD.style.display  = 'none';
                 
+                // [QUAN TRỌNG] BẬT bắt buộc nhập cho Hộ Gia Đình
+                if(inputHGD) inputHGD.required = true;
+
                 if(khungDacDiem) khungDacDiem.style.display = 'block';
                 if(thongBao) thongBao.style.display = 'none';
-                if(inputHGD) inputHGD.required = true;
-                // Cập nhật hệ số ngầm cho Hộ Gia Đình
+
                 if(dropdown && inputAn && DATA_HE_SO) { 
                     inputAn.value = DATA_HE_SO[dropdown.value] || 0.5; 
                 }
 
             } else {
-                // --- TRƯỜNG HỢP KINH DOANH / SẢN XUẤT ---
+                // --- TRƯỜNG HỢP 2: KINH DOANH / SẢN XUẤT ---
                 if(khungHGD) khungHGD.style.display = 'none';
                 if(khungKD)  khungKD.style.display  = 'block';
                 
+                // [QUAN TRỌNG] TẮT bắt buộc nhập cho Hộ Gia Đình (Để không bị lỗi focus)
                 if(inputHGD) inputHGD.required = false;
+
                 if(khungDacDiem) khungDacDiem.style.display = 'none';
 
-                // Hiển thị thông báo hệ số
                 if (thongBao && DATA_HE_SO) {
                     thongBao.style.display = 'block';
                     var k_min = loaiHinh === 'kinh_doanh' ? 'kd_min' : 'sx_min';
