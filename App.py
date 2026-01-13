@@ -115,17 +115,48 @@ def ai_doc_hoa_don(file_path):
             else:
                 print("⚠️ Không tìm thấy tên khách hàng.")
             
-            # --- 2. MỚI: TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) ---
-            # Tìm trong "Địa chỉ sử dụng điện" và so khớp với danh sách SETTINGS 
-            address_block = re.findall(r"Địa chỉ.*", full_text, re.IGNORECASE)
-            combined_address_text = " ".join(address_block).lower()
-            tinh_list = sorted(SETTINGS.get('tinh_thanh', {}).keys(), key=len, reverse=True)
-            for tinh in tinh_list:
-                if tinh.lower() in combined_address_text or tinh.lower() in full_text.lower():
-                    data["tinh_thanh"] = tinh
-                    break
-            if not data["tinh_thanh"]:
-                print("⚠️ Không tìm thấy khu vực trong danh sách cài đặt.")
+            # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - ƯU TIÊN CUỐI DÒNG ---
+            # Lấy các dòng có chứa chữ "Địa chỉ" [cite: 2, 61, 118]
+            dia_chi_lines = re.findall(r"Địa chỉ.*", full_text, re.IGNORECASE)
+            full_addr = " ".join(dia_chi_lines)
+
+            # CHIẾN THUẬT 1: Tìm cụm "Thành phố X", "Tỉnh X" hoặc "TP X" ở cuối dòng
+            # Regex này tìm từ khóa Thành phố/Tỉnh và lấy phần chữ phía sau cho đến hết dòng hoặc dấu phẩy
+            match_uu_tien = re.search(r"(?:Thành phố|Tỉnh|TP\.?)\s+([^,\n\r]+)", full_addr, re.IGNORECASE)
+            
+            tinh_tim_duoc = ""
+            if match_uu_tien:
+                tinh_tim_duoc = match_uu_tien.group(1).strip() # Ví dụ: "Đà Nẵng" hoặc "Đồng Nai"
+
+            # CHIẾN THUẬT 2: So khớp với danh sách SETTINGS
+            if 'tinh_thanh' in SETTINGS:
+                found = False
+                # Nếu tìm được từ khóa ưu tiên ở trên, kiểm tra nó trước
+                if tinh_tim_duoc:
+                    for tinh_key in SETTINGS['tinh_thanh'].keys():
+                        if tinh_tim_duoc.lower() == tinh_key.lower() or tinh_key.lower() in tinh_tim_duoc.lower():
+                            data["tinh_thanh"] = tinh_key
+                            found = True
+                            break
+                
+                # Nếu chiến thuật 1 không ra, dùng chiến thuật "Cắt đuôi"
+                if not found:
+                    # Tách địa chỉ bằng dấu phẩy và lấy phần tử cuối cùng (Thành phố/Tỉnh thường nằm đây)
+                    parts = [p.strip() for p in full_addr.split(',')]
+                    if parts:
+                        last_part = parts[-1].lower()
+                        for tinh_key in SETTINGS['tinh_thanh'].keys():
+                            if tinh_key.lower() in last_part:
+                                data["tinh_thanh"] = tinh_key
+                                found = True
+                                break
+                                
+                # Nếu vẫn không ra, mới quét toàn bộ văn bản (Dễ nhầm nhưng là bước cuối)
+                if not found:
+                    for tinh_key in SETTINGS['tinh_thanh'].keys():
+                        if tinh_key.lower() in full_addr.lower():
+                            data["tinh_thanh"] = tinh_key
+                            break
 
             # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
             # Tìm đoạn văn bản sau cụm "Mục đích sử dụng điện"
