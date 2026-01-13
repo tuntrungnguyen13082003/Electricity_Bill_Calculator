@@ -308,22 +308,15 @@ def home():
                     # =================================================
                     # 1. LOGIC HỘ GIA ĐÌNH (ĐÃ KHÔI PHỤC ĐẦY ĐỦ)
                     # =================================================
-                    don_vi = "VND" if cd == 'theo_tien' else "kWh"
-                    gia_tri_dau_vao_kem_dv = f"{raw_gt} {don_vi}"
-                    dt_uoc_tinh = round(kwp_min * he_so_dt, 1)
-                    ket_qua_kem_dt = f"{kwp_min} kWp (Mái: {dt_uoc_tinh} m²)"
-
+                    # Bước 1: Lấy dữ liệu từ Form trước
                     raw_gt = request.form.get('gia_tri_dau_vao', '0')
                     cd = request.form.get('che_do_nhap', 'theo_tien')
-                    
-                    # Xử lý input: Xóa dấu chấm/phẩy để thành số thực
                     val_str = raw_gt.replace('.', '').replace(',', '')
                     gt = float(val_str) if val_str else 0
-                    
                     hs = float(request.form.get('he_so_nhap') or 0.5)
                     ngu_canh = request.form.get('ngu_canh_chon')
 
-                    # Lưu lại dữ liệu để HTML hiển thị lại
+                    # Bước 2: Cập nhật dữ liệu nhập để hiển thị lại trên Web
                     du_lieu_nhap.update({
                         'gia_tri': raw_gt, # Giữ nguyên string có dấu chấm để hiện lại cho đẹp
                         'che_do': cd, 
@@ -331,23 +324,24 @@ def home():
                         'ngu_canh': ngu_canh
                     })
 
-                    # Gọi hàm tính toán (Giả định hàm này đã có trong code của bạn)
+                    # Bước 3: Tính toán kWp
                     if 'tinh_toan_kwp' in globals():
                         kwp_list = tinh_toan_kwp(lh, gt, cd, hs, gn, SETTINGS)
                         kwp_min, kwp_max = kwp_list[0], kwp_list[1]
                     else:
-                        # Fallback nếu hàm bị thiếu (Tính nhẩm đơn giản để không crash)
-                        # VD: Tiền / 2000đ / 30 ngày / 4h nắng
                         uoc_luong = (gt / 2000) / 30 / gn if cd == 'theo_tien' else gt / 30 / gn
                         kwp_min = round(uoc_luong * 0.8, 2)
                         kwp_max = round(uoc_luong * 1.2, 2)
-                        don_vi = "VND" if cd == 'theo_tien' else "kWh"
-                        gia_tri_dau_vao_kem_dv = f"{raw_gt} {don_vi}"
-                        dt_uoc_tinh = round(kwp_min * he_so_dt, 1)
-                        ket_qua_kem_dt = f"{kwp_min} kWp (Mái: {dt_uoc_tinh} m²)"
+
+                    # Bước 4: Sau khi có kết quả, mới định dạng chuỗi để lưu Excel
+                    don_vi = "VND" if cd == 'theo_tien' else "kWh"
+                    gia_tri_dau_vao_kem_dv = f"{raw_gt} {don_vi}"
+                    dt_uoc_tinh = round(kwp_min * he_so_dt, 1)
+                    ket_qua_kem_dt = f"{kwp_min} kWp (Mái: {dt_uoc_tinh} m²)"
+
                 else:
                     # --- B. NHÁNH KINH DOANH / SẢN XUẤT (THUẬT TOÁN MỚI) ---
-                    # 1. Hàm hỗ trợ (Giữ nguyên)
+                    # Bước 1: Lấy dữ liệu input
                     def get_hour_safe(key, default_h):
                         val = request.form.get(key, "")
                         if not val: return default_h
@@ -373,17 +367,19 @@ def home():
                     du_lieu_nhap.update({
                         'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
                         'ngay_dau': d_start, 'ngay_cuoi': d_end,
-                        'gio_lam_tu': request.form.get('gio_lam_tu'), 'gio_lam_den': request.form.get('gio_lam_den'),
+                        'gio_lam_tu': request.form.get('gio_lam_tu'), 
+                        'gio_lam_den': request.form.get('gio_lam_den'),
                         'list_ngay_nghi': list_ngay_nghi
                     })
 
-                    # Tính kWp Min/Max (Giữ nguyên)
+                    # Bước 2: Tính toán kWp dải Min - Max
                     pref = 'kd' if lh == 'kinh_doanh' else 'sx'
                     hs_min, hs_max = SETTINGS['he_so_nhom'].get(f'{pref}_min', 0.1), SETTINGS['he_so_nhom'].get(f'{pref}_max', 0.25)
                     total_kwh = kwh_bt + kwh_cd + kwh_td
                     kwp_min = round(((total_kwh * hs_min) / 30) / gn, 2)
                     kwp_max = round(((total_kwh * hs_max) / 30) / gn, 2)
 
+                    # Bước 3: Định dạng chuỗi lưu Excel cho Kinh doanh / Sản xuất
                     gia_tri_dau_vao_kem_dv = f"{total_kwh} kWh"
                     dt_min = round(kwp_min * he_so_dt, 1)
                     dt_max = round(kwp_max * he_so_dt, 1)
