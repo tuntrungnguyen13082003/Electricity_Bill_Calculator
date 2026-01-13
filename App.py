@@ -316,36 +316,43 @@ def home():
 
                 if lh == 'can_ho':
                     # =================================================
-                    # 1. LOGIC HỘ GIA ĐÌNH (ĐÃ KHÔI PHỤC ĐẦY ĐỦ)
+                    # 1. LOGIC HỘ GIA ĐÌNH (CHỈ DÙNG SỐ ĐIỆN kWh)
                     # =================================================
-                    # Bước 1: Lấy dữ liệu từ Form trước
+                    # Bước 1: Lấy dữ liệu từ Form
                     raw_gt = request.form.get('gia_tri_dau_vao', '0')
-                    cd = request.form.get('che_do_nhap', 'theo_tien')
+                    # HGD giờ chỉ dùng kWh, 'theo_kwh' được lấy từ input hidden hoặc ép cứng tại đây
+                    cd = 'theo_kwh' 
+                    
+                    # Xử lý chuỗi số (xóa dấu chấm/phẩy) để tính toán
                     val_str = raw_gt.replace('.', '').replace(',', '')
                     gt = float(val_str) if val_str else 0
+                    
                     hs = float(request.form.get('he_so_nhap') or 0.5)
                     ngu_canh = request.form.get('ngu_canh_chon')
 
                     # Bước 2: Cập nhật dữ liệu nhập để hiển thị lại trên Web
                     du_lieu_nhap.update({
-                        'gia_tri': raw_gt, # Giữ nguyên string có dấu chấm để hiện lại cho đẹp
+                        'gia_tri': raw_gt,
                         'che_do': cd, 
                         'he_so': hs, 
                         'ngu_canh': ngu_canh
                     })
 
-                    # Bước 3: Tính toán kWp
+                    # Bước 3: Tính toán kWp (Giữ nguyên logic kiểm tra hàm sẵn có)
                     if 'tinh_toan_kwp' in globals():
                         kwp_list = tinh_toan_kwp(lh, gt, cd, hs, gn, SETTINGS)
                         kwp_min, kwp_max = kwp_list[0], kwp_list[1]
                     else:
-                        uoc_luong = (gt / 2000) / 30 / gn if cd == 'theo_tien' else gt / 30 / gn
-                        kwp_min = round(uoc_luong * 0.8, 2)
-                        kwp_max = round(uoc_luong * 1.2, 2)
+                        # Fallback tính toán đơn giản nếu không tìm thấy hàm
+                        uoc_luong = gt / 30 / gn if gn > 0 else 0
+                        kwp_min = round(uoc_luong, 2)
+                        kwp_max = round(uoc_luong, 2)
 
-                    # Bước 4: Sau khi có kết quả, mới định dạng chuỗi để lưu Excel
-                    don_vi = "VND" if cd == 'theo_tien' else "kWh"
-                    gia_tri_dau_vao_kem_dv = f"{raw_gt} {don_vi}"
+                    # Bước 4: Định dạng chuỗi để lưu vào Excel (Theo yêu cầu mới)
+                    # - Đầu vào: Luôn hiển thị đơn vị kWh
+                    gia_tri_dau_vao_kem_dv = f"{raw_gt} kWh"
+                    
+                    # - Kết quả: Hiện 1 con số kWp duy nhất và diện tích mái
                     dt_uoc_tinh = round(kwp_min * he_so_dt, 1)
                     ket_qua_kem_dt = f"{kwp_min} kWp (Mái: {dt_uoc_tinh} m²)"
 

@@ -517,11 +517,14 @@
         function capNhatGiaoDien() {
             var loaiHinh = document.getElementById('loai_hinh').value;
             
-            // Lấy các phần tử giao diện
+            // 1. Lấy các khung bao ngoài
             var khungHGD = document.getElementById('khung_ho_gia_dinh');
             var khungKD  = document.getElementById('khung_chuyen_nghiep');
-            var inputHGD = document.getElementById('gia_tri_input'); // Ô nhập tiền của Hộ GD
             
+            // 2. Lấy ô nhập liệu chính của Hộ gia đình (nay là số điện kWh)
+            var inputHGD = document.getElementById('gia_tri_input'); 
+            
+            // 3. Các phần tử bổ trợ
             var khungDacDiem = document.getElementById('khung_dac_diem');
             var dropdown = document.getElementById('chon_ngu_canh');
             var inputAn = document.getElementById('he_so_nhap');
@@ -532,13 +535,14 @@
                 if(khungHGD) khungHGD.style.display = 'block';
                 if(khungKD)  khungKD.style.display  = 'none';
                 
-                // [QUAN TRỌNG] BẬT bắt buộc nhập cho Hộ Gia Đình
+                // BẬT bắt buộc nhập cho ô số điện Hộ Gia Đình
                 if(inputHGD) inputHGD.required = true;
 
                 if(khungDacDiem) khungDacDiem.style.display = 'block';
                 if(thongBao) thongBao.style.display = 'none';
 
-                if(dropdown && inputAn && DATA_HE_SO) { 
+                // GIỮ NGUYÊN: Cập nhật hệ số ngầm dựa trên "Đặc điểm sử dụng"
+                if(dropdown && inputAn && typeof DATA_HE_SO !== 'undefined') { 
                     inputAn.value = DATA_HE_SO[dropdown.value] || 0.5; 
                 }
 
@@ -547,12 +551,13 @@
                 if(khungHGD) khungHGD.style.display = 'none';
                 if(khungKD)  khungKD.style.display  = 'block';
                 
-                // [QUAN TRỌNG] TẮT bắt buộc nhập cho Hộ Gia Đình (Để không bị lỗi focus)
+                // TẮT bắt buộc nhập cho ô Hộ Gia Đình (để tránh lỗi không submit được form khi ẩn)
                 if(inputHGD) inputHGD.required = false;
 
                 if(khungDacDiem) khungDacDiem.style.display = 'none';
 
-                if (thongBao && DATA_HE_SO) {
+                // GIỮ NGUYÊN: Hiển thị thông báo dải hệ số Min - Max cho Doanh nghiệp
+                if (thongBao && typeof DATA_HE_SO !== 'undefined') {
                     thongBao.style.display = 'block';
                     var k_min = loaiHinh === 'kinh_doanh' ? 'kd_min' : 'sx_min';
                     var k_max = loaiHinh === 'kinh_doanh' ? 'kd_max' : 'sx_max';
