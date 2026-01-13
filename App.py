@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import pytz
 import base64
 import re
 import pdfplumber
@@ -517,7 +518,8 @@ def home():
                 try:
                     map_sheet = {'can_ho': 'Hộ Gia Đình', 'kinh_doanh': 'Kinh Doanh', 'san_xuat': 'Sản Xuất'}
                     ten_sheet = map_sheet.get(lh, 'Khác')
-                    thoi_gian = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+                    thoi_gian = datetime.now(vn_tz).strftime("%d/%m/%Y %H:%M:%S")
                     new_row = pd.DataFrame([{
                                 "Thời Gian": thoi_gian,
                                 "Tên Khách Hàng": ten_kh, 
