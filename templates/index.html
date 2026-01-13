@@ -648,51 +648,45 @@
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
         window.charts = {}; 
-        const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
-        let liveData = JSON.parse(JSON.stringify(chartDataRaw));
-        const IS_WORKING_SUNDAY = (liveData.stats.sun_work > 0);
-        const DAYS_WEEK = liveData.stats.week_work || 26; 
-        const DAYS_SUN  = liveData.stats.sun_work || 0;
+    const chartDataRaw = {{ du_lieu_nhap.chart_data | tojson }};
+    let liveData = JSON.parse(JSON.stringify(chartDataRaw));
+    
+    // --- CẤU HÌNH LOGIC HIỂN THỊ (SỬA Ở ĐÂY) ---
+    const IS_WORKING_SUNDAY = (liveData.stats.sun_work > 0); // Có làm Chủ Nhật không?
+    
+    // BẠN SỬA DÒNG NÀY: false nghĩa là "Tôi làm full tuần, không có ngày nghỉ thường"
+    // Khi set là false, biểu đồ số 3 sẽ về 0 hết.
+    const HAS_WEEKDAY_OFF = false; 
 
-        // --- HÀM CHUYỂN TAB ---
-        function switchChartTab(canvasId, btn) {
-            document.querySelectorAll('.chart-wrapper').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.chart-tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById('wrapper_' + canvasId).style.display = 'block';
-            btn.classList.add('active');
-        }
+    // --- HÀM TẠO DỮ LIỆU RỖNG (QUAN TRỌNG) ---
+    function getEffectiveData(originalData, isActive) {
+        // Nếu isActive = true thì trả về dữ liệu gốc
+        if (isActive && originalData) return originalData;
+        
+        // Nếu isActive = false thì trả về mảng toàn số 0 (Biểu đồ phẳng lì)
+        return {
+            td: Array(48).fill(0),
+            bt_l: Array(48).fill(0),
+            cd_l: Array(48).fill(0)
+        };
+    }
 
-        document.addEventListener("DOMContentLoaded", function() {
-            const tabBtn = document.getElementById('btn_tab_bieu_do');
-            if(tabBtn) openSubTab('sub_bieu_do', tabBtn);
-            initAllCharts();
-        });
+    document.addEventListener("DOMContentLoaded", function() {
+        initAllCharts();
+    });
 
-        function getEffectiveData(originalData, isActive) {
-            if (isActive && originalData) return originalData;
-            // Nếu không kích hoạt, trả về mảng toàn số 0
-            return {
-                td: Array(48).fill(0),
-                bt_l: Array(48).fill(0),
-                cd_l: Array(48).fill(0)
-            };
-        }
-
-        // --- 1. KHỞI TẠO ---
-        // --- 1. KHỞI TẠO 4 BIỂU ĐỒ ---
+    // --- 1. KHỞI TẠO 4 BIỂU ĐỒ ---
     function initAllCharts() {
-        // Lấy dữ liệu thực tế dựa trên cấu hình (Có làm CN hay không?)
-        // 1. Ngày làm việc thường: Luôn có
+        // 1. Ngày làm việc thường (Thứ 2 - Thứ 7): Luôn hiển thị
         const dataWorkWeek = liveData.weekday_work;
         
-        // 2. Ngày làm việc CN: Chỉ hiện số liệu nếu IS_WORKING_SUNDAY = true
+        // 2. Ngày làm việc CN: Chỉ hiển thị nếu IS_WORKING_SUNDAY = true
         const dataWorkSun  = getEffectiveData(liveData.sunday_work, IS_WORKING_SUNDAY);
         
-        // 3. Ngày nghỉ thường: Dùng cho ngày Lễ. 
-        // (Tùy ý bạn, ở đây mình vẫn để hiện để chỉnh Lễ, nếu muốn ẩn luôn thì sửa true thành false)
-        const dataOffWeek  = getEffectiveData(liveData.off_weekday, true); 
+        // 3. Ngày nghỉ thường: Chỉ hiển thị nếu HAS_WEEKDAY_OFF = true (Đã sửa)
+        const dataOffWeek  = getEffectiveData(liveData.off_weekday, HAS_WEEKDAY_OFF); 
         
-        // 4. Ngày nghỉ CN: Luôn có (vì nghỉ CN thì phải dùng profile này)
+        // 4. Ngày nghỉ CN: Luôn hiển thị (Profile dùng cho những ngày CN được nghỉ)
         const dataOffSun   = liveData.off_sunday;
 
         // --- Tìm Max Y để đồng bộ tỷ lệ ---
@@ -716,14 +710,17 @@
             if (window.charts[id]) window.charts[id].destroy();
         });
 
-        // --- Vẽ biểu đồ mới với dữ liệu đã lọc ---
-        // Cho phép KÉO (Drag) ở biểu đồ số 1
+        // --- Vẽ biểu đồ ---
+        // Biểu đồ 1: Master (Cho phép kéo)
         window.charts['chart_work_weekday'] = createChart('chart_work_weekday', dataWorkWeek, COMMON_MAX_Y, true); 
         
-        // Các biểu đồ còn lại:
-        // Nếu dataWorkSun là toàn số 0 (do không làm CN) -> Biểu đồ sẽ trắng trơn -> Đúng logic
+        // Biểu đồ 2: Slave (Chạy theo logic CN)
         window.charts['chart_work_sunday']  = createChart('chart_work_sunday', dataWorkSun, COMMON_MAX_Y, false);
+        
+        // Biểu đồ 3: Ngày nghỉ thường (Sẽ phẳng lì nếu HAS_WEEKDAY_OFF = false)
         window.charts['chart_off_weekday']  = createChart('chart_off_weekday', dataOffWeek, COMMON_MAX_Y, false);
+        
+        // Biểu đồ 4: Ngày nghỉ CN
         window.charts['chart_off_sunday']   = createChart('chart_off_sunday', dataOffSun, COMMON_MAX_Y, false);
     }
 
@@ -733,7 +730,6 @@
         if (!ctx) return;
 
         const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-        // Tính tổng (Nếu dataSrc là mảng 0 thì tổng là 0)
         const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
 
         return new Chart(ctx, {
@@ -762,9 +758,7 @@
                 ]
             },
             options: {
-                responsive: true, 
-                maintainAspectRatio: false, 
-                animation: false,
+                responsive: true, maintainAspectRatio: false, animation: false,
                 scales: { 
                     y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
                     x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
@@ -784,7 +778,6 @@
                             e.target.style.cursor = 'default';
                             if (newValue < 0) newValue = 0;
                             if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
-                            
                             recalculateSystem(canvasId, index, newValue);
                         }
                     },
