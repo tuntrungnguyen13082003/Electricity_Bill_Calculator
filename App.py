@@ -53,12 +53,31 @@ def ai_doc_hoa_don(file_path):
                 if text:
                     full_text += text + "\n"
 
-            # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT ---
-            # Nếu thấy từ khóa về khung giờ thì chuyển sang mô hình kinh doanh
-            if any(x in full_text for x in ["Khung giờ", "BT:", "CD:", "TD:"]):
-                data["loai_hinh"] = "kinh_doanh"
+            # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
+            # Tìm đoạn văn bản sau cụm "Mục đích sử dụng điện"
+            purpose_match = re.search(r"Mục đích sử dụng điện\s*(.*)", full_text, re.IGNORECASE)
+            
+            if purpose_match:
+                purpose_text = purpose_match.group(1).lower()
+                
+                if "sinh hoạt" in purpose_text:
+                    data["loai_hinh"] = "can_ho"
+                elif "sản xuất" in purpose_text:
+                    data["loai_hinh"] = "san_xuat"
+                elif "kinh doanh" in purpose_text:
+                    data["loai_hinh"] = "kinh_doanh"
+                else:
+                    # Nếu không tìm thấy từ khóa trong mục đích, dùng fallback khung giờ
+                    if any(x in full_text for x in ["Khung giờ", "BT:", "CD:", "TD:"]):
+                        data["loai_hinh"] = "kinh_doanh"
+                    else:
+                        data["loai_hinh"] = "can_ho"
             else:
-                data["loai_hinh"] = "can_ho"
+                # Fallback nếu không tìm thấy dòng "Mục đích sử dụng điện"
+                if any(x in full_text for x in ["Khung giờ", "BT:", "CD:", "TD:"]):
+                    data["loai_hinh"] = "kinh_doanh"
+                else:
+                    data["loai_hinh"] = "can_ho"
 
             # --- 2. TRÍCH XUẤT NGÀY THÁNG (Giữ nguyên của bạn) ---
             date_match = re.search(r"từ\s+(\d{2}/\d{2}/\d{4})\s+đến\s+(\d{2}/\d{2}/\d{4})", full_text)
