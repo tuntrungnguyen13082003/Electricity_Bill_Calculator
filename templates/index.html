@@ -475,7 +475,7 @@
                 
                 if(khungDacDiem) khungDacDiem.style.display = 'block';
                 if(thongBao) thongBao.style.display = 'none';
-
+                if(inputHGD) inputHGD.required = true;
                 // Cập nhật hệ số ngầm cho Hộ Gia Đình
                 if(dropdown && inputAn && DATA_HE_SO) { 
                     inputAn.value = DATA_HE_SO[dropdown.value] || 0.5; 
@@ -486,6 +486,7 @@
                 if(khungHGD) khungHGD.style.display = 'none';
                 if(khungKD)  khungKD.style.display  = 'block';
                 
+                if(inputHGD) inputHGD.required = false;
                 if(khungDacDiem) khungDacDiem.style.display = 'none';
 
                 // Hiển thị thông báo hệ số
