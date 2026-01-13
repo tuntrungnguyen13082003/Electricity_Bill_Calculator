@@ -356,14 +356,26 @@
                     <div id="tab_gd" class="v-tab-content active">
                         <table class="table" style="border: none;"><thead style="background: #f4f6f7; position: sticky; top: 0; z-index: 10;"><tr><th>Thời Gian</th><th>Khách Hàng</th><th>Khu Vực</th><th>Đầu Vào</th><th>Kết Quả</th><th class="col-center">Xóa</th></tr></thead><tbody>
                         {% for row in lich_su if row['sheet_source'] == "Hộ Gia Đình" %}
-                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] }}</td><td style="font-weight: bold;">{{ row['Tên Khách Hàng'] }}</td><td>{{ row['Khu Vực'].split(' - ')[0] }}</td><td>{{ row['Đầu Vào'] }}</td><td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] }} kWp</td><td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td></tr>
+                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] if row['Thời Gian']|string != 'nan' else '-' }}</td>
+                            <td style="font-weight: bold;">{{ row['Tên Khách Hàng'] if row['Tên Khách Hàng']|string != 'nan' else 'Chưa có tên' }}</td>
+                            <td>{{ row['Khu Vực'].split(' - ')[0] if row['Khu Vực']|string != 'nan' else '-' }}</td>
+                            <td>{{ row['Đầu Vào'] if row['Đầu Vào']|string != 'nan' else '-' }}</td>
+                            <td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] if row['Kết Quả (kWp)']|string != 'nan' else '0' }} kWp</td>
+                            <td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td>
+                        </tr>
                         {% else %}<tr><td colspan="6" style="text-align: center;">Chưa có dữ liệu Hộ Gia Đình.</td></tr>{% endfor %}
                         </tbody></table>
                     </div>
                     <div id="tab_kd" class="v-tab-content">
                         <table class="table" style="border: none;"><thead style="background: #f4f6f7; position: sticky; top: 0; z-index: 10;"><tr><th>Thời Gian</th><th>Khách Hàng</th><th>Khu Vực</th><th>Đầu Vào</th><th>Kết Quả</th><th class="col-center">Xóa</th></tr></thead><tbody>
                         {% for row in lich_su if row['sheet_source'] == "Kinh Doanh" %}
-                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] }}</td><td style="font-weight: bold;">{{ row['Tên Khách Hàng'] }}</td><td>{{ row['Khu Vực'].split(' - ')[0] }}</td><td>{{ row['Đầu Vào'] }}</td><td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] }} kWp</td><td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td></tr>
+                        <tr><td style="font-size: 13px; color: #7f8c8d;">{{ row['Thời Gian'] if row['Thời Gian']|string != 'nan' else '-' }}</td>
+                            <td style="font-weight: bold;">{{ row['Tên Khách Hàng'] if row['Tên Khách Hàng']|string != 'nan' else 'Chưa có tên' }}</td>
+                            <td>{{ row['Khu Vực'].split(' - ')[0] if row['Khu Vực']|string != 'nan' else '-' }}</td>
+                            <td>{{ row['Đầu Vào'] if row['Đầu Vào']|string != 'nan' else '-' }}</td>
+                            <td style="font-weight: bold; color: #27ae60;">{{ row['Kết Quả (kWp)'] if row['Kết Quả (kWp)']|string != 'nan' else '0' }} kWp</td>
+                            <td class="col-center"><form action="/delete_history" method="POST" onsubmit="return confirm('Xóa?');"><input type="hidden" name="row_index" value="{{ row['id_row'] }}"><input type="hidden" name="sheet_source" value="{{ row['sheet_source'] }}"><button type="submit" class="btn-danger-circle">🗑️</button></form></td>
+                        </tr>
                         {% else %}<tr><td colspan="6" style="text-align: center;">Chưa có dữ liệu Kinh Doanh.</td></tr>{% endfor %}
                         </tbody></table>
                     </div>
