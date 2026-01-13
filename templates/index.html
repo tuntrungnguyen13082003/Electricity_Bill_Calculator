@@ -778,40 +778,34 @@
         }
 
         // --- HÀM CÂN BẰNG NỘI BỘ (Tách ra để tái sử dụng cho cả 2 biểu đồ) ---
+        // --- HÀM CÂN BẰNG (PHIÊN BẢN BIỆT LẬP TUYỆT ĐỐI) ---
         function performBalancing(dataSet, targetIndex, newValue, delta) {
-            // 1. Cập nhật điểm đang kéo
+            // 1. Cập nhật chính điểm đang kéo
             distributeValueToComponents(dataSet, targetIndex, newValue);
 
-            // 2. Tìm đồng đội để chia sẻ (Logic cũ)
-            const targetType = getTariffType(targetIndex);
-            // Giờ cao điểm (Type 2) của ngày thường -> Sang chủ nhật nó thành Type 1 (Bình thường)
-            // Nên ta cần check lỏng hơn: Nếu đang sửa Cao điểm thì được phép bù trừ vào Bình thường
-            
-            const isEditingLowPeak = (targetType === 0); 
+            // Xác định loại giờ đang kéo là gì? (0: Thấp điểm, 1: Bình thường, 2: Cao điểm)
+            const targetType = getTariffType(targetIndex); 
 
             let candidates = [];
             for (let i = 0; i < 48; i++) {
-                if (i === targetIndex) continue;
+                if (i === targetIndex) continue; // Bỏ qua chính nó
 
-                // Vùng cấm bay (Sáng sớm & Chiều muộn)
-                if (!isEditingLowPeak) {
+                // --- VÙNG CẤM BAY (Giữ nguyên logic bảo vệ tải nền sáng sớm/chiều muộn) ---
+                // Chỉ áp dụng cấm nếu không phải là giờ Thấp điểm
+                if (targetType !== 0) { 
                     if (i >= 34) continue; // Sau 17h
                     if (i >= 8 && i < 16) continue; // 4h-8h
                 }
                 
-                // LOGIC QUAN TRỌNG: 
-                // Nếu đang kéo Cao điểm -> Chỉ tìm Bình thường hoặc Cao điểm để trừ
-                // Không được đụng vào Thấp điểm
+                // --- LOGIC MỚI: CHỈ CHẤP NHẬN ĐỒNG ĐỘI "CÙNG MÀU" ---
                 const currentType = getTariffType(i);
-                if (isEditingLowPeak) {
-                    // Kéo thấp điểm -> Chỉ bù vào thấp điểm
-                    if (currentType === 0) candidates.push(i);
-                } else {
-                    // Kéo Cao điểm/Bình thường -> Bù vào Cao điểm/Bình thường (Tránh Thấp điểm)
-                    if (currentType !== 0) {
-                         const val = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
-                         if (val > 0.1) candidates.push(i);
-                    }
+
+                // QUAN TRỌNG: Chỉ khi nào CÙNG LOẠI (Type === Type) mới được bù trừ
+                // Đỏ bù Đỏ, Xanh bù Xanh. Không xâm phạm lẫn nhau.
+                if (currentType === targetType) {
+                     const val = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
+                     // Chỉ chọn những cột đang có điện (để tránh lỗi chia cho số quá nhỏ)
+                     if (val > 0.1) candidates.push(i);
                 }
             }
 
@@ -821,7 +815,8 @@
                 candidates.forEach(i => {
                     const cur = dataSet.td[i] + dataSet.bt_l[i] + dataSet.cd_l[i];
                     let neu = cur + compensation;
-                    if (neu < 0) neu = 0;
+                    // Chặn không cho âm
+                    if (neu < 0) neu = 0; 
                     distributeValueToComponents(dataSet, i, neu);
                 });
             }
