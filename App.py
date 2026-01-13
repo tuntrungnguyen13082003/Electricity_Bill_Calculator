@@ -115,48 +115,47 @@ def ai_doc_hoa_don(file_path):
             else:
                 print("⚠️ Không tìm thấy tên khách hàng.")
             
-            # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - ƯU TIÊN CUỐI DÒNG ---
-            # Lấy các dòng có chứa chữ "Địa chỉ" [cite: 2, 61, 118]
+            # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - TẬP TRUNG TỪ KHÓA ---
+            # Lấy các dòng có chứa chữ "Địa chỉ" để thu hẹp phạm vi quét
             dia_chi_lines = re.findall(r"Địa chỉ.*", full_text, re.IGNORECASE)
             full_addr = " ".join(dia_chi_lines)
 
-            # CHIẾN THUẬT 1: Tìm cụm "Thành phố X", "Tỉnh X" hoặc "TP X" ở cuối dòng
-            # Regex này tìm từ khóa Thành phố/Tỉnh và lấy phần chữ phía sau cho đến hết dòng hoặc dấu phẩy
-            match_uu_tien = re.search(r"(?:Thành phố|Tỉnh|TP\.?)\s+([^,\n\r]+)", full_addr, re.IGNORECASE)
+            # Tạo danh sách các tỉnh từ SETTINGS để đối chiếu
+            tinh_keys = sorted(SETTINGS['tinh_thanh'].keys(), key=len, reverse=True)
             
-            tinh_tim_duoc = ""
-            if match_uu_tien:
-                tinh_tim_duoc = match_uu_tien.group(1).strip() # Ví dụ: "Đà Nẵng" hoặc "Đồng Nai"
+            tinh_found = ""
 
-            # CHIẾN THUẬT 2: So khớp với danh sách SETTINGS
-            if 'tinh_thanh' in SETTINGS:
-                found = False
-                # Nếu tìm được từ khóa ưu tiên ở trên, kiểm tra nó trước
-                if tinh_tim_duoc:
-                    for tinh_key in SETTINGS['tinh_thanh'].keys():
-                        if tinh_tim_duoc.lower() == tinh_key.lower() or tinh_key.lower() in tinh_tim_duoc.lower():
-                            data["tinh_thanh"] = tinh_key
-                            found = True
+            # BƯỚC A: Tìm cụm "Thành phố/Tỉnh/TP + Tên" (Ưu tiên cao nhất)
+            # Regex này tìm: (Thành phố|Tỉnh|TP) + khoảng trắng + [Tên Tỉnh]
+            keyword_pattern = r"(?:Thành phố|Tỉnh|TP\.?)\s+([^\d,\n\r]+)"
+            matches = re.findall(keyword_pattern, full_addr, re.IGNORECASE)
+            
+            # Kiểm tra các kết quả tìm được từ khóa xem có nằm trong danh sách SETTINGS không
+            for m in matches:
+                clean_match = m.strip()
+                for k in tinh_keys:
+                    if k.lower() in clean_match.lower():
+                        tinh_found = k
+                        break
+                if tinh_found: break
+
+            # BƯỚC B: Nếu bước A không ra, thực hiện quét ngược từ cuối dòng địa chỉ lên
+            if not tinh_found:
+                # Tách địa chỉ bằng dấu phẩy, lấy phần tử cuối cùng (thường là Tỉnh/Thành)
+                parts = [p.strip() for p in full_addr.split(',')]
+                if parts:
+                    last_part = parts[-1]
+                    for k in tinh_keys:
+                        if k.lower() in last_part.lower():
+                            tinh_found = k
                             break
-                
-                # Nếu chiến thuật 1 không ra, dùng chiến thuật "Cắt đuôi"
-                if not found:
-                    # Tách địa chỉ bằng dấu phẩy và lấy phần tử cuối cùng (Thành phố/Tỉnh thường nằm đây)
-                    parts = [p.strip() for p in full_addr.split(',')]
-                    if parts:
-                        last_part = parts[-1].lower()
-                        for tinh_key in SETTINGS['tinh_thanh'].keys():
-                            if tinh_key.lower() in last_part:
-                                data["tinh_thanh"] = tinh_key
-                                found = True
-                                break
-                                
-                # Nếu vẫn không ra, mới quét toàn bộ văn bản (Dễ nhầm nhưng là bước cuối)
-                if not found:
-                    for tinh_key in SETTINGS['tinh_thanh'].keys():
-                        if tinh_key.lower() in full_addr.lower():
-                            data["tinh_thanh"] = tinh_key
-                            break
+
+            # BƯỚC C: Lưu kết quả vào data
+            if tinh_found:
+                data["tinh_thanh"] = tinh_found
+                print(f"✅ Đã xác định đúng Khu vực: {tinh_found}")
+            else:
+                print("⚠️ Không tìm thấy từ khóa Thành phố/Tỉnh phù hợp.")
 
             # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
             # Tìm đoạn văn bản sau cụm "Mục đích sử dụng điện"
