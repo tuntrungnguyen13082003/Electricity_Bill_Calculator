@@ -239,20 +239,61 @@
             {% endif %}
 
             {% if du_lieu_nhap.get('chart_data') %}
-            <div id="chart_section" style="margin-top: 30px;">
-                <h3 style="text-align: center;">📊 Phân Tích Biểu Đồ</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <button class="chart-tab-btn active" onclick="switchChartTab('chart_work', this)">Ngày Làm Việc</button>
-                    {% if du_lieu_nhap.chart_data.stats.off > 0 %}
-                    <button class="chart-tab-btn" onclick="switchChartTab('chart_off', this)">Ngày Nghỉ</button>
-                    {% endif %}
+            <div class="row" style="margin-top: 20px;">
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">1. Ngày Làm Việc (Thứ 2 - Thứ 7) [MASTER]</h5>
+                            <small>Kéo biểu đồ này để kích hoạt tính toán</small>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 300px;">
+                                <canvas id="chart_work_weekday"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div id="wrapper_chart_work" class="chart-wrapper active" style="height: 400px;">
-                    <canvas id="chart_work"></canvas>
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">2. Ngày Làm Việc (Chủ Nhật) [SLAVE]</h5>
+                            <small>Tự động chạy theo & chuyển màu Cao điểm -> Bình thường</small>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 300px;">
+                                <canvas id="chart_work_sunday"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="wrapper_chart_off" class="chart-wrapper" style="height: 400px; display: none;">
-                    <canvas id="chart_off"></canvas>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">3. Ngày Nghỉ (Thứ 2 - Thứ 7)</h5>
+                            <small>Tải nền (Ít biến động)</small>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 300px;">
+                                <canvas id="chart_off_weekday"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0">4. Ngày Nghỉ (Chủ Nhật)</h5>
+                            <small>Tải nền (Ít biến động)</small>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 300px;">
+                                <canvas id="chart_off_sunday"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             {% endif %}
@@ -630,8 +671,8 @@
         // --- 1. KHỞI TẠO ---
         function initAllCharts() {
             let maxVal = 0;
-            // Bước 1: Duyệt qua tất cả các kịch bản để tìm giá trị đỉnh (Max) đồng bộ trục Y
-            // Bao gồm cả sunday_work và off_sunday để tính toán chính xác
+            
+            // Bước 1: Tìm Max Y chung cho tất cả dataset để đồng bộ tỷ lệ
             const allDatasets = [
                 liveData.weekday_work, 
                 liveData.sunday_work, 
@@ -641,59 +682,39 @@
             
             allDatasets.forEach(data => {
                 if (data) {
+                    // Tính tổng load tại mỗi giờ
                     const hourlyTotals = data.td.map((val, i) => val + (data.bt_l[i]||0) + (data.cd_l[i]||0));
                     const currentMax = Math.max(...hourlyTotals);
                     if (currentMax > maxVal) maxVal = currentMax;
                 }
             });
 
-            // Giới hạn trần (Gấp 2 lần đỉnh)
+            // Thiết lập trần hiển thị
             if (!window.HARD_LIMIT) {
                 window.HARD_LIMIT = maxVal * 2; 
                 if (window.HARD_LIMIT < 100) window.HARD_LIMIT = 100;
             }
-
             const COMMON_MAX_Y = Math.ceil(window.HARD_LIMIT * 1.1);
 
-            // 1. Vẽ Biểu đồ Ngày Làm Việc
-            if(window.charts['chart_work']) window.charts['chart_work'].destroy();
-            window.charts['chart_work'] = createChart('chart_work', liveData.weekday_work, COMMON_MAX_Y);
-            
-            // 2. Vẽ Biểu đồ Ngày Nghỉ (LOGIC THÔNG MINH MỚI)
-            if(document.getElementById('chart_off')) {
-                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
-                
-                // KIỂM TRA: Nếu có số ngày nghỉ Chủ Nhật > 0, ưu tiên lấy profile off_sunday 
-                // (Tập dữ liệu này đã được Python xử lý bỏ màu đỏ/giờ cao điểm)
-                let dataHienThi;
-                if (liveData.stats.off_sunday_count > 0) {
-                    dataHienThi = liveData.off_sunday;
-                } else {
-                    dataHienThi = liveData.off_weekday;
-                }
-                
-                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
-            }
+            // Bước 2: Hủy biểu đồ cũ (nếu có) để vẽ mới
+            ['chart_work_weekday', 'chart_work_sunday', 'chart_off_weekday', 'chart_off_sunday'].forEach(id => {
+                if (window.charts[id]) window.charts[id].destroy();
+            });
 
-            if(document.getElementById('chart_off')) {
-                if(window.charts['chart_off']) window.charts['chart_off'].destroy();
-                
-                // LOGIC MỚI:
-                // Nếu có đi làm CN -> Hiển thị biểu đồ CN (Đã được đồng bộ ở trên)
-                // Nếu nghỉ CN -> Hiển thị biểu đồ Ngày nghỉ (Tải nền thấp)
-                let dataHienThi = IS_WORKING_SUNDAY ? liveData.sunday_work : liveData.off_weekday;
-                
-                window.charts['chart_off'] = createChart('chart_off', dataHienThi, COMMON_MAX_Y);
-            }
+            // Bước 3: Vẽ 4 biểu đồ tường minh
+            // Chỉ cho phép KÉO (Drag) ở biểu đồ số 1 (Master)
+            window.charts['chart_work_weekday'] = createChart('chart_work_weekday', liveData.weekday_work, COMMON_MAX_Y, true); 
+            window.charts['chart_work_sunday']  = createChart('chart_work_sunday', liveData.sunday_work, COMMON_MAX_Y, false);
+            window.charts['chart_off_weekday']  = createChart('chart_off_weekday', liveData.off_weekday, COMMON_MAX_Y, false);
+            window.charts['chart_off_sunday']   = createChart('chart_off_sunday', liveData.off_sunday, COMMON_MAX_Y, false);
         }
 
-        // --- 2. VẼ BIỂU ĐỒ ---
-        function createChart(canvasId, dataSrc, maxYValue) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
-            
-            if (!dataSrc) return;
+        // --- 2. HÀM TẠO BIỂU ĐỒ ---
+        function createChart(canvasId, dataSrc, maxYValue, allowDrag) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx || !dataSrc) return; // Nếu dữ liệu null thì bỏ qua
 
+            const DARK_YELLOW = 'rgba(243, 156, 18, 1)'; 
             const totalLoad = dataSrc.td.map((val, i) => val + (dataSrc.bt_l[i]||0) + (dataSrc.cd_l[i]||0));
 
             return new Chart(ctx, {
@@ -701,14 +722,31 @@
                 data: {
                     labels: liveData.labels,
                     datasets: [
-                        { type: 'line', label: 'Tổng công suất (kW)', data: totalLoad, borderColor: DARK_YELLOW, borderWidth: 3, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: 'white', pointBorderColor: DARK_YELLOW, pointBorderWidth: 2, tension: 0.4, fill: false, order: 0, dragData: true },
+                        { 
+                            type: 'line', 
+                            label: 'Tổng công suất (kW)', 
+                            data: totalLoad, 
+                            borderColor: DARK_YELLOW, 
+                            borderWidth: 3, 
+                            pointRadius: 3, 
+                            pointHoverRadius: 6, 
+                            pointBackgroundColor: 'white', 
+                            pointBorderColor: DARK_YELLOW, 
+                            tension: 0.4, 
+                            fill: false, 
+                            order: 0, 
+                            // Chỉ cho phép drag nếu allowDrag = true
+                            dragData: allowDrag 
+                        },
                         { label: 'Thấp điểm', data: [...dataSrc.td], backgroundColor: '#2ecc71', order: 1, stack: 'S0', dragData: false },
                         { label: 'Bình thường', data: [...dataSrc.bt_l], backgroundColor: '#3498db', order: 1, stack: 'S0', dragData: false },
                         { label: 'Cao điểm', data: [...dataSrc.cd_l], backgroundColor: '#e74c3c', order: 1, stack: 'S0', dragData: false }
                     ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false, animation: false,
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    animation: false, // Tắt animation để update mượt hơn
                     scales: { 
                         y: { beginAtZero: true, min: 0, stacked: true, max: maxYValue, title: {display: true, text: 'kW'} }, 
                         x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 90, minRotation: 90 } } 
@@ -716,17 +754,20 @@
                     plugins: {
                         dragData: {
                             round: 1, showTooltip: true,
-                            onDragStart: function(e) { e.target.style.cursor = 'grabbing'; },
+                            onDragStart: function(e) { if(allowDrag) e.target.style.cursor = 'grabbing'; },
                             onDrag: function(e, datasetIndex, index, value) { 
+                                if (!allowDrag) return false;
                                 if (datasetIndex !== 0) return false; 
                                 if (value < 0) return false; 
                                 if (value > window.HARD_LIMIT) return false; 
                             },
                             onDragEnd: function(e, datasetIndex, index, newValue) {
-                                if (datasetIndex !== 0) return;
+                                if (!allowDrag || datasetIndex !== 0) return;
                                 e.target.style.cursor = 'default';
                                 if (newValue < 0) newValue = 0;
                                 if (newValue > window.HARD_LIMIT) newValue = window.HARD_LIMIT;
+                                
+                                // Gọi hàm tính toán (Sử dụng code logic đã fix ở câu trước)
                                 recalculateSystem(canvasId, index, newValue);
                             }
                         },
@@ -737,7 +778,7 @@
                                 label: function(context) {
                                     let label = context.dataset.label || '';
                                     if (label) label += ': ';
-                                    if (context.parsed.y !== null) label += context.parsed.y + ' kW';
+                                    if (context.parsed.y !== null) label += context.parsed.y.toFixed(2) + ' kW';
                                     return label;
                                 }
                             }
