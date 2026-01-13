@@ -115,47 +115,38 @@ def ai_doc_hoa_don(file_path):
             else:
                 print("⚠️ Không tìm thấy tên khách hàng.")
             
-            # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - TẬP TRUNG TỪ KHÓA ---
-            # Lấy các dòng có chứa chữ "Địa chỉ" để thu hẹp phạm vi quét
-            dia_chi_lines = re.findall(r"Địa chỉ.*", full_text, re.IGNORECASE)
-            full_addr = " ".join(dia_chi_lines)
-
-            # Tạo danh sách các tỉnh từ SETTINGS để đối chiếu
-            tinh_keys = sorted(SETTINGS['tinh_thanh'].keys(), key=len, reverse=True)
+            # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) ---
+            # Bước 1: Chỉ lấy các dòng có chứa chữ "Địa chỉ" để thu hẹp phạm vi [cite: 61, 118]
+            address_lines = re.findall(r"Địa chỉ.*", full_text, re.IGNORECASE)
+            full_addr = " ".join(address_lines)
             
-            tinh_found = ""
+            tinh_keys = SETTINGS['tinh_thanh'].keys()
+            found_tinh = ""
+            last_pos = -1
 
-            # BƯỚC A: Tìm cụm "Thành phố/Tỉnh/TP + Tên" (Ưu tiên cao nhất)
-            # Regex này tìm: (Thành phố|Tỉnh|TP) + khoảng trắng + [Tên Tỉnh]
-            keyword_pattern = r"(?:thành phố|tỉnh|TP\.?)\s+([^\d,\n\r]+)"
-            matches = re.findall(keyword_pattern, full_addr, re.IGNORECASE)
-            
-            # Kiểm tra các kết quả tìm được từ khóa xem có nằm trong danh sách SETTINGS không
-            for m in matches:
-                clean_match = m.strip()
-                for k in tinh_keys:
-                    if k.lower() in clean_match.lower():
-                        tinh_found = k
-                        break
-                if tinh_found: break
+            # Bước 2: Duyệt danh sách tỉnh và tìm vị trí xuất hiện CUỐI CÙNG trong dòng địa chỉ
+            # Vì trong địa chỉ Việt Nam, Tỉnh/Thành phố luôn nằm ở cuối cùng 
+            for tinh in tinh_keys:
+                # Tìm vị trí xuất hiện cuối cùng của tên tỉnh (không phân biệt hoa thường)
+                pos = full_addr.lower().rfind(tinh.lower())
+                
+                if pos > last_pos:
+                    # Bước 3: Kiểm tra xem 15 ký tự đứng trước có chứa từ "Phường/Quận/Huyện/Xã" không
+                    # Điều này để loại bỏ trường hợp "Phường Bình Thuận" 
+                    prefix = full_addr[max(0, pos-15):pos].lower()
+                    if not any(word in prefix for word in ["phường", "quận", "huyện", "xã"]):
+                        last_pos = pos
+                        found_tinh = tinh
 
-            # BƯỚC B: Nếu bước A không ra, thực hiện quét ngược từ cuối dòng địa chỉ lên
-            if not tinh_found:
-                # Tách địa chỉ bằng dấu phẩy, lấy phần tử cuối cùng (thường là Tỉnh/Thành)
-                parts = [p.strip() for p in full_addr.split(',')]
-                if parts:
-                    last_part = parts[-1]
-                    for k in tinh_keys:
-                        if k.lower() in last_part.lower():
-                            tinh_found = k
-                            break
-
-            # BƯỚC C: Lưu kết quả vào data
-            if tinh_found:
-                data["tinh_thanh"] = tinh_found
-                print(f"✅ Đã xác định đúng Khu vực: {tinh_found}")
+            if found_tinh:
+                data["tinh_thanh"] = found_tinh
+                print(f"✅ Đã xác định đúng Khu vực (Vị trí cuối): {found_tinh}")
             else:
-                print("⚠️ Không tìm thấy từ khóa Thành phố/Tỉnh phù hợp.")
+                # Fallback: Nếu không lọc được, quét toàn văn bản như cũ
+                for tinh in tinh_keys:
+                    if tinh.lower() in full_text.lower():
+                        data["tinh_thanh"] = tinh
+                        break
 
             # --- 1. NHẬN DIỆN MÔ HÌNH LẮP ĐẶT (NÂNG CAO) ---
             # Tìm đoạn văn bản sau cụm "Mục đích sử dụng điện"
