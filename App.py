@@ -106,36 +106,45 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (BẢN ĐA DÒNG SIÊU CẤP) ---
-            # Logic: Bắt đầu sau "Khách hàng", lấy TẤT CẢ cho đến khi gặp "Địa chỉ"
-            # re.DOTALL: Cho phép dấu "." khớp với cả ký tự xuống dòng (\n)
-            regex_da_dong = r"Khách hàng\s*[\n\r:]*(.*?)(?=\s*Địa chỉ)"
-            name_block = re.search(regex_da_dong, full_text, re.IGNORECASE | re.DOTALL)
+            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (LOGIC QUÉT DÒNG THÔNG MINH) ---
+            lines = full_text.split('\n')
+            name_parts = []
+            found_start = False
 
-            if name_block:
-                # Lấy toàn bộ khối văn bản thô (có thể gồm 2-3 dòng)
-                raw_name = name_block.group(1).strip()
-                
-                # BƯỚC CHECK ĐỦ DÒNG: 
-                # Thay thế tất cả các kiểu xuống dòng (\n, \r) thành khoảng trắng
-                # Điều này giúp nối "Công ty Xăng dầu..." (dòng 1) với "...TNHH Một Thành Viên" (dòng 2)
-                joined_name = raw_name.replace('\n', ' ').replace('\r', ' ')
-                
-                # Dọn dẹp ký tự thừa (giữ lại dấu gạch ngang "-" theo ý bạn)
-                clean_name = joined_name.replace('"', '').replace(',', '')
-                
-                # PHÒNG HỜ: Nếu khối tên quá dài dính sang các nhãn khác (như Mã số thuế)
-                # Chúng ta sẽ cắt bỏ mọi thứ từ chữ "Mã số thuế" trở đi nếu lỡ dính vào
-                for label in ["Mã số thuế", "Mã khách hàng", "Số bảng kê", "Điện thoại"]:
-                    clean_name = re.split(label, clean_name, flags=re.IGNORECASE)[0]
-                
-                # CHUẨN HÓA: Xóa khoảng trắng thừa giữa các từ (ví dụ "Công  ty" -> "Công ty")
-                final_name = " ".join(clean_name.split()).strip()
-                
-                data["ten_kh"] = final_name
-                print(f"✅ Tên đầy đủ (Đã nối dòng): {data['ten_kh']}")
-            else:
-                print("⚠️ Không tìm thấy khối tên khách hàng.")
+            # Các từ khóa báo hiệu kết thúc phần tên
+            stop_keywords = ["Địa chỉ", "Điện thoại", "Mã số thuế", "Mã khách hàng", "Số bảng kê"]
+
+            for line in lines:
+                # Bước 1: Tìm điểm bắt đầu
+                if "Khách hàng" in line:
+                    found_start = True
+                    # Lấy phần văn bản nằm sau chữ "Khách hàng" ngay trên dòng đó
+                    # Ví dụ: "Khách hàng: Công ty Xăng dầu" -> lấy "Công ty Xăng dầu"
+                    start_part = line.split("Khách hàng")[-1].strip(" :\"")
+                    if start_part:
+                        name_parts.append(start_part)
+                    continue # Nhảy sang dòng tiếp theo để quét tiếp
+
+                # Bước 2: Gom các dòng tiếp theo cho đến khi gặp điểm dừng
+                if found_start:
+                    # Nếu dòng hiện tại chứa bất kỳ từ khóa dừng nào -> NGẮT
+                    if any(key in line for key in stop_keywords):
+                        break
+                    
+                    # Nếu dòng không chứa từ khóa dừng, thì nó là phần tiếp theo của tên
+                    # (Kể cả khi có dấu gạch ngang hay xuống dòng)
+                    clean_line = line.strip(" \"")
+                    if clean_line:
+                        name_parts.append(clean_line)
+
+            # Bước 3: Nối các mảnh tên lại và chuẩn hóa
+            full_name = " ".join(name_parts)
+            # Xử lý trường hợp lỡ dính chữ "Địa chỉ" ở cuối dòng cuối cùng
+            for key in stop_keywords:
+                full_name = full_name.split(key)[0]
+
+            data["ten_kh"] = " ".join(full_name.split()).strip(" ,")
+            print(f"✅ Tên đầy đủ đã quét: {data['ten_kh']}")
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
