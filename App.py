@@ -106,40 +106,52 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (LOGIC CẮT KHUNG) ---
-            # Bước 1: Xác định vị trí "Khách hàng" (Bắt đầu) và "Địa chỉ" (Kết thúc) theo chiều dọc
-            text_lower = full_text.lower()
-            start_key = "khách hàng"
-            end_key = "địa chỉ"
+            page = pdf.pages[0]
+            words = page.extract_words()
 
-            start_idx = text_lower.find(start_key)
-            end_idx = text_lower.find(end_key)
+            # Bước 1: Xác định 4 ranh giới của "khung" chứa tên
+            top_limit = 0
+            bottom_limit = page.height
+            left_limit = 0
+            right_limit = page.width
 
-            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                # Bước 2: "Ôm" toàn bộ khối văn bản nằm giữa hai mốc này
-                # Bỏ qua chữ "Khách hàng" bằng cách cộng thêm độ dài của nó
-                raw_block = full_text[start_idx + len(start_key):end_idx]
+            for w in words:
+                text = w['text'].lower()
+                # Ranh giới TRÊN: Dòng chữ "Khách hàng"
+                if "khách" in text and "hàng" in text:
+                    top_limit = w['top'] - 5 
+                    left_limit = w['x1'] # Lấy từ sau chữ "Khách hàng"
+                # Ranh giới DƯỚI: Dòng chữ "Địa chỉ"
+                if "địa" in text and "chỉ" in text and w['top'] > top_limit:
+                    bottom_limit = w['top'] 
+                # Ranh giới PHẢI: Khung màu xanh "Mã khách hàng"
+                if "mã" in text and "khách" in text and w['x0'] > left_limit:
+                    right_limit = w['x0'] - 10
+
+            # Bước 2: Cắt vùng không gian (ROI) đã xác định
+            # Vùng này nằm giữa: Khách hàng - Địa chỉ (dọc) và Label - Mã KH (ngang)
+            roi = page.within_bbox((left_limit, top_limit, right_limit, bottom_limit))
+            
+            # Bước 3: Lấy các ký tự và lọc theo định dạng (Bold + Size lớn nhất)
+            chars = roi.extract_chars()
+            if chars:
+                # Tìm kích thước font lớn nhất trong vùng này (thường là tên khách hàng)
+                max_size = max(c['size'] for c in chars)
                 
-                # Bước 3: Xử lý ranh giới ngang (Cắt bỏ khung màu xanh bên phải)
-                # Nếu trong khối lỡ dính chữ từ khung màu xanh, ta lấy phần bên trái của nó
-                stop_horizontal = ["Mã khách hàng", "Số bảng kê", "Mã số thuế", "Số công tơ"]
+                # Lấy các ký tự có size gần bằng max_size (sai số 0.5 để bắt đủ dòng)
+                # Đồng thời ưu tiên các font có chữ "Bold" trong tên font
+                name_list = [
+                    c['text'] for c in chars 
+                    if (max_size - 0.5 <= c['size'] <= max_size + 0.5)
+                ]
                 
-                # Chuyển khối thành một dòng duy nhất để xử lý cắt ngang dễ hơn
-                temp_name = raw_block.replace('\n', ' ').replace('\r', ' ')
+                data["ten_kh"] = "".join(name_list).strip()
+                # Chuẩn hóa khoảng trắng nếu tên bị rời rạc
+                data["ten_kh"] = " ".join(data["ten_kh"].split())
                 
-                for label in stop_horizontal:
-                    if label.lower() in temp_name.lower():
-                        # Chỉ lấy phần bên trái của nhãn khung xanh
-                        temp_name = re.split(label, temp_name, flags=re.IGNORECASE)[0]
-                
-                # Bước 4: Làm sạch cuối cùng
-                # Xóa dấu hai chấm, khoảng trắng dư thừa
-                clean_name = temp_name.strip(" :\"")
-                data["ten_kh"] = " ".join(clean_name.split()).strip()
-                
-                print(f"✅ Đã cắt khung và lấy Tên: {data['ten_kh']}")
+                print(f"✅ Đã cắt khung & lọc Font lớn nhất: {data['ten_kh']}")
             else:
-                print("⚠️ Không xác định được ranh giới Khách hàng - Địa chỉ.")         
+                print("⚠️ Vùng cắt không chứa ký tự nào.")          
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
