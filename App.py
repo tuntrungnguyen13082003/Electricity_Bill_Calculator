@@ -182,16 +182,22 @@ def ai_doc_hoa_don(file_path):
                         name_lines.append(clean_line)
 
                 # Nối các dòng lại với nhau
-                full_name_raw = " ".join(name_lines)
+                # --- CHUẨN HÓA DẤU GẠCH NGANG TRƯỚC KHI GỬI VỀ WEB ---
+                raw_final_name = " ".join(name_lines)
                 
-                # Bước cuối: Xóa mã khách hàng (ví dụ PP010...) dính ở cuối bằng Regex
-                # Cách này sẽ không đụng chạm gì đến dấu gạch ngang ở giữa tên
-                final_name = re.sub(r"\s+[A-Z]{2,}\d{7,}.*", "", full_name_raw).strip()
+                # 1. Thay thế các biến thể Unicode của dấu gạch về dấu chuẩn bàn phím
+                # \u2013 là En-dash, \u2014 là Em-dash
+                raw_final_name = raw_final_name.replace('\u2013', '-').replace('\u2014', '-')
+                raw_final_name = raw_final_name.replace('–', '-').replace('—', '-')
+
+                # 2. Xóa mã khách hàng (ví dụ PP010...) dính ở cuối
+                final_name = re.sub(r"\s+[A-Z]{2,}\d{7,}.*", "", raw_final_name).strip()
                 
-                # Chỉ xóa dấu gạch ngang nếu nó nằm ở TẬN CÙNG của cả cái tên sau khi nối
-                data["ten_kh"] = final_name.strip(" :\"-")
+                # 3. KẾT QUẢ CUỐI CÙNG (QUAN TRỌNG)
+                # TUYỆT ĐỐI KHÔNG để dấu "-" trong hàm strip() dưới đây
+                data["ten_kh"] = final_name.strip(" :\"") 
                 
-                print(f"✅ Tên đã nối và giữ dấu gạch: {data['ten_kh']}")  
+                print(f"✅ Đã chuẩn hóa dấu gạch gửi về Web: {data['ten_kh']}")
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
