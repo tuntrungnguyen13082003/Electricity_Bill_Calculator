@@ -124,7 +124,7 @@
                     </div>
 
                     <label>Tên Khách Hàng:</label>
-                    <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_kh', '') }}" required>
+                    <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_khach_hang', '') }}" required>
                     
                     <label>Khu vực lắp đặt:</label>
                     <select name="tinh_thanh_chon" class="form-control">
@@ -141,20 +141,13 @@
 
                     <div id="khung_ho_gia_dinh">
                         <input type="hidden" name="che_do_nhap" value="theo_kwh"> <label style="margin-top:15px">Số điện tiêu thụ trung bình tháng (kWh/Tháng):</label>
-                        <input type="number" 
-                            name="gia_tri_dau_vao" 
-                            id="gia_tri_input" 
-                            class="form-control"
-                            placeholder="Ví dụ: 500"
-                            required
-                            value="{{ du_lieu_nhap.gia_tri }}">
-
+                        <input type="number" name="gia_tri_dau_vao" id="gia_tri_input" class="form-control" placeholder="Ví dụ: 500" required value="{{ du_lieu_nhap.get('gia_tri_dau_vao', '') }}">
                         <div id="khung_dac_diem" style="margin-top: 15px;">
                             <label>Đặc điểm sử dụng:</label>
                             <select id="chon_ngu_canh" name="ngu_canh_chon" class="form-control">
-                                <option value="gd_di_lam" {% if du_lieu_nhap.ngu_canh == 'gd_di_lam' %}selected{% endif %}>💼 Đi làm hành chính</option>
-                                <option value="gd_co_nguoi" {% if du_lieu_nhap.ngu_canh == 'gd_co_nguoi' %}selected{% endif %}>👴👶 Có người ở nhà</option>
-                                <option value="gd_ban_dem" {% if du_lieu_nhap.ngu_canh == 'gd_ban_dem' %}selected{% endif %}>🌙 Dùng ban đêm</option>
+                                <option value="gd_di_lam" {% if du_lieu_nhap.get('ngu_canh_chon') == 'gd_di_lam' %}selected{% endif %}>💼 Đi làm hành chính</option>
+                                <option value="gd_co_nguoi" {% if du_lieu_nhap.get('ngu_canh_chon') == 'gd_co_nguoi' %}selected{% endif %}>👴👶 Có người ở nhà</option>
+                                <option value="gd_ban_dem" {% if du_lieu_nhap.get('ngu_canh_chon') == 'gd_ban_dem' %}selected{% endif %}>🌙 Dùng ban đêm</option>
                             </select>
                         </div>
                     </div>
