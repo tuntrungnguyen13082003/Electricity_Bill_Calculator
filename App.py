@@ -109,76 +109,82 @@ def ai_doc_hoa_don(file_path):
             page = pdf.pages[0]
             words = page.extract_words()
             
-            # --- BƯỚC 1: ĐỊNH VỊ NHÃN ĐỂ DỰNG VÁCH (Duyệt tìm tọa độ thực tế) ---
+            # --- BƯỚC 1: ĐỊNH VỊ NHÃN (DEBUG MODE) ---
             y_start = None
             y_end = None
-            x_limit = 380 
+            x_limit = 450 # Mặc định vách phải rộng hơn một chút
             x_label_end = 0
 
-            # 1. Tìm tọa độ của các "Cột mốc" trên hóa đơn
+            print(f"DEBUG: Tổng số từ tìm thấy trong trang: {len(words)}")
+
             for w in words:
                 txt = w['text'].lower()
                 
-                # Tìm nhãn "Khách hàng" (thường nằm sát lề trái x0 < 100)
-                if "khách" in txt and "hàng" in txt and w['x0'] < 100:
+                # Tìm nhãn "Khách hàng" (Nới lỏng x0 lên 150)
+                if "khách" in txt and "hàng" in txt and w['x0'] < 150:
                     if y_start is None:
-                        y_start = w['top'] - 5  # Vách TRÊN
-                        x_label_end = w['x1']   # Vách TRÁI (bỏ qua chữ tiêu đề)
+                        y_start = w['top'] - 5
+                        x_label_end = w['x1']
+                        print(f"DEBUG: Found 'Khách hàng' at y={y_start}, x_end={x_label_end}")
 
-                # Tìm nhãn "Địa chỉ" (phải nằm dưới Khách hàng)
-                if "địa" in txt and "chỉ" in txt and w['x0'] < 100:
+                # Tìm nhãn "Địa chỉ" (Phải nằm dưới y_start)
+                if "địa" in txt and "chỉ" in txt and w['x0'] < 150:
                     if y_start is not None and w['top'] > y_start + 10:
-                        y_end = w['top'] - 2    # Vách DƯỚI
-                        break # Tìm được 2 mốc quan trọng nhất thì dừng vòng lặp này
+                        if y_end is None:
+                            y_end = w['top'] - 2
+                            print(f"DEBUG: Found 'Địa chỉ' at y={y_end}")
 
-            # 2. Tìm vách PHẢI (Chặn khung màu xanh)
-            for w in words:
-                txt = w['text'].lower()
-                if any(k in txt for k in ["mã", "tiền", "thanh"]) and w['x0'] > 300:
-                    x_limit = w['x0'] - 10
-                    break
+                # Tìm vách PHẢI (Chặn khung màu xanh)
+                if any(k in txt for k in ["mã", "khách", "tiền", "thanh"]) and w['x0'] > 300:
+                    if w['x0'] < x_limit:
+                        x_limit = w['x0'] - 5
+                        print(f"DEBUG: Updated x_limit to {x_limit}")
 
-            # --- BƯỚC 2: RÀ SOÁT TỪNG DÒNG (Dựa trên khung đã dựng) ---
+            # Kiểm tra nếu thiếu mốc định vị
             if y_start is None or y_end is None:
-                print("⚠️ Không tìm thấy đủ nhãn Khách hàng và Địa chỉ.")
-                return data
+                print(f"❌ LỖI: Không tìm thấy mốc. y_start={y_start}, y_end={y_end}")
+                # Fallback: Nếu không thấy mốc, quét tạm vùng dự kiến
+                if y_start: y_end = y_start + 100 
+                else: return data
 
-            name_lines = []
+            # --- BƯỚC 2: RÀ SOÁT CHỮ TRONG KHUNG ---
+            name_parts = []
             lines_dict = {}
             for w in words:
-                # Chỉ lấy chữ nằm TRONG KHUNG đã xác định
-                if y_start <= w['top'] <= y_end and w['x0'] >= x_label_end:
-                    y_key = round(w['top'])
-                    found_line = False
-                    for existing_y in lines_dict.keys():
-                        if abs(y_key - existing_y) < 3:
-                            lines_dict[existing_y].append(w)
-                            found_line = True
-                            break
-                    if not found_line:
-                        lines_dict[y_key] = [w]
+                # Điều kiện lọc: Nằm trong khoảng y, và nằm bên trái x_limit
+                if y_start <= w['top'] <= y_end:
+                    # Nếu cùng dòng với nhãn "Khách hàng", phải nằm sau x_label_end
+                    if abs(w['top'] - (y_start + 5)) < 5 and w['x0'] < x_label_end:
+                        continue
+                        
+                    if w['x0'] < x_limit:
+                        y_key = round(w['top'])
+                        found_line = False
+                        for existing_y in lines_dict.keys():
+                            if abs(y_key - existing_y) < 3:
+                                lines_dict[existing_y].append(w)
+                                found_line = True
+                                break
+                        if not found_line:
+                            lines_dict[y_key] = [w]
 
+            # Gom chữ từ dictionary
             sorted_y = sorted(lines_dict.keys())
+            print(f"DEBUG: Số dòng tìm thấy trong khung: {len(sorted_y)}")
+
             for y in sorted_y:
                 line_words = sorted(lines_dict[y], key=lambda x: x['x0'])
-                line_content = ""
-                for w in line_words:
-                    # Nếu đang rà mà chạm vách phải (khung xanh) thì dừng dòng này
-                    if w['x0'] >= x_limit:
-                        break
-                    line_content += w['text'] + " "
-
-                clean_line = line_content.strip(" :\"-")
+                line_text = " ".join([w['text'] for w in line_words]).strip()
                 
-                # Nếu nội dung dòng có chứa nhãn "Địa chỉ" thì dừng toàn bộ (an toàn)
-                if "địa" in clean_line.lower() and "chỉ" in clean_line.lower():
-                    break
+                # Loại trừ các chữ tiêu đề lỡ lọt vào
+                clean_line = re.sub(r"^(Khách hàng|Địa chỉ|Mã số thuế)[:\s-]*", "", line_text, flags=re.IGNORECASE)
                 
                 if clean_line:
-                    name_lines.append(clean_line)
+                    print(f"DEBUG: Nhặt được dòng: {clean_line}")
+                    name_parts.append(clean_line)
 
-            data["ten_kh"] = " ".join(name_lines).strip()
-            print(f"✅ Tên khách hàng chuẩn: {data['ten_kh']}")    
+            data["ten_kh"] = " ".join(name_parts).strip(" :\"-")
+            print(f"✅ KẾT QUẢ CUỐI CÙNG: {data['ten_kh']}")    
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
