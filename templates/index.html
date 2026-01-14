@@ -709,7 +709,8 @@
 
         function resetToanBoGiaoDien() {
             console.log("🧹 Đang dọn dẹp dữ liệu (Giữ lại Ngày nghỉ và Giờ làm)...");
-
+            if (event && event.type === 'click') return; 
+                console.log("🧹 Đã gọi hàm Reset!");
             // 1. XÓA CÁC Ô NHẬP LIỆU (Trừ Giờ làm việc)
             const inputs = document.querySelectorAll('input');
             inputs.forEach(input => {
