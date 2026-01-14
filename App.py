@@ -490,21 +490,13 @@ def home():
         elif 'btn_calc' in request.form:
             try:
                 # --- A. CẬP NHẬT DỮ LIỆU FORM (GIỮ NGUYÊN) ---
-                ten_khach_hang = request.form.get('ten_khach_hang', 'Khách vãng lai')
-                tinh_thanh_chon = request.form.get('tinh_thanh_chon', '')
-                loai_hinh = request.form.get('loai_hinh', 'can_ho')
-                
-                # CẬP NHẬT NGAY VÀO du_lieu_nhap (Dùng đúng tên name của HTML)
-                du_lieu_nhap.update({
-                    'ten_khach_hang': ten_khach_hang, 
-                    'tinh_thanh_chon': tinh_thanh_chon, 
-                    'loai_hinh': loai_hinh
-                })
-                gn = SETTINGS['tinh_thanh'].get(tinh_thanh_chon, 4.0)
+                ten_kh = request.form.get('ten_khach_hang', 'Khách vãng lai')
+                lh, tc = request.form.get('loai_hinh'), request.form.get('tinh_thanh_chon')
+                gn = SETTINGS['tinh_thanh'].get(tc, 4.0)
                 he_so_dt = SETTINGS.get('dien_tich_kwp', 4.5)
+                du_lieu_nhap.update({'ten_kh': ten_kh, 'loai_hinh': lh, 'tinh_chon': tc})
 
-
-                if loai_hinh == 'can_ho':
+                if lh == 'can_ho':
                     # =================================================
                     # 1. LOGIC HỘ GIA ĐÌNH (CHỈ DÙNG SỐ ĐIỆN kWh)
                     # =================================================
@@ -572,17 +564,15 @@ def home():
                     list_ngay_nghi = [int(x) for x in request.form.getlist('ngay_nghi')]
 
                     du_lieu_nhap.update({
-                        'kwh_bt': request.form.get('kwh_bt', '0'),
-                        'kwh_cd': request.form.get('kwh_cd', '0'),
-                        'kwh_td': request.form.get('kwh_td', '0'),
-                        'ngay_dau': request.form.get('ngay_dau', ''),
-                        'ngay_cuoi': request.form.get('ngay_cuoi', ''),
-                        'gio_lam_tu': request.form.get('gio_lam_tu'),
-                        'gio_lam_den': request.form.get('gio_lam_den')
+                        'kwh_cd': kwh_cd, 'kwh_td': kwh_td, 'kwh_bt': kwh_bt,
+                        'ngay_dau': d_start, 'ngay_cuoi': d_end,
+                        'gio_lam_tu': request.form.get('gio_lam_tu'), 
+                        'gio_lam_den': request.form.get('gio_lam_den'),
+                        'list_ngay_nghi': list_ngay_nghi
                     })
 
                     # Bước 2: Tính toán kWp dải Min - Max
-                    pref = 'kd' if loai_hinh == 'kinh_doanh' else 'sx'
+                    pref = 'kd' if lh == 'kinh_doanh' else 'sx'
                     hs_min, hs_max = SETTINGS['he_so_nhom'].get(f'{pref}_min', 0.1), SETTINGS['he_so_nhom'].get(f'{pref}_max', 0.25)
                     total_kwh = kwh_bt + kwh_cd + kwh_td
                     kwp_min = round(((total_kwh * hs_min) / 30) / gn, 2)
@@ -730,8 +720,8 @@ def home():
                     thoi_gian = datetime.now(vn_tz).strftime("%d/%m/%Y %H:%M:%S")
                     new_row = pd.DataFrame([{
                                 "Thời Gian": thoi_gian,
-                                "Tên Khách Hàng": ten_khach_hang, 
-                                "Khu Vực": tinh_thanh_chon, 
+                                "Tên Khách Hàng": ten_kh, 
+                                "Khu Vực": tc, 
                                 "Đầu Vào": gia_tri_dau_vao_kem_dv, 
                                 "Kết Quả (kWp)": ket_qua_kem_dt
                             }])
