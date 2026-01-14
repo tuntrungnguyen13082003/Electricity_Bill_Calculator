@@ -109,33 +109,41 @@ def ai_doc_hoa_don(file_path):
             page = pdf.pages[0]
             words = page.extract_words()
             
-            # --- BƯỚC 1: XÁC ĐỊNH CÁC "VÁCH NGĂN" ---
-            y_start = 0      # Vách trên (Khách hàng)
-            y_end = 1000     # Vách dưới (Địa chỉ)
-            x_limit = 400    # Vách phải (Khung xanh - Mã khách hàng)
+            # --- BƯỚC 1: XÁC ĐỊNH CÁC "VÁCH NGĂN" CHUẨN ---
+            y_start = 0
+            y_end = 9999
+            x_limit = 380 # Vách phải mặc định ngăn khung xanh
 
-            # Tìm tọa độ của các từ khóa để dựng vách
+            # Sắp xếp words theo tọa độ từ trên xuống để rà soát chính xác
+            words.sort(key=lambda x: x['top'])
+
             for w in words:
                 txt = w['text'].lower()
-                # Xác định vách trên
-                if "khách" in txt and "hàng" in txt:
-                    y_start = w['top'] - 2
-                # Xác định vách dưới
-                if ("địa" in txt and "chỉ" in txt) and w['top'] > y_start:
-                    y_end = w['top'] - 2
-                # Xác định vách phải (Khung màu xanh thường bắt đầu bằng "Mã khách hàng")
-                if "mã" in txt and "khách" in txt and w['x0'] > 300:
-                    x_limit = w['x0'] - 10
+                
+                # 1. Xác định vách trên (Dòng "Khách hàng")
+                # Bỏ qua phần header: Chỉ lấy nhãn "Khách hàng" nếu nó nằm từ 1/4 trang trở xuống
+                if "khách" in txt and "hàng" in txt and w['top'] > (page.height * 0.15):
+                    if y_start == 0: 
+                        y_start = w['top'] - 2
+                        # Tên khách hàng thường nằm cùng dòng hoặc ngay dưới nhãn này
+                
+                # 2. Xác định vách dưới (Dòng "Địa chỉ")
+                # Phải nằm dưới vách trên một khoảng nhất định
+                if ("địa" in txt and "chỉ" in txt) and w['top'] > y_start + 10:
+                    if y_end == 9999:
+                        y_end = w['top'] - 1
+                
+                # 3. Xác định vách phải (Ngăn khung màu xanh)
+                # Tìm các nhãn trong khung xanh như "Mã khách hàng", "Số tiền"
+                if any(k in txt for k in ["mã", "khách", "tiền", "thanh"]) and w['x0'] > 300:
+                    if w['x0'] < x_limit or x_limit == 380:
+                        x_limit = w['x0'] - 10
 
-            # --- BƯỚC 2: RÀ SOÁT TỪNG DÒNG THEO LOGIC CỦA BẠN ---
-            name_lines = []
-            
-            # Nhóm các từ theo từng dòng dựa trên tọa độ 'top'
-            # (Các từ có 'top' chênh lệch nhau < 3px được coi là cùng 1 dòng)
+            # --- BƯỚC 2: RÀ SOÁT TỪNG DÒNG (GIỮ NGUYÊN THUẬT TOÁN CỦA BẠN) ---
+            # Sửa luôn lỗi typo clean_name thành clean_line ở đây
             lines_dict = {}
             for w in words:
                 if y_start <= w['top'] <= y_end:
-                    # Làm tròn tọa độ top để nhóm dòng
                     y_key = round(w['top'])
                     found_line = False
                     for existing_y in lines_dict.keys():
@@ -146,41 +154,26 @@ def ai_doc_hoa_don(file_path):
                     if not found_line:
                         lines_dict[y_key] = [w]
 
-            # Sắp xếp các dòng từ trên xuống dưới
+            name_lines = []
             sorted_y = sorted(lines_dict.keys())
-            
             for y in sorted_y:
-                line_words = lines_dict[y]
-                # Sắp xếp các từ trong dòng từ trái qua phải
-                line_words.sort(key=lambda x: x['x0'])
-                
+                line_words = sorted(lines_dict[y], key=lambda x: x['x0'])
                 line_content = ""
                 for w in line_words:
-                    # 1. Kiểm tra nếu chạm khung xanh (vách phải) thì dừng dòng này
-                    if w['x0'] >= x_limit:
-                        break
-                    
-                    # 2. Bỏ qua chính chữ tiêu đề "Khách hàng:"
-                    if "khách" in w['text'].lower() or "hàng" in w['text'].lower():
-                        continue
-                        
-                    # 3. Nếu gặp chữ thì in tiếp chữ đó ra (nối vào dòng)
-                    # pdfplumber extract_words đã tự động bỏ qua khoảng trắng thừa
+                    if w['x0'] >= x_limit: break
+                    # Bỏ qua nhãn "Khách hàng"
+                    if "khách" in w['text'].lower() or "hàng" in w['text'].lower(): continue
                     line_content += w['text'] + " "
 
-                # Kiểm tra nội dung dòng này
                 clean_line = line_content.strip(" :\"-")
-                
-                # NẾU GẶP "ĐỊA CHỈ" THÌ DỪNG TOÀN BỘ (Theo yêu cầu của bạn)
+                # Kiểm tra điểm dừng
                 if "địa" in clean_line.lower() and "chỉ" in clean_line.lower():
                     break
-                
                 if clean_line:
                     name_lines.append(clean_line)
 
-            # Nối các dòng lại thành tên hoàn chỉnh
             data["ten_kh"] = " ".join(name_lines).strip()
-            print(f"✅ Kết quả rà soát tên: {data['ten_kh']}")      
+            print(f"✅ Kết quả rà soát tên: {data['ten_kh']}")     
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
