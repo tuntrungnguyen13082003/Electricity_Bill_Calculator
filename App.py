@@ -109,69 +109,53 @@ def ai_doc_hoa_don(file_path):
             page = pdf.pages[0]
             words = page.extract_words()
             
-            # --- BƯỚC 1: ĐỊNH VỊ MỐC DỰA TRÊN CỤM TỪ ---
+            # --- BƯỚC 1: ĐỊNH VỊ MỐC (NỚI LỎNG VÁCH NGĂN) ---
             y_start = None
             y_end = None
             x_label_end = 0
-            x_limit = 350 # Vách phải mặc định
+            x_limit = 380 # Nới rộng vách phải mặc định để không mất chữ "CÔNG"
 
-            # Sắp xếp từ theo tọa độ để tìm mốc chính xác
             words.sort(key=lambda x: (x['top'], x['x0']))
-
-            print(f"DEBUG: Bắt đầu rà soát {len(words)} từ...")
 
             for i, w in enumerate(words):
                 txt = w['text'].lower()
                 
-                # 1. Tìm mốc "Khách hàng" (chấp nhận cả "Khách hàng:")
+                # Tìm mốc "Khách hàng"
                 if "khách" in txt and w['x0'] < 150:
-                    # Kiểm tra từ tiếp theo có phải là "hàng" không
                     next_txt = words[i+1]['text'].lower() if i+1 < len(words) else ""
                     if "hàng" in next_txt or "hàng" in txt:
                         if y_start is None:
                             y_start = w['top'] - 4
                             x_label_end = max(w['x1'], words[i+1]['x1'] if "hàng" in next_txt else w['x1'])
-                            print(f"DEBUG: Tìm thấy 'Khách hàng' tại Y={y_start}")
 
-                # 2. Tìm mốc "Địa chỉ" (phải nằm dưới Khách hàng ít nhất 10px)
+                # Tìm mốc "Địa chỉ"
                 if "địa" in txt and w['x0'] < 150:
                     next_txt = words[i+1]['text'].lower() if i+1 < len(words) else ""
                     if "chỉ" in next_txt or "chỉ" in txt:
                         if y_start is not None and w['top'] > y_start + 10:
                             if y_end is None:
                                 y_end = w['top'] - 2
-                                print(f"DEBUG: Tìm thấy 'Địa chỉ' tại Y={y_end}")
 
-                # 3. Tìm vách PHẢI (Khung xanh: Mã khách hàng, Số tiền...)
-                if any(k in txt for k in ["mã", "tiền", "thanh", "hạn"]) and w['x0'] > 300:
+                # Tìm vách PHẢI (Khung xanh) - Lấy mép trái của khung
+                if any(k in txt for k in ["mã", "khách", "tiền", "thanh"]) and w['x0'] > 300:
                     if w['x0'] < x_limit:
-                        x_limit = w['x0'] - 8
-                        print(f"DEBUG: Cập nhật x_limit (vách phải) = {x_limit}")
+                        x_limit = w['x0'] - 2 # Chỉ trừ 2px thay vì 8px để tránh mất chữ
 
-            # --- BƯỚC 2: RÀ SOÁT CHỮ TRONG KHUNG (THEO YÊU CẦU CỦA BẠN) ---
-            if y_start is None:
-                print("❌ LỖI: Vẫn không thấy mốc Khách hàng.")
-                return data
-            
-            # Nếu thấy Khách hàng mà chưa thấy Địa chỉ, lấy tạm một khoảng 120px
-            if y_end is None: 
-                y_end = y_start + 120
-                print(f"DEBUG: Tự động đặt vách dưới y_end = {y_end}")
+            # --- BƯỚC 2: RÀ SOÁT & GOM CHỮ (GIỮ DẤU GẠCH NGANG) ---
+            if y_start is None: return data
+            if y_end is None: y_end = y_start + 150
 
             name_parts = []
             lines_dict = {}
 
             for w in words:
-                # Điều kiện: Nằm giữa Khách hàng - Địa chỉ và nằm bên trái Khung xanh
-                if y_start <= w['top'] <= y_end and w['x0'] < x_limit:
-                    # Nếu là dòng đầu tiên, phải nằm bên phải nhãn "Khách hàng"
-                    if abs(w['top'] - y_start) < 15 and w['x0'] <= x_label_end + 5:
+                # Nới lỏng điều kiện x_limit một chút (chỉ bỏ qua nếu hẳn chữ nằm trong khung xanh)
+                if y_start <= w['top'] <= y_end and w['x0'] < x_limit + 5:
+                    # Bỏ qua nhãn "Khách hàng" ở đầu
+                    if abs(w['top'] - y_start) < 15 and w['x1'] <= x_label_end + 5:
                         continue
                         
                     y_key = round(w['top'])
-                    if y_key not in lines_dict: lines_dict[y_key] = []
-                    
-                    # Tìm xem có dòng nào đã tồn tại gần tọa độ này chưa
                     assigned = False
                     for existing_y in lines_dict.keys():
                         if abs(y_key - existing_y) < 4:
@@ -180,25 +164,29 @@ def ai_doc_hoa_don(file_path):
                             break
                     if not assigned: lines_dict[y_key] = [w]
 
-            # Gom các dòng đã rà soát
             sorted_y = sorted(lines_dict.keys())
             for y in sorted_y:
                 line_words = sorted(lines_dict[y], key=lambda x: x['x0'])
-                # Loại bỏ các từ trống hoặc tiêu đề lọt vào
-                clean_words = [w['text'] for w in line_words if w['text'].strip()]
-                line_text = " ".join(clean_words)
+                # Lấy text và giữ nguyên các ký tự gạch ngang
+                line_text = " ".join([w['text'] for w in line_words]).strip()
                 
-                # Điểm dừng cuối cùng: Nếu dòng chứa chữ "Địa chỉ" thì dừng rà soát
-                if "địa" in line_text.lower() and "chỉ" in line_text.lower():
+                # Điểm dừng: Nếu dòng chứa chữ "Địa chỉ" thì ngưng
+                if "địa" in line_text.lower() and "chỉ" in line_text.lower() and y > y_start + 20:
                     break
                 
-                if line_text:
-                    print(f"DEBUG: Gom được dòng tên: {line_text}")
-                    name_parts.append(line_text)
+                # CHỈ STRIP KHOẢNG TRẮNG VÀ DẤU HAI CHẤM (KHÔNG STRIP DẤU GẠCH NGANG)
+                clean_line = line_text.strip(" :\"")
+                
+                if clean_line:
+                    name_parts.append(clean_line)
 
-            data["ten_kh"] = " ".join(name_parts).strip(" :\"-")
-            # Xử lý xóa mã khách hàng dính ở cuối nếu có (ví dụ PP01...)
-            data["ten_kh"] = re.sub(r"\s+[A-Z]{2}\d{7,}.*", "", data["ten_kh"])
+            # Nối các dòng lại
+            raw_final_name = " ".join(name_parts)
+            
+            # Xóa mã khách hàng PP... ở cuối nếu có
+            final_name = re.sub(r"\s+[A-Z]{2}\d{7,}.*", "", raw_final_name).strip(" :\"-")
+            
+            data["ten_kh"] = final_name
             print(f"✅ KẾT QUẢ CUỐI CÙNG: {data['ten_kh']}")    
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
