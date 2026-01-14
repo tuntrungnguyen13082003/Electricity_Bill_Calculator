@@ -120,11 +120,11 @@
                     <div style="background: #f0f9f4; padding: 15px; border-radius: 8px; border: 1px solid #16a085; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                         <strong style="color: #16a085;">📸 Nhập nhanh bằng AI (PDF/Ảnh)</strong>
                         <button type="button" onclick="document.getElementById('inp_scan_img').click()" class="btn-calc" style="width: auto; margin: 0; padding: 5px 15px; background: #16a085;">Tải file lên</button>
-                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="resetToanBoGiaoDien(); uploadVaQuetAnh(this);">
+                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="uploadVaQuetAnh(this)">
                     </div>
 
                     <label>Tên Khách Hàng:</label>
-                    <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_khach_hang', '') }}" required>
+                    <input type="text" name="ten_khach_hang" class="form-control" placeholder="Nhập tên khách hàng..." value="{{ du_lieu_nhap.get('ten_kh', '') }}" required>
                     
                     <label>Khu vực lắp đặt:</label>
                     <select name="tinh_thanh_chon" class="form-control">
@@ -141,13 +141,20 @@
 
                     <div id="khung_ho_gia_dinh">
                         <input type="hidden" name="che_do_nhap" value="theo_kwh"> <label style="margin-top:15px">Số điện tiêu thụ trung bình tháng (kWh/Tháng):</label>
-                        <input type="number" name="gia_tri_dau_vao" id="gia_tri_input" class="form-control" placeholder="Ví dụ: 500" required value="{{ du_lieu_nhap.get('gia_tri_dau_vao', '') }}">
+                        <input type="number" 
+                            name="gia_tri_dau_vao" 
+                            id="gia_tri_input" 
+                            class="form-control"
+                            placeholder="Ví dụ: 500"
+                            required
+                            value="{{ du_lieu_nhap.gia_tri }}">
+
                         <div id="khung_dac_diem" style="margin-top: 15px;">
                             <label>Đặc điểm sử dụng:</label>
                             <select id="chon_ngu_canh" name="ngu_canh_chon" class="form-control">
-                                <option value="gd_di_lam" {% if du_lieu_nhap.get('ngu_canh_chon') == 'gd_di_lam' %}selected{% endif %}>💼 Đi làm hành chính</option>
-                                <option value="gd_co_nguoi" {% if du_lieu_nhap.get('ngu_canh_chon') == 'gd_co_nguoi' %}selected{% endif %}>👴👶 Có người ở nhà</option>
-                                <option value="gd_ban_dem" {% if du_lieu_nhap.get('ngu_canh_chon') == 'gd_ban_dem' %}selected{% endif %}>🌙 Dùng ban đêm</option>
+                                <option value="gd_di_lam" {% if du_lieu_nhap.ngu_canh == 'gd_di_lam' %}selected{% endif %}>💼 Đi làm hành chính</option>
+                                <option value="gd_co_nguoi" {% if du_lieu_nhap.ngu_canh == 'gd_co_nguoi' %}selected{% endif %}>👴👶 Có người ở nhà</option>
+                                <option value="gd_ban_dem" {% if du_lieu_nhap.ngu_canh == 'gd_ban_dem' %}selected{% endif %}>🌙 Dùng ban đêm</option>
                             </select>
                         </div>
                     </div>
@@ -706,41 +713,6 @@
                 initAllCharts();
             }
         });
-
-        function resetToanBoGiaoDien() {
-            console.log("🧹 Đang dọn dẹp dữ liệu (Giữ lại Ngày nghỉ và Giờ làm)...");
-            if (event && event.type === 'click') return; 
-                console.log("🧹 Đã gọi hàm Reset!");
-            // 1. XÓA CÁC Ô NHẬP LIỆU (Trừ Giờ làm việc)
-            const inputs = document.querySelectorAll('input');
-            inputs.forEach(input => {
-                
-                const danhSachGiuLai = ['gio_lam_tu', 'gio_lam_den'];
-
-                if (input.type !== 'button' && input.type !== 'submit' && input.type !== 'file') {
-                    // Nếu KHÔNG nằm trong danh sách giữ lại thì mới xóa
-                    if (!danhSachGiuLai.includes(input.name) && !danhSachGiuLai.includes(input.id)) {
-                        input.value = "";
-                    }
-                }
-            });
-
-            // 2. RESET CÁC Ô CHỌN (Trừ Ngày nghỉ trong tuần)
-            const selects = document.querySelectorAll('select');
-            selects.forEach(select => {
-                
-                if (select.name !== 'ngay_nghi' && select.id !== 'ngay_nghi') {
-                    select.selectedIndex = 0;
-                }
-            });
-
-            // 3. XÓA VÙNG KẾT QUẢ (Giữ nguyên như cũ)
-            const vungKetQua = document.getElementById('vung-ket-qua-solar');
-            if (vungKetQua) {
-                vungKetQua.innerHTML = ""; 
-            }
-        }
-
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
