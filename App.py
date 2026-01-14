@@ -106,29 +106,36 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (Logic: Khách hàng -> Địa chỉ) ---
-            # Flags: 
-            # - re.IGNORECASE: Không phân biệt hoa thường
-            # - re.DOTALL: Cho phép dấu "." khớp với cả dấu xuống dòng (để đọc tên đa dòng)
-            regex_ten = r"Khách hàng\s*[\n\r:]*(.*?)(?=\s*Địa chỉ)"
-            name_block = re.search(regex_ten, full_text, re.IGNORECASE | re.DOTALL)
+            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (BẢN ĐA DÒNG SIÊU CẤP) ---
+            # Logic: Bắt đầu sau "Khách hàng", lấy TẤT CẢ cho đến khi gặp "Địa chỉ"
+            # re.DOTALL: Cho phép dấu "." khớp với cả ký tự xuống dòng (\n)
+            regex_da_dong = r"Khách hàng\s*[\n\r:]*(.*?)(?=\s*Địa chỉ)"
+            name_block = re.search(regex_da_dong, full_text, re.IGNORECASE | re.DOTALL)
 
             if name_block:
+                # Lấy toàn bộ khối văn bản thô (có thể gồm 2-3 dòng)
                 raw_name = name_block.group(1).strip()
                 
-                # 1. Thay thế dấu xuống dòng bằng khoảng trắng
-                # 2. Xóa các ký tự dư thừa như dấu ngoặc kép ("), nhưng GIỮ LẠI dấu gạch ngang (-)
-                clean_name = raw_name.replace('\n', ' ').replace('"', '')
+                # BƯỚC CHECK ĐỦ DÒNG: 
+                # Thay thế tất cả các kiểu xuống dòng (\n, \r) thành khoảng trắng
+                # Điều này giúp nối "Công ty Xăng dầu..." (dòng 1) với "...TNHH Một Thành Viên" (dòng 2)
+                joined_name = raw_name.replace('\n', ' ').replace('\r', ' ')
                 
-                # 3. Loại bỏ các mã số hoặc nhãn phụ nếu lỡ dính vào (ví dụ: Mã số thuế)
-                # Dừng lại nếu gặp bất kỳ nhãn nào khác như "Mã số thuế" hoặc "Mã khách hàng"
-                clean_name = re.split(r"Mã số thuế|Mã khách hàng|Số bảng kê", clean_name, flags=re.IGNORECASE)[0]
+                # Dọn dẹp ký tự thừa (giữ lại dấu gạch ngang "-" theo ý bạn)
+                clean_name = joined_name.replace('"', '').replace(',', '')
                 
-                # 4. Chuẩn hóa khoảng trắng (xóa khoảng trắng thừa ở giữa các từ)
-                data["ten_kh"] = ' '.join(clean_name.split()).strip()
-                print(f"✅ Tìm thấy tên khách hàng: {data['ten_kh']}")
+                # PHÒNG HỜ: Nếu khối tên quá dài dính sang các nhãn khác (như Mã số thuế)
+                # Chúng ta sẽ cắt bỏ mọi thứ từ chữ "Mã số thuế" trở đi nếu lỡ dính vào
+                for label in ["Mã số thuế", "Mã khách hàng", "Số bảng kê", "Điện thoại"]:
+                    clean_name = re.split(label, clean_name, flags=re.IGNORECASE)[0]
+                
+                # CHUẨN HÓA: Xóa khoảng trắng thừa giữa các từ (ví dụ "Công  ty" -> "Công ty")
+                final_name = " ".join(clean_name.split()).strip()
+                
+                data["ten_kh"] = final_name
+                print(f"✅ Tên đầy đủ (Đã nối dòng): {data['ten_kh']}")
             else:
-                print("⚠️ Không tìm thấy tên khách hàng theo logic dừng tại 'Địa chỉ'.")
+                print("⚠️ Không tìm thấy khối tên khách hàng.")
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
