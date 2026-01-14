@@ -106,45 +106,42 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (LOGIC QUÉT DÒNG THÔNG MINH) ---
-            lines = full_text.split('\n')
-            name_parts = []
-            found_start = False
+            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (LOGIC GOM KHỐI TUYỆT ĐỐI) ---
+            # Bước 1: Tìm vị trí của từ khóa "Khách hàng" và "Địa chỉ"
+            text_lower = full_text.lower()
+            start_keyword = "khách hàng"
+            end_keyword = "địa chỉ"
 
-            # Các từ khóa báo hiệu kết thúc phần tên
-            stop_keywords = ["Địa chỉ", "Điện thoại", "Mã số thuế", "Mã khách hàng", "Số bảng kê"]
+            start_idx = text_lower.find(start_keyword)
+            end_idx = text_lower.find(end_keyword)
 
-            for line in lines:
-                # Bước 1: Tìm điểm bắt đầu
-                if "Khách hàng" in line:
-                    found_start = True
-                    # Lấy phần văn bản nằm sau chữ "Khách hàng" ngay trên dòng đó
-                    # Ví dụ: "Khách hàng: Công ty Xăng dầu" -> lấy "Công ty Xăng dầu"
-                    start_part = line.split("Khách hàng")[-1].strip(" :\"")
-                    if start_part:
-                        name_parts.append(start_part)
-                    continue # Nhảy sang dòng tiếp theo để quét tiếp
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                # Bước 2: Cắt lấy toàn bộ đoạn ở giữa
+                # Cộng thêm độ dài của start_keyword để bỏ qua chính chữ "Khách hàng"
+                raw_name_block = full_text[start_idx + len(start_keyword):end_idx]
+                
+                # Bước 3: Dọn dẹp khối văn bản
+                # Thay thế tất cả các kiểu xuống dòng, tab thành khoảng trắng
+                clean_name = raw_name_block.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                
+                # Xóa bỏ các ký tự dấu hai chấm, dấu ngoặc kép ở đầu/cuối
+                clean_name = clean_name.strip(" :\"")
+                
+                # Xử lý các mã số lỡ dính vào (như Mã khách hàng: PP01...)
+                # Nếu trong khối tên có các nhãn phụ khác, ta cắt tiếp
+                for label in ["Mã số thuế", "Mã khách hàng", "Số bảng kê", "Điện thoại"]:
+                    if label.lower() in clean_name.lower():
+                        clean_name = re.split(label, clean_name, flags=re.IGNORECASE)[0]
 
-                # Bước 2: Gom các dòng tiếp theo cho đến khi gặp điểm dừng
-                if found_start:
-                    # Nếu dòng hiện tại chứa bất kỳ từ khóa dừng nào -> NGẮT
-                    if any(key in line for key in stop_keywords):
-                        break
-                    
-                    # Nếu dòng không chứa từ khóa dừng, thì nó là phần tiếp theo của tên
-                    # (Kể cả khi có dấu gạch ngang hay xuống dòng)
-                    clean_line = line.strip(" \"")
-                    if clean_line:
-                        name_parts.append(clean_line)
-
-            # Bước 3: Nối các mảnh tên lại và chuẩn hóa
-            full_name = " ".join(name_parts)
-            # Xử lý trường hợp lỡ dính chữ "Địa chỉ" ở cuối dòng cuối cùng
-            for key in stop_keywords:
-                full_name = full_name.split(key)[0]
-
-            data["ten_kh"] = " ".join(full_name.split()).strip(" ,")
-            print(f"✅ Tên đầy đủ đã quét: {data['ten_kh']}")
+                # Bước 4: Chuẩn hóa khoảng trắng dư thừa ở giữa các từ
+                data["ten_kh"] = " ".join(clean_name.split()).strip()
+                print(f"✅ Tên đầy đủ (Gom khối): {data['ten_kh']}")
+            else:
+                # Fallback nếu không tìm thấy điểm neo "Địa chỉ"
+                print("⚠️ Không tìm thấy điểm dừng 'Địa chỉ', thử lại với Regex dòng đơn...")
+                name_match = re.search(r"Khách hàng\s*[:\-]*\s*(.*)", full_text, re.IGNORECASE)
+                if name_match:
+                    data["ten_kh"] = name_match.group(1).strip()
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
