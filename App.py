@@ -106,16 +106,29 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (Cải tiến)
-            # Lấy văn bản nằm giữa "Khách hàng" và "Địa chỉ", tránh dính "Mã khách hàng"
-            name_match = re.search(r"Khách hàng\s*[\n\r]+(.*?)(?=\s*Địa chỉ|\s*Mã khách hàng|\s*Số bảng kê)", full_text, re.IGNORECASE | re.DOTALL)
-            if name_match:
-                raw_name = name_match.group(1).strip()
-                # Xử lý xuống dòng và ký tự dư
-                clean_name = raw_name.replace('\n', ' ').replace('"', '').replace(',', '')
-                # Xóa các mã khách hàng nếu lỡ dính vào (ví dụ: PP01000128522)
-                clean_name = re.sub(r"[A-Z]{2,}\d{7,}", "", clean_name).strip()
-                data["ten_kh"] = ' '.join(clean_name.split())
+            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (Logic: Khách hàng -> Địa chỉ) ---
+            # Flags: 
+            # - re.IGNORECASE: Không phân biệt hoa thường
+            # - re.DOTALL: Cho phép dấu "." khớp với cả dấu xuống dòng (để đọc tên đa dòng)
+            regex_ten = r"Khách hàng\s*[\n\r:]*(.*?)(?=\s*Địa chỉ)"
+            name_block = re.search(regex_ten, full_text, re.IGNORECASE | re.DOTALL)
+
+            if name_block:
+                raw_name = name_block.group(1).strip()
+                
+                # 1. Thay thế dấu xuống dòng bằng khoảng trắng
+                # 2. Xóa các ký tự dư thừa như dấu ngoặc kép ("), nhưng GIỮ LẠI dấu gạch ngang (-)
+                clean_name = raw_name.replace('\n', ' ').replace('"', '')
+                
+                # 3. Loại bỏ các mã số hoặc nhãn phụ nếu lỡ dính vào (ví dụ: Mã số thuế)
+                # Dừng lại nếu gặp bất kỳ nhãn nào khác như "Mã số thuế" hoặc "Mã khách hàng"
+                clean_name = re.split(r"Mã số thuế|Mã khách hàng|Số bảng kê", clean_name, flags=re.IGNORECASE)[0]
+                
+                # 4. Chuẩn hóa khoảng trắng (xóa khoảng trắng thừa ở giữa các từ)
+                data["ten_kh"] = ' '.join(clean_name.split()).strip()
+                print(f"✅ Tìm thấy tên khách hàng: {data['ten_kh']}")
+            else:
+                print("⚠️ Không tìm thấy tên khách hàng theo logic dừng tại 'Địa chỉ'.")
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
