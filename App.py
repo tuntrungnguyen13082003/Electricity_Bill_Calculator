@@ -179,10 +179,10 @@ def ai_doc_hoa_don(file_path):
                     clean_line = line_text.strip(" :\"")
                     
                     if clean_line:
-                        name_parts.append(clean_line)
+                        name_lines.append(clean_line)
 
                 # Nối các dòng lại với nhau
-                full_name_raw = " ".join(name_parts)
+                full_name_raw = " ".join(name_lines)
                 
                 # Bước cuối: Xóa mã khách hàng (ví dụ PP010...) dính ở cuối bằng Regex
                 # Cách này sẽ không đụng chạm gì đến dấu gạch ngang ở giữa tên
