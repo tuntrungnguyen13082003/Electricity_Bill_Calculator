@@ -120,7 +120,7 @@
                     <div style="background: #f0f9f4; padding: 15px; border-radius: 8px; border: 1px solid #16a085; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                         <strong style="color: #16a085;">📸 Nhập nhanh bằng AI (PDF/Ảnh)</strong>
                         <button type="button" onclick="document.getElementById('inp_scan_img').click()" class="btn-calc" style="width: auto; margin: 0; padding: 5px 15px; background: #16a085;">Tải file lên</button>
-                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange=" uploadVaQuetAnh(this);">
+                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="uploadVaQuetAnh(this)">
                     </div>
 
                     <label>Tên Khách Hàng:</label>
@@ -615,6 +615,7 @@
     <script>
         function uploadVaQuetAnh(input) {
             if (input.files && input.files[0]) {
+                resetToanBoGiaoDien();
                 const file = input.files[0];
                 // Tìm nút bấm dựa trên class btn-calc nằm trong khung AI
                 const btn = input.parentElement.querySelector('.btn-calc');
