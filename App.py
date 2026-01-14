@@ -121,7 +121,7 @@ def ai_doc_hoa_don(file_path):
                 raw_block = full_text[start_idx + len(start_key):end_idx]
                 
                 # Bước 3: Xử lý ranh giới ngang (Cắt bỏ khung màu xanh bên phải)
-                // Nếu trong khối lỡ dính chữ từ khung màu xanh, ta lấy phần bên trái của nó
+                # Nếu trong khối lỡ dính chữ từ khung màu xanh, ta lấy phần bên trái của nó
                 stop_horizontal = ["Mã khách hàng", "Số bảng kê", "Mã số thuế", "Số công tơ"]
                 
                 # Chuyển khối thành một dòng duy nhất để xử lý cắt ngang dễ hơn
@@ -139,7 +139,7 @@ def ai_doc_hoa_don(file_path):
                 
                 print(f"✅ Đã cắt khung và lấy Tên: {data['ten_kh']}")
             else:
-    print("⚠️ Không xác định được ranh giới Khách hàng - Địa chỉ.")
+                print("⚠️ Không xác định được ranh giới Khách hàng - Địa chỉ.")         
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
