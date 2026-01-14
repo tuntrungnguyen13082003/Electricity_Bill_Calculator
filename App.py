@@ -182,22 +182,24 @@ def ai_doc_hoa_don(file_path):
                         name_lines.append(clean_line)
 
                 # Nối các dòng lại với nhau
-                # --- CHUẨN HÓA DẤU GẠCH NGANG TRƯỚC KHI GỬI VỀ WEB ---
-                raw_final_name = " ".join(name_lines)
+                # --- 1. NỐI DÒNG VÀ CHUẨN HÓA DẤU GẠCH ---
+                full_name_raw = " ".join(name_lines)
                 
-                # 1. Thay thế các biến thể Unicode của dấu gạch về dấu chuẩn bàn phím
-                # \u2013 là En-dash, \u2014 là Em-dash
-                raw_final_name = raw_final_name.replace('\u2013', '-').replace('\u2014', '-')
-                raw_final_name = raw_final_name.replace('–', '-').replace('—', '-')
+                # Thay thế tất cả các loại dấu gạch "lạ" trong PDF về dấu gạch ngang chuẩn (-)
+                # \u2013 (En-dash), \u2014 (Em-dash), \u00ad (Soft hyphen)
+                full_name_raw = full_name_raw.replace('\u2013', '-').replace('\u2014', '-').replace('\u00ad', '-')
+                # Thay thế trực tiếp các ký tự nhìn thấy
+                full_name_raw = full_name_raw.replace('–', '-').replace('—', '-')
 
-                # 2. Xóa mã khách hàng (ví dụ PP010...) dính ở cuối
-                final_name = re.sub(r"\s+[A-Z]{2,}\d{7,}.*", "", raw_final_name).strip()
+                # --- 2. DỌN DẸP MÃ KHÁCH HÀNG ---
+                # Chỉ xóa nếu gặp cụm Mã khách hàng (VD: PP010...) ở cuối
+                final_name = re.sub(r"\s+[A-Z]{2,}\d{7,}.*", "", full_name_raw).strip()
                 
-                # 3. KẾT QUẢ CUỐI CÙNG (QUAN TRỌNG)
-                # TUYỆT ĐỐI KHÔNG để dấu "-" trong hàm strip() dưới đây
+                # --- 3. QUAN TRỌNG: SỬA LẠI LỆNH STRIP ---
+                # Bỏ dấu "-" ra khỏi hàm strip() để tránh việc nó xóa mất dấu gạch ở cuối dòng 1
                 data["ten_kh"] = final_name.strip(" :\"") 
                 
-                print(f"✅ Đã chuẩn hóa dấu gạch gửi về Web: {data['ten_kh']}")
+                print(f"✅ Tên chuẩn hóa gửi về Web: {data['ten_kh']}")
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
