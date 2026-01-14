@@ -106,42 +106,40 @@ def ai_doc_hoa_don(file_path):
                 print("❌ LỖI: PDF không có chữ (có thể là file ảnh quét).")
                 return None
             
-            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (LOGIC GOM KHỐI TUYỆT ĐỐI) ---
-            # Bước 1: Tìm vị trí của từ khóa "Khách hàng" và "Địa chỉ"
+            # --- 1. TRÍCH XUẤT TÊN KHÁCH HÀNG (LOGIC CẮT KHUNG) ---
+            # Bước 1: Xác định vị trí "Khách hàng" (Bắt đầu) và "Địa chỉ" (Kết thúc) theo chiều dọc
             text_lower = full_text.lower()
-            start_keyword = "khách hàng"
-            end_keyword = "địa chỉ"
+            start_key = "khách hàng"
+            end_key = "địa chỉ"
 
-            start_idx = text_lower.find(start_keyword)
-            end_idx = text_lower.find(end_keyword)
+            start_idx = text_lower.find(start_key)
+            end_idx = text_lower.find(end_key)
 
             if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                # Bước 2: Cắt lấy toàn bộ đoạn ở giữa
-                # Cộng thêm độ dài của start_keyword để bỏ qua chính chữ "Khách hàng"
-                raw_name_block = full_text[start_idx + len(start_keyword):end_idx]
+                # Bước 2: "Ôm" toàn bộ khối văn bản nằm giữa hai mốc này
+                # Bỏ qua chữ "Khách hàng" bằng cách cộng thêm độ dài của nó
+                raw_block = full_text[start_idx + len(start_key):end_idx]
                 
-                # Bước 3: Dọn dẹp khối văn bản
-                # Thay thế tất cả các kiểu xuống dòng, tab thành khoảng trắng
-                clean_name = raw_name_block.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                # Bước 3: Xử lý ranh giới ngang (Cắt bỏ khung màu xanh bên phải)
+                // Nếu trong khối lỡ dính chữ từ khung màu xanh, ta lấy phần bên trái của nó
+                stop_horizontal = ["Mã khách hàng", "Số bảng kê", "Mã số thuế", "Số công tơ"]
                 
-                # Xóa bỏ các ký tự dấu hai chấm, dấu ngoặc kép ở đầu/cuối
-                clean_name = clean_name.strip(" :\"")
+                # Chuyển khối thành một dòng duy nhất để xử lý cắt ngang dễ hơn
+                temp_name = raw_block.replace('\n', ' ').replace('\r', ' ')
                 
-                # Xử lý các mã số lỡ dính vào (như Mã khách hàng: PP01...)
-                # Nếu trong khối tên có các nhãn phụ khác, ta cắt tiếp
-                for label in ["Mã số thuế", "Mã khách hàng", "Số bảng kê", "Điện thoại"]:
-                    if label.lower() in clean_name.lower():
-                        clean_name = re.split(label, clean_name, flags=re.IGNORECASE)[0]
-
-                # Bước 4: Chuẩn hóa khoảng trắng dư thừa ở giữa các từ
+                for label in stop_horizontal:
+                    if label.lower() in temp_name.lower():
+                        # Chỉ lấy phần bên trái của nhãn khung xanh
+                        temp_name = re.split(label, temp_name, flags=re.IGNORECASE)[0]
+                
+                # Bước 4: Làm sạch cuối cùng
+                # Xóa dấu hai chấm, khoảng trắng dư thừa
+                clean_name = temp_name.strip(" :\"")
                 data["ten_kh"] = " ".join(clean_name.split()).strip()
-                print(f"✅ Tên đầy đủ (Gom khối): {data['ten_kh']}")
+                
+                print(f"✅ Đã cắt khung và lấy Tên: {data['ten_kh']}")
             else:
-                # Fallback nếu không tìm thấy điểm neo "Địa chỉ"
-                print("⚠️ Không tìm thấy điểm dừng 'Địa chỉ', thử lại với Regex dòng đơn...")
-                name_match = re.search(r"Khách hàng\s*[:\-]*\s*(.*)", full_text, re.IGNORECASE)
-                if name_match:
-                    data["ten_kh"] = name_match.group(1).strip()
+    print("⚠️ Không xác định được ranh giới Khách hàng - Địa chỉ.")
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
             # Lấy toàn bộ văn bản từ chữ "Địa chỉ" cho đến khi gặp chữ "Điện thoại" hoặc "Mã số thuế"
