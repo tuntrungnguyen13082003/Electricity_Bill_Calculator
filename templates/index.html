@@ -715,28 +715,35 @@
         });
 
         function resetToanBoGiaoDien() {
-            console.log("🧹 Đang dọn dẹp toàn bộ dữ liệu...");
+            console.log("🧹 Đang dọn dẹp dữ liệu (Giữ lại Ngày nghỉ và Giờ làm)...");
 
-            // 1. XÓA INPUT (Đầu vào)
-            // Tìm tất cả các ô input và xóa giá trị
+            // 1. XÓA CÁC Ô NHẬP LIỆU (Trừ Giờ làm việc)
             const inputs = document.querySelectorAll('input');
             inputs.forEach(input => {
+                
+                const danhSachGiuLai = ['gio_lam_tu', 'gio_lam_den'];
+
                 if (input.type !== 'button' && input.type !== 'submit' && input.type !== 'file') {
-                    input.value = "";
+                    // Nếu KHÔNG nằm trong danh sách giữ lại thì mới xóa
+                    if (!danhSachGiuLai.includes(input.name) && !danhSachGiuLai.includes(input.id)) {
+                        input.value = "";
+                    }
                 }
             });
 
-            // Reset các ô chọn (Dropdown) về mặc định
+            // 2. RESET CÁC Ô CHỌN (Trừ Ngày nghỉ trong tuần)
             const selects = document.querySelectorAll('select');
             selects.forEach(select => {
-                select.selectedIndex = 0;
+                
+                if (select.name !== 'ngay_nghi' && select.id !== 'ngay_nghi') {
+                    select.selectedIndex = 0;
+                }
             });
 
-            // 2. XÓA OUTPUT (Đầu ra - Kết quả kWp và Biểu đồ)
-            // Chúng ta chỉ cần làm rỗng nội dung của div 'vung-ket-qua-solar'
+            // 3. XÓA VÙNG KẾT QUẢ (Giữ nguyên như cũ)
             const vungKetQua = document.getElementById('vung-ket-qua-solar');
             if (vungKetQua) {
-                vungKetQua.innerHTML = ""; // Xóa sạch cả box kết quả và biểu đồ bên trong
+                vungKetQua.innerHTML = ""; 
             }
         }
 
