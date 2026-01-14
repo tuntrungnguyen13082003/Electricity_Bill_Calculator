@@ -141,7 +141,7 @@ def ai_doc_hoa_don(file_path):
                     if w['x0'] < x_limit:
                         x_limit = w['x0'] - 2 # Chỉ trừ 2px thay vì 8px để tránh mất chữ
 
-            # --- BƯỚC 2: RÀ SOÁT & GOM CHỮ (GIỮ DẤU GẠCH NGANG) ---
+            # --- BƯỚC 2: RÀ SOÁT & GOM CHỮ (PHIÊN BẢN BẢO VỆ DẤU GẠCH NGANG) ---
             if y_start is None: return data
             if y_end is None: y_end = y_start + 150
 
@@ -149,9 +149,8 @@ def ai_doc_hoa_don(file_path):
             lines_dict = {}
 
             for w in words:
-                # Nới lỏng điều kiện x_limit một chút (chỉ bỏ qua nếu hẳn chữ nằm trong khung xanh)
+                # Nới lỏng vách phải thêm 5px để không bị "chém" mất dấu gạch nằm sát lề
                 if y_start <= w['top'] <= y_end and w['x0'] < x_limit + 5:
-                    # Bỏ qua nhãn "Khách hàng" ở đầu
                     if abs(w['top'] - y_start) < 15 and w['x1'] <= x_label_end + 5:
                         continue
                         
@@ -167,26 +166,30 @@ def ai_doc_hoa_don(file_path):
             sorted_y = sorted(lines_dict.keys())
             for y in sorted_y:
                 line_words = sorted(lines_dict[y], key=lambda x: x['x0'])
-                # Lấy text và giữ nguyên các ký tự gạch ngang
+                # Lấy text nguyên bản từ PDF
                 line_text = " ".join([w['text'] for w in line_words]).strip()
                 
-                # Điểm dừng: Nếu dòng chứa chữ "Địa chỉ" thì ngưng
+                # Điểm dừng: Nếu chạm chữ "Địa chỉ" thì ngắt ngay
                 if "địa" in line_text.lower() and "chỉ" in line_text.lower() and y > y_start + 20:
                     break
                 
-                # CHỈ STRIP KHOẢNG TRẮNG VÀ DẤU HAI CHẤM (KHÔNG STRIP DẤU GẠCH NGANG)
+                # QUAN TRỌNG: Chỉ xóa dấu cách và dấu hai chấm ở hai đầu mỗi dòng
+                # KHÔNG đưa dấu "-" vào hàm strip này để bảo vệ dấu gạch ngang
                 clean_line = line_text.strip(" :\"")
                 
                 if clean_line:
                     name_parts.append(clean_line)
 
-            # Nối các dòng lại
-            raw_final_name = " ".join(name_parts)
+            # Nối các dòng lại thành một chuỗi duy nhất
+            full_name_raw = " ".join(name_parts)
             
-            # Xóa mã khách hàng PP... ở cuối nếu có
-            final_name = re.sub(r"\s+[A-Z]{2}\d{7,}.*", "", raw_final_name).strip(" :\"-")
+            # Xóa mã khách hàng (ví dụ PP010...) dính ở cuối nếu có
+            # Dùng Regex để xóa chuẩn xác mà không đụng chạm đến dấu gạch ngang ở giữa
+            final_name = re.sub(r"\s+[A-Z]{2,}\d{7,}.*", "", full_name_raw).strip()
             
-            data["ten_kh"] = final_name
+            # Chỉ xóa dấu gạch ngang nếu nó nằm ở TẬN CÙNG của toàn bộ cái tên
+            data["ten_kh"] = final_name.strip(" :\"-") 
+            
             print(f"✅ KẾT QUẢ CUỐI CÙNG: {data['ten_kh']}")    
 
             # --- 2. TRÍCH XUẤT KHU VỰC (TỈNH/THÀNH) - QUÉT TOÀN KHỐI ĐỊA CHỈ ---
