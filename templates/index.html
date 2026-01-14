@@ -120,7 +120,7 @@
                     <div style="background: #f0f9f4; padding: 15px; border-radius: 8px; border: 1px solid #16a085; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                         <strong style="color: #16a085;">📸 Nhập nhanh bằng AI (PDF/Ảnh)</strong>
                         <button type="button" onclick="document.getElementById('inp_scan_img').click()" class="btn-calc" style="width: auto; margin: 0; padding: 5px 15px; background: #16a085;">Tải file lên</button>
-                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="uploadVaQuetAnh(this)">
+                        <input type="file" id="inp_scan_img" accept="image/*, .pdf" style="display: none;" onchange="resetToanBoGiaoDien(); uploadVaQuetAnh(this);">
                     </div>
 
                     <label>Tên Khách Hàng:</label>
@@ -712,6 +712,32 @@
                 initAllCharts();
             }
         });
+
+        function resetToanBoGiaoDien() {
+            console.log("🧹 Đang dọn dẹp toàn bộ dữ liệu...");
+
+            // 1. XÓA INPUT (Đầu vào)
+            // Tìm tất cả các ô input và xóa giá trị
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+                if (input.type !== 'button' && input.type !== 'submit' && input.type !== 'file') {
+                    input.value = "";
+                }
+            });
+
+            // Reset các ô chọn (Dropdown) về mặc định
+            const selects = document.querySelectorAll('select');
+            selects.forEach(select => {
+                select.selectedIndex = 0;
+            });
+
+            // 2. XÓA OUTPUT (Đầu ra - Kết quả kWp và Biểu đồ)
+            // Chúng ta chỉ cần làm rỗng nội dung của div 'vung-ket-qua-solar'
+            const vungKetQua = document.getElementById('vung-ket-qua-solar');
+            if (vungKetQua) {
+                vungKetQua.innerHTML = ""; // Xóa sạch cả box kết quả và biểu đồ bên trong
+            }
+        }
     </script>
     {% if du_lieu_nhap.get('chart_data') %}
     <script>
